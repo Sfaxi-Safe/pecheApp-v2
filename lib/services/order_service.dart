@@ -3,22 +3,22 @@ import 'package:peche_app/models/order.dart';
 import 'package:uuid/uuid.dart';
 
 class OrderService with ChangeNotifier {
-  final List<Order> _orders = [];
+  final List<PecheOrder> _orders = [];
   
-  List<Order> get orders => [..._orders];
+  List<PecheOrder> get orders => [..._orders];
   
   // Obtenir les commandes d'un client
-  List<Order> getOrdersByClientId(String clientId) {
+  List<PecheOrder> getOrdersByClientId(String clientId) {
     return _orders.where((order) => order.clientId == clientId).toList();
   }
   
   // Obtenir les commandes pour un pêcheur
-  List<Order> getOrdersByFishermanId(String fishermanId) {
+  List<PecheOrder> getOrdersByFishermanId(String fishermanId) {
     return _orders.where((order) => order.fishermanId == fishermanId).toList();
   }
   
   // Créer une nouvelle commande
-  Future<Order> createOrder({
+  Future<PecheOrder> createOrder({
     required String clientId,
     required String fishId,
     required String fishermanId,
@@ -27,7 +27,7 @@ class OrderService with ChangeNotifier {
     String? deliveryAddress,
     String? notes,
   }) async {
-    final newOrder = Order(
+    final newOrder = PecheOrder(
       id: const Uuid().v4(),
       clientId: clientId,
       fishId: fishId,
@@ -49,7 +49,7 @@ class OrderService with ChangeNotifier {
   Future<void> updateOrderStatus(String orderId, OrderStatus newStatus) async {
     final index = _orders.indexWhere((order) => order.id == orderId);
     if (index >= 0) {
-      final updatedOrder = Order(
+      final updatedOrder = PecheOrder(
         id: _orders[index].id,
         clientId: _orders[index].clientId,
         fishId: _orders[index].fishId,

@@ -1,6 +1,6 @@
 enum OrderStatus { pending, confirmed, inProgress, delivered, cancelled }
 
-class Order {
+class PecheOrder {
   final String id;
   final String clientId;
   final String fishId;
@@ -13,7 +13,7 @@ class Order {
   final String? deliveryAddress;
   final String? notes;
 
-  Order({
+  PecheOrder({
     required this.id,
     required this.clientId,
     required this.fishId,
@@ -45,8 +45,8 @@ class Order {
   }
 
   // Créer un objet Order à partir d'un Map
-  factory Order.fromMap(Map<String, dynamic> map) {
-    return Order(
+  factory PecheOrder.fromMap(Map<String, dynamic> map) {
+    return PecheOrder(
       id: map['id'],
       clientId: map['clientId'],
       fishId: map['fishId'],

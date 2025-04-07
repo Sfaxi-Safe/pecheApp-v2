@@ -1,67 +1,89 @@
 class Fisherman {
   final String id;
-  final String name;
-  final String phoneNumber;
   final String email;
-  final bool isCertified;
-  final double rating;
-  final List<String> fishCaptureIds;
+  final String nom;
+  final String prenom;
+  final String? cin;
+  final String? matricule;
+  final String? capacite;
+  final String? longeur;
+  final String? largeur;
+  final String? bateau;
+  final String? pays;
+  final String? proprietaire;
+  final String? serie;
+  final String? certification;
+  final String? port;
+  final String? engin;
+  final String? telephone;
+  final bool? isValid;
 
   Fisherman({
     required this.id,
-    required this.name,
-    required this.phoneNumber,
     required this.email,
-    this.isCertified = false,
-    this.rating = 0.0,
-    this.fishCaptureIds = const [],
+    required this.nom,
+    required this.prenom,
+    this.cin,
+    this.matricule,
+    this.capacite,
+    this.longeur,
+    this.largeur,
+    this.bateau,
+    this.pays,
+    this.proprietaire,
+    this.serie,
+    this.certification,
+    this.port,
+    this.engin,
+    this.telephone,
+    this.isValid,
   });
 
   // Convertir un objet Fisherman en Map
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'name': name,
-      'phoneNumber': phoneNumber,
       'email': email,
-      'isCertified': isCertified,
-      'rating': rating,
-      'fishCaptureIds': fishCaptureIds,
+      'nom': nom,
+      'prenom': prenom,
+      'cin': cin,
+      'matricule': matricule,
+      'capacite': capacite,
+      'longeur': longeur,
+      'largeur': largeur,
+      'bateau': bateau,
+      'pays': pays,
+      'proprietaire': proprietaire,
+      'serie': serie,
+      'certification': certification,
+      'port': port,
+      'engin': engin,
+      'telephone': telephone,
+      'isValid': isValid,
     };
   }
 
   // Créer un objet Fisherman à partir d'un Map
   factory Fisherman.fromMap(Map<String, dynamic> map) {
     return Fisherman(
-      id: map['id'],
-      name: map['name'],
-      phoneNumber: map['phoneNumber'],
-      email: map['email'],
-      isCertified: map['isCertified'] ?? false,
-      rating: map['rating'] ?? 0.0,
-      fishCaptureIds: List<String>.from(map['fishCaptureIds'] ?? []),
-    );
-  }
-
-  // Créer une copie de l'objet avec des modifications
-  Fisherman copyWith({
-    String? id,
-    String? name,
-    String? phoneNumber,
-    String? email,
-    bool? isCertified,
-    double? rating,
-    List<String>? fishCaptureIds,
-  }) {
-    return Fisherman(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      phoneNumber: phoneNumber ?? this.phoneNumber,
-      email: email ?? this.email,
-      isCertified: isCertified ?? this.isCertified,
-      rating: rating ?? this.rating,
-      fishCaptureIds: fishCaptureIds ?? this.fishCaptureIds,
+      id: map['id']?.toString() ?? '',
+      email: map['email'] ?? '',
+      nom: map['nom'] ?? '',
+      prenom: map['prenom'] ?? '',
+      cin: map['cin'],
+      matricule: map['matricule'],
+      capacite: map['capacite'],
+      longeur: map['longeur'],
+      largeur: map['largeur'],
+      bateau: map['bateau'],
+      pays: map['pays'],
+      proprietaire: map['proprietaire'],
+      serie: map['serie'],
+      certification: map['certification'],
+      port: map['port'],
+      engin: map['engin'],
+      telephone: map['telephone']?.toString(),
+      isValid: map['is_valid'] == 1,
     );
   }
 }
-
