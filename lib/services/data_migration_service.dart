@@ -8,6 +8,7 @@ import 'package:peche_app/models/catch.dart';
 import 'package:peche_app/models/lot.dart';
 import 'package:peche_app/utils/sql_parser.dart';
 import 'package:uuid/uuid.dart';
+//fedeeeeeeeeeeeeeeeeeeeet
 
 class DataMigrationService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
