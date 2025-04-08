@@ -10,6 +10,7 @@ import 'package:peche_app/services/statistics_service.dart';
 import 'package:peche_app/utils/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:peche_app/screens/admin/admin_dashboard_screen.dart';
 
 void main() async {
   // Assurez-vous que Flutter est initialisé
@@ -39,7 +40,6 @@ void main() async {
     ),
   );
 }
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -148,6 +148,28 @@ class WelcomeScreen extends StatelessWidget {
                     ),
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.blue.shade900,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Nouveau bouton pour les administrateurs
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AdminDashboardScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.admin_panel_settings),
+                  label: const Text('Administration'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 15,
+                    ),
+                    backgroundColor: Colors.grey.shade800,
+                    foregroundColor: Colors.white,
                   ),
                 ),
               ],
