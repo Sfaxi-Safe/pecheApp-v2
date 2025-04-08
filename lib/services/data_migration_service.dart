@@ -177,7 +177,7 @@ class DataMigrationService {
     for (final orderData in sqlOrders) {
       final orderId = orderData['id']?.toString() ?? const Uuid().v4();
 
-      final order = Order(
+      final order = PecheOrder(
         id: orderId,
         clientId: orderData['user_id']?.toString() ?? '',
         fishId: '', // Nécessite de récupérer les produits vendus
