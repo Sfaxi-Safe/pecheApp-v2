@@ -12,6 +12,7 @@ import 'package:peche_app/services/order_service.dart';
 import 'package:peche_app/services/statistics_service.dart';
 import 'package:peche_app/utils/app_theme.dart';
 import 'package:provider/provider.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -101,12 +102,82 @@ class _LandingPageState extends State<LandingPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_showOnboarding == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    return SafeArea(
-      child: _showOnboarding! ? const OnboardingPage() : const LoginScreen(),
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.blue.shade300, Colors.blue.shade900],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.sailing, size: 100, color: Colors.white),
+                const SizedBox(height: 20),
+                const Text(
+                  'Bienvenue sur Pêche App',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 40),
+                const Text(
+                  'Choisissez votre profil',
+                  style: TextStyle(fontSize: 18, color: Colors.white),
+                ),
+                const SizedBox(height: 30),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(),
+                      ),
+                    );
+                  },
+                  icon: const FaIcon(FontAwesomeIcons.fish),
+                  label: const Text('Je suis pêcheur'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 15,
+                    ),
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.blue.shade900,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.shopping_cart),
+                  label: const Text('Je suis client'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 15,
+                    ),
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.blue.shade900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
