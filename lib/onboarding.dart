@@ -10,7 +10,7 @@ class OnboardingController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    controller = VideoPlayerController.asset('lib/assets/OnBV.mp4')
+    controller = VideoPlayerController.asset('lib/assets/database/b1f2d0a1-e807-4eaf-9be7-34e0c9d912f6.mp4')
       ..initialize().then((_) {
         controller.setLooping(true);
         controller.play();
@@ -46,19 +46,23 @@ class OnboardingPage extends StatelessWidget {
             children: [
               onboardingController.controller.value.isInitialized
                   ? SizedBox.expand(
-                      child: FittedBox(
-                        fit: BoxFit.cover,
-                        child: SizedBox(
-                          width: onboardingController.controller.value.size.width,
-                          height: onboardingController.controller.value.size.height,
-                          child: VideoPlayer(onboardingController.controller),
-                        ),
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: onboardingController.controller.value.size.width,
+                        height:
+                            onboardingController.controller.value.size.height,
+                        child: VideoPlayer(onboardingController.controller),
                       ),
-                    )
+                    ),
+                  )
                   : const Center(child: CircularProgressIndicator()),
 
+              // Correction appliquée ici
               Positioned.fill(
-                child: Container(color: Colors.black.withOpacity(0.5)),
+                child: Container(
+                  color: Colors.black.withAlpha((0.5 * 255).toInt()),
+                ),
               ),
 
               Positioned.fill(
@@ -92,7 +96,8 @@ class OnboardingPage extends StatelessWidget {
                           color: Colors.white,
                         ),
                         child: MaterialButton(
-                          onPressed: () => onboardingController.completeOnboarding(),
+                          onPressed:
+                              () => onboardingController.completeOnboarding(),
                           minWidth: double.infinity,
                           child: const Text(
                             "Commencer",

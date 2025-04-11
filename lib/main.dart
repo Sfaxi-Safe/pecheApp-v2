@@ -37,13 +37,15 @@ void main() async {
                   StatisticsService(fishService),
         ),
       ],
-      child: const MyApp(),
+      child: MyApp(hasSeenOnboarding: hasSeenOnboarding),
     ),
   );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool hasSeenOnboarding;
+
+  const MyApp({super.key, required this.hasSeenOnboarding});
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +55,7 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
       debugShowCheckedModeBanner: false,
-      home: const LandingPage(), // 👈 ici
+      home: hasSeenOnboarding ? const LoginScreen() : const OnboardingPage(),
       routes: {
         '/login': (context) => const LoginScreen(),
         '/fisherman/dashboard': (context) => const DashboardScreen(),
@@ -82,22 +84,10 @@ class _LandingPageState extends State<LandingPage> {
   Future<void> _initApp() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     bool hasSeenOnboarding = prefs.getBool('hasSeenOnboarding') ?? false;
-    bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
 
-    if (!hasSeenOnboarding) {
-      setState(() {
-        _showOnboarding = true;
-      });
-    } else {
-      if (isLoggedIn) {
-        // Tu peux ici ajouter une logique supplémentaire pour charger l’utilisateur
-        Get.offAll(() => const DashboardScreen());
-      } else {
-        setState(() {
-          _showOnboarding = false;
-        });
-      }
-    }
+    setState(() {
+      _showOnboarding = !hasSeenOnboarding;
+    });
   }
 
   @override
