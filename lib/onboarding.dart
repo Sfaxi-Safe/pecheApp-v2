@@ -73,7 +73,7 @@ class OnboardingPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'réservez votre table en tout simplicité',
+                        'Le goût authentique de la mer sans intermédiaires',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 50,
@@ -82,7 +82,7 @@ class OnboardingPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 20),
                       const Text(
-                        "Découvrez les meilleurs restaurants et réservez en quelques clics",
+                        "Découvrez le meilleur de la pêche, sélectionné avec soin pour vous en simples clics",
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
@@ -108,7 +108,7 @@ class OnboardingPage extends StatelessWidget {
                       const SizedBox(height: 30),
                       const Align(
                         child: Text(
-                          "Profitez d'une réservation rapide et garantie",
+                          "Pêche en toute confiance",
                           style: TextStyle(color: Colors.white70, fontSize: 15),
                         ),
                       ),
