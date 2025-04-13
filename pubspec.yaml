@@ -76,7 +76,7 @@ flutter:
   #   - images/a_dot_ham.jpeg
   assets:
     - assets/database/peche_database.sql
-    - assets/database/b1f2d0a1-e807-4eaf-9be7-34e0c9d912f6.mp4
+    - assets/vid/fish_on.mp4
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

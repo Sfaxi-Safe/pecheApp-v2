@@ -10,7 +10,7 @@ class OnboardingController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    controller = VideoPlayerController.asset('lib/assets/database/b1f2d0a1-e807-4eaf-9be7-34e0c9d912f6.mp4')
+    controller = VideoPlayerController.asset('assets/vid/fish_on.mp4')
       ..initialize().then((_) {
         controller.setLooping(true);
         controller.play();
