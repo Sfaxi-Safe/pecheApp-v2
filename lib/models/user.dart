@@ -1,3 +1,5 @@
+import 'package:uuid/uuid.dart';
+
 class User {
   final String id;
   final String email;
@@ -19,12 +21,33 @@ class User {
     required this.createdAt,
   });
 
-  // Convertir un objet User en Map
+  // Créer un nouvel utilisateur avec un ID généré
+  factory User.create({
+    required String email,
+    required String password,
+    required String name,
+    required String phoneNumber,
+    required String userType,
+    String? profileImageUrl,
+  }) {
+    return User(
+      id: const Uuid().v4(),
+      email: email,
+      password: password,
+      name: name,
+      phoneNumber: phoneNumber,
+      userType: userType,
+      profileImageUrl: profileImageUrl,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  // Convertir un User en Map pour SQLite
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'email': email,
-      'password': password, // Dans une vraie app, ne jamais stocker le mot de passe en clair
+      'password': password,
       'name': name,
       'phoneNumber': phoneNumber,
       'userType': userType,
@@ -33,7 +56,7 @@ class User {
     };
   }
 
-  // Créer un objet User à partir d'un Map
+  // Créer un User à partir d'un Map de SQLite
   factory User.fromMap(Map<String, dynamic> map) {
     return User(
       id: map['id'],
@@ -47,7 +70,7 @@ class User {
     );
   }
 
-  // Créer une copie de l'objet avec des modifications
+  // Créer une copie d'un User avec des modifications
   User copyWith({
     String? id,
     String? email,
@@ -70,4 +93,3 @@ class User {
     );
   }
 }
-

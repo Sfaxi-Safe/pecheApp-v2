@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:peche_app/models/fish.dart';
-import 'package:peche_app/services/fish_service.dart';
+import '../models/fish.dart';
+import 'fish_service.dart';
 
 class StatisticsService with ChangeNotifier {
   final FishService _fishService;
@@ -44,4 +44,3 @@ class StatisticsService with ChangeNotifier {
     return fishes.first;
   }
 }
-
