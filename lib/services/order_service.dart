@@ -2,9 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/order.dart';
 import 'database_helper.dart';
+import 'notification_service.dart';
 
 class OrderService with ChangeNotifier {
   final DatabaseHelper _dbHelper = DatabaseHelper();
+  final NotificationService _notificationService = NotificationService();
   List<PecheOrder> _orders = [];
   bool _isLoading = false;
 
@@ -15,6 +17,7 @@ class OrderService with ChangeNotifier {
   // Initialiser le service
   Future<void> init(String userId, String userType) async {
     await loadOrders(userId, userType);
+    await _notificationService.init();
   }
 
   // Charger les commandes depuis la base de données
@@ -63,6 +66,10 @@ class OrderService with ChangeNotifier {
       await _dbHelper.insertOrder(newOrder);
       _orders.add(newOrder);
       notifyListeners();
+      
+      // Envoyer une notification au pêcheur
+      _sendNewOrderNotification(fishermanId, newOrder.id);
+      
       return true;
     } catch (e) {
       print('Erreur lors de la création de la commande: $e');
@@ -97,6 +104,9 @@ class OrderService with ChangeNotifier {
         _orders[index] = updatedOrder;
         notifyListeners();
       }
+      
+      // Envoyer une notification au client
+      _sendOrderStatusUpdateNotification(order.clientId, orderId, newStatus);
 
       return true;
     } catch (e) {
@@ -127,5 +137,76 @@ class OrderService with ChangeNotifier {
   // Annuler une commande
   Future<bool> cancelOrder(String orderId) async {
     return await updateOrderStatus(orderId, OrderStatus.cancelled);
+  }
+  
+  // Envoyer une notification pour une nouvelle commande
+  Future<void> _sendNewOrderNotification(String fishermanId, String orderId) async {
+    try {
+      // Récupérer les informations du pêcheur
+      final fisherman = await _dbHelper.getFishermanById(fishermanId);
+      if (fisherman == null) return;
+      
+      // Récupérer les informations de la commande
+      final order = await _dbHelper.getOrderById(orderId);
+      if (order == null) return;
+      
+      // Récupérer les informations du poisson
+      final fish = await _dbHelper.getFishById(order.fishId);
+      if (fish == null) return;
+      
+      // Envoyer la notification
+      await _notificationService.showNotification(
+        title: 'Nouvelle commande !',
+        body: 'Vous avez reçu une commande pour ${order.quantity} kg de ${fish.species}.',
+        payload: 'order:$orderId',
+      );
+    } catch (e) {
+      print('Erreur lors de l\'envoi de la notification: $e');
+    }
+  }
+  
+  // Envoyer une notification pour une mise à jour de statut de commande
+  Future<void> _sendOrderStatusUpdateNotification(String clientId, String orderId, OrderStatus status) async {
+    try {
+      // Récupérer les informations du client
+      final client = await _dbHelper.getUserById(clientId);
+      if (client == null) return;
+      
+      // Récupérer les informations de la commande
+      final order = await _dbHelper.getOrderById(orderId);
+      if (order == null) return;
+      
+      // Récupérer les informations du poisson
+      final fish = await _dbHelper.getFishById(order.fishId);
+      if (fish == null) return;
+      
+      // Déterminer le message en fonction du statut
+      String statusMessage;
+      switch (status) {
+        case OrderStatus.confirmed:
+          statusMessage = 'Votre commande a été confirmée.';
+          break;
+        case OrderStatus.inProgress:
+          statusMessage = 'Votre commande est en cours de préparation.';
+          break;
+        case OrderStatus.delivered:
+          statusMessage = 'Votre commande a été livrée.';
+          break;
+        case OrderStatus.cancelled:
+          statusMessage = 'Votre commande a été annulée.';
+          break;
+        default:
+          statusMessage = 'Le statut de votre commande a été mis à jour.';
+      }
+      
+      // Envoyer la notification
+      await _notificationService.showNotification(
+        title: 'Mise à jour de commande',
+        body: '$statusMessage (${fish.species})',
+        payload: 'order:$orderId',
+      );
+    } catch (e) {
+      print('Erreur lors de l\'envoi de la notification: $e');
+    }
   }
 }

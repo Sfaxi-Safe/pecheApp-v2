@@ -10,7 +10,10 @@ import 'services/fish_service.dart';
 import 'services/order_service.dart';
 import 'services/statistics_service.dart';
 import 'services/database_helper.dart';
+import 'services/message_service.dart';
+import 'services/payment_service.dart';
 import 'utils/app_theme.dart';
+import 'utils/theme_provider.dart';
 
 void main() async {
   // Assurez-vous que les widgets Flutter sont initialisés
@@ -32,6 +35,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => FishService()),
         ChangeNotifierProvider(create: (_) => OrderService()),
+        ChangeNotifierProvider(create: (_) => MessageService()),
+        ChangeNotifierProvider(create: (_) => PaymentService()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProxyProvider<FishService, StatisticsService>(
           create: (context) => StatisticsService(
             Provider.of<FishService>(context, listen: false),
@@ -40,8 +46,8 @@ class MyApp extends StatelessWidget {
             StatisticsService(fishService),
         ),
       ],
-      child: Consumer<AuthService>(
-        builder: (context, authService, _) {
+      child: Consumer2<AuthService, ThemeProvider>(
+        builder: (context, authService, themeProvider, _) {
           // Ajouter des utilisateurs de test pour le développement
           WidgetsBinding.instance.addPostFrameCallback((_) {
             authService.addTestUsers();
@@ -51,7 +57,7 @@ class MyApp extends StatelessWidget {
             title: 'Pêche App',
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.light,
+            themeMode: themeProvider.themeMode,
             debugShowCheckedModeBanner: false,
             home: const AuthWrapper(),
             routes: {
@@ -94,10 +100,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
         // Initialiser les services nécessaires pour le pêcheur
         final fishService = Provider.of<FishService>(context, listen: false);
         final orderService = Provider.of<OrderService>(context, listen: false);
+        final messageService = Provider.of<MessageService>(context, listen: false);
+        final paymentService = Provider.of<PaymentService>(context, listen: false);
         
         // Initialiser les services avec l'ID de l'utilisateur
         WidgetsBinding.instance.addPostFrameCallback((_) {
           orderService.init(authService.currentUser!.id, 'fisherman');
+          messageService.init(authService.currentUser!.id);
+          paymentService.init(authService.currentUser!.id);
         });
         
         return const DashboardScreen();
@@ -105,10 +115,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
         // Initialiser les services nécessaires pour le client
         final fishService = Provider.of<FishService>(context, listen: false);
         final orderService = Provider.of<OrderService>(context, listen: false);
+        final messageService = Provider.of<MessageService>(context, listen: false);
+        final paymentService = Provider.of<PaymentService>(context, listen: false);
         
         // Initialiser les services avec l'ID de l'utilisateur
         WidgetsBinding.instance.addPostFrameCallback((_) {
           orderService.init(authService.currentUser!.id, 'client');
+          messageService.init(authService.currentUser!.id);
+          paymentService.init(authService.currentUser!.id);
         });
         
         return const HomeScreen();

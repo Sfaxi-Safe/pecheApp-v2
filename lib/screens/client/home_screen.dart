@@ -1,613 +1,351 @@
 import 'package:flutter/material.dart';
-import 'package:peche_app/screens/client/all_fish_screen.dart';
-import 'package:peche_app/screens/client/fish_detail_screen.dart';
-import 'package:peche_app/screens/client/map_screen.dart';
-import 'package:peche_app/screens/client/notifications_screen.dart';
-import 'package:peche_app/screens/client/search_screen.dart';
-import 'package:peche_app/services/auth_service.dart';
-import 'package:peche_app/services/fish_service.dart';
-import 'package:peche_app/utils/app_theme.dart';
 import 'package:provider/provider.dart';
+import '../../services/fish_service.dart';
+import '../../services/auth_service.dart';
+import '../../models/fish.dart';
+import '../../utils/responsive.dart';
+import '../../widgets/animated_list_item.dart';
+import '../../widgets/animated_button.dart';
+import '../../widgets/theme_switch.dart';
+import '../messaging/conversations_screen.dart';
+import '../../utils/page_transitions.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({Key? key}) : super(key: key);
+
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _isSearching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    
+    // Charger les poissons au démarrage
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<FishService>(context, listen: false).loadFishes();
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _startSearch() {
+    setState(() {
+      _isSearching = true;
+    });
+  }
+
+  void _stopSearch() {
+    setState(() {
+      _isSearching = false;
+      _searchQuery = '';
+      _searchController.clear();
+    });
+  }
+
+  void _updateSearchQuery(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final fishService = Provider.of<FishService>(context);
     final authService = Provider.of<AuthService>(context);
-    final fishes = fishService.getAllFishes();
+    final fishService = Provider.of<FishService>(context);
+    final user = authService.currentUser;
+    
+    // Filtrer les poissons en fonction de la recherche
+    List<Fish> filteredFishes = _searchQuery.isEmpty
+        ? fishService.fishes
+        : fishService.fishes.where((fish) {
+            return fish.species.toLowerCase().contains(_searchQuery.toLowerCase());
+          }).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accueil client'),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const NotificationsScreen(),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: 'Rechercher un poisson...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: Colors.white70),
                 ),
+                style: const TextStyle(color: Colors.white),
+                autofocus: true,
+                onChanged: _updateSearchQuery,
+              )
+            : const Text('Pêche App'),
+        actions: [
+          if (_isSearching)
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: _stopSearch,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: _startSearch,
+            ),
+          IconButton(
+            icon: const Icon(Icons.message),
+            onPressed: () {
+              Navigator.of(context).pushWithSlide(
+                const ConversationsScreen(),
+                direction: SlideDirection.left,
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              authService.logout();
-            },
+          const ThemeSwitch(),
+        ],
+        bottom: _isSearching
+            ? null
+            : TabBar(
+                controller: _tabController,
+                tabs: const [
+                  Tab(text: 'Tous'),
+                  Tab(text: 'Populaires'),
+                  Tab(text: 'Récents'),
+                ],
+              ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Onglet "Tous"
+          _buildFishGrid(context, filteredFishes),
+          
+          // Onglet "Populaires"
+          _buildFishGrid(
+            context,
+            filteredFishes
+                .where((fish) => fishService.getAverageRating(fish.id) >= 4.0)
+                .toList(),
+          ),
+          
+          // Onglet "Récents"
+          _buildFishGrid(
+            context,
+            filteredFishes
+                .where((fish) {
+                  final now = DateTime.now();
+                  final difference = now.difference(fish.captureDate);
+                  return difference.inDays <= 7; // Poissons capturés dans les 7 derniers jours
+                })
+                .toList(),
           ),
         ],
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.blue.shade50,
-              Colors.blue.shade100,
-            ],
-          ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            UserAccountsDrawerHeader(
+              accountName: Text(user?.name ?? 'Utilisateur'),
+              accountEmail: Text(user?.email ?? ''),
+              currentAccountPicture: CircleAvatar(
+                backgroundImage: user?.profileImageUrl != null
+                    ? NetworkImage(user!.profileImageUrl!)
+                    : null,
+                child: user?.profileImageUrl == null
+                    ? const Icon(Icons.person, size: 40)
+                    : null,
+              ),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.home),
+              title: const Text('Accueil'),
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.shopping_cart),
+              title: const Text('Mes commandes'),
+              onTap: () {
+                Navigator.pop(context);
+                // Naviguer vers l'écran des commandes
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.message),
+              title: const Text('Messages'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).pushWithSlide(
+                  const ConversationsScreen(),
+                  direction: SlideDirection.left,
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Paramètres'),
+              onTap: () {
+                Navigator.pop(context);
+                // Naviguer vers l'écran des paramètres
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.exit_to_app),
+              title: const Text('Déconnexion'),
+              onTap: () async {
+                await authService.logout();
+                Navigator.pop(context);
+              },
+            ),
+          ],
         ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
+      ),
+    );
+  }
+
+  Widget _buildFishGrid(BuildContext context, List<Fish> fishes) {
+    if (fishes.isEmpty) {
+      return const Center(
+        child: Text('Aucun poisson trouvé'),
+      );
+    }
+
+    return GridView.builder(
+      padding: context.responsivePadding(const EdgeInsets.all(16)),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.responsive(
+          mobile: 2,
+          tablet: 3,
+          desktop: 4,
+        ),
+        childAspectRatio: 0.75,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: fishes.length,
+      itemBuilder: (context, index) {
+        final fish = fishes[index];
+        return AnimatedListItem(
+          index: index,
+          animationType: AnimationType.fade,
+          child: _buildFishCard(context, fish),
+        );
+      },
+    );
+  }
+
+  Widget _buildFishCard(BuildContext context, Fish fish) {
+    final fishService = Provider.of<FishService>(context);
+    final averageRating = fishService.getAverageRating(fish.id);
+    
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image du poisson
+          ClipRRect(
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(12),
+              topRight: Radius.circular(12),
+            ),
+            child: AspectRatio(
+              aspectRatio: 1.2,
+              child: Image.network(
+                fish.imageUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          
+          // Informations du poisson
+          Padding(
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Barre de recherche
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SearchScreen(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.search,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Rechercher un poisson...',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Bannière principale
-                Container(
-                  width: double.infinity,
-                  height: 180,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    image: const DecorationImage(
-                      image: NetworkImage(
-                        'https://images.unsplash.com/photo-1498654200943-1088dd4438ae?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
-                      ),
-                      fit: BoxFit.cover,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.7),
-                        ],
-                      ),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Poisson frais et local',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Découvrez les poissons pêchés près de chez vous',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const MapScreen(),
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.accentColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                          ),
-                          child: const Text('Trouver un point de vente'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Actions rapides
-                const Text(
-                  'Actions rapides',
+                Text(
+                  fish.species,
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: context.responsiveFontSize(16),
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.textColor,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 16),
-                
+                const SizedBox(height: 4),
                 Row(
                   children: [
-                    Expanded(
-                      child: _buildActionCard(
-                        context,
-                        'Rechercher',
-                        Icons.search,
-                        Colors.blue.shade700,
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const SearchScreen(),
-                            ),
-                          );
-                        },
-                      ),
+                    Icon(
+                      Icons.star,
+                      color: Colors.amber,
+                      size: context.responsiveFontSize(16),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildActionCard(
-                        context,
-                        'Carte',
-                        Icons.map,
-                        Colors.green.shade700,
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const MapScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Poissons disponibles
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Poissons frais disponibles',
+                    const SizedBox(width: 4),
+                    Text(
+                      averageRating > 0
+                          ? averageRating.toStringAsFixed(1)
+                          : 'Pas d\'avis',
                       style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textColor,
+                        fontSize: context.responsiveFontSize(12),
+                        color: Colors.grey[600],
                       ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const AllFishScreen(),
-                          ),
-                        );
-                      },
-                      child: const Text('Voir tout'),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                
-                SizedBox(
-                  height: 220,
-                  child: fishes.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Aucun poisson disponible pour le moment',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: fishes.length > 3 ? 3 : fishes.length,
-                          itemBuilder: (context, index) {
-                            final fish = fishes[index];
-                            final formattedDate = '${fish.captureDate.day}/${fish.captureDate.month}/${fish.captureDate.year}';
-                            
-                            return _buildFishCard(
-                              fish.species,
-                              '${fish.weight} kg',
-                              formattedDate,
-                              fish.imageUrl,
-                              () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => FishDetailScreen(fishId: fish.id),
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Pêcheurs à proximité
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Pêcheurs à proximité',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textColor,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        // Voir tous les pêcheurs
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Fonctionnalité à venir'),
-                          ),
-                        );
-                      },
-                      child: const Text('Voir tout'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                
-                SizedBox(
-                  height: 120,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      _buildFishermanCard(
-                        'Pierre Dupont',
-                        4.8,
-                        true,
-                        'https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-                        () {
-                          // Profil du pêcheur
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Profil du pêcheur à venir'),
-                            ),
-                          );
-                        },
-                      ),
-                      _buildFishermanCard(
-                        'Marie Laurent',
-                        4.5,
-                        true,
-                        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-                        () {
-                          // Profil du pêcheur
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Profil du pêcheur à venir'),
-                            ),
-                          );
-                        },
-                      ),
-                      _buildFishermanCard(
-                        'Jean Martin',
-                        4.2,
-                        false,
-                        'https://images.unsplash.com/photo-1566492031773-4f4e44671857?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-                        () {
-                          // Profil du pêcheur
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Profil du pêcheur à venir'),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
+                Text(
+                  '${fish.weight} kg - ${fish.length} cm',
+                  style: TextStyle(
+                    fontSize: context.responsiveFontSize(12),
+                    color: Colors.grey[600],
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionCard(
-    BuildContext context,
-    String title,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.3),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+          
+          // Bouton Voir détails
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: AnimatedButton(
+              onPressed: () {
+                // Naviguer vers l'écran de détails du poisson
+              },
+              color: Theme.of(context).primaryColor,
+              child: const Text('Voir détails'),
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 40,
-              color: Colors.white,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFishCard(
-    String name,
-    String weight,
-    String date,
-    String imageUrl,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 160,
-        margin: const EdgeInsets.only(right: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(12),
-              ),
-              child: Image.network(
-                imageUrl,
-                height: 120,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    weight,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Pêché le: $date',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFishermanCard(
-    String name,
-    double rating,
-    bool isCertified,
-    String imageUrl,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 200,
-        margin: const EdgeInsets.only(right: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.horizontal(
-                left: Radius.circular(12),
-              ),
-              child: Image.network(
-                imageUrl,
-                height: 120,
-                width: 80,
-                fit: BoxFit.cover,
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textColor,
-                          ),
-                        ),
-                        if (isCertified) ...[
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.verified,
-                            color: Colors.blue,
-                            size: 16,
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.star,
-                          color: Colors.amber,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          rating.toString(),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Voir le profil',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
-
