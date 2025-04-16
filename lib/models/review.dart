@@ -64,9 +64,35 @@ class Review {
       userId: map['userId'],
       userName: map['userName'],
       userImageUrl: map['userImageUrl'],
-      rating: map['rating'] is int ? (map['rating'] as int).toDouble() : map['rating'],
+      rating:
+          map['rating'] is int
+              ? (map['rating'] as int).toDouble()
+              : map['rating'],
       comment: map['comment'],
       createdAt: DateTime.parse(map['createdAt']),
+    );
+  }
+
+  // Créer une copie d'un Review avec des modifications
+  Review copyWith({
+    String? id,
+    String? fishId,
+    String? userId,
+    String? userName,
+    String? userImageUrl,
+    double? rating,
+    String? comment,
+    DateTime? createdAt,
+  }) {
+    return Review(
+      id: id ?? this.id,
+      fishId: fishId ?? this.fishId,
+      userId: userId ?? this.userId,
+      userName: userName ?? this.userName,
+      userImageUrl: userImageUrl ?? this.userImageUrl,
+      rating: rating ?? this.rating,
+      comment: comment ?? this.comment,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }
