@@ -1,31 +1,31 @@
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
-import '../models/message.dart';
-import '../models/user.dart';
+import '../models/marketplace_message.dart';
+import '../models/marketplace_user.dart';
+
 import 'database_helper.dart';
 
 class MessageService with ChangeNotifier {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  List<Message> _messages = [];
+  List<MarketplaceMessage> _messages = [];
   List<Map<String, dynamic>> _conversations = [];
-  String? _currentUserId;
+  int? _currentUserId;
   bool _isLoading = false;
 
   // Getters
-  List<Message> get messages => _messages;
+  List<MarketplaceMessage> get messages => _messages;
   List<Map<String, dynamic>> get conversations => _conversations;
   bool get isLoading => _isLoading;
 
   // Initialiser le service
   Future<void> init(String userId) async {
-    _currentUserId = userId;
+    _currentUserId = int.tryParse(userId);
     await loadConversations();
   }
 
   // Charger les conversations de l'utilisateur
   Future<void> loadConversations() async {
     if (_currentUserId == null) return;
-    
+
     _isLoading = true;
     notifyListeners();
 
@@ -40,26 +40,37 @@ class MessageService with ChangeNotifier {
   }
 
   // Charger les messages entre deux utilisateurs
-  Future<void> loadMessages(String otherUserId) async {
+  Future<void> loadMessages(String otherUserIdStr) async {
     if (_currentUserId == null) return;
-    
+
+    final otherUserId = int.tryParse(otherUserIdStr);
+    if (otherUserId == null) return;
+
     _isLoading = true;
     notifyListeners();
 
     try {
-      _messages = await _dbHelper.getMessagesBetweenUsers(_currentUserId!, otherUserId);
-      
+      _messages = await _dbHelper.getMessagesBetweenUsers(
+        _currentUserId!,
+        otherUserId,
+      );
+
       // Marquer les messages comme lus
       for (var message in _messages) {
         if (message.receiverId == _currentUserId && !message.isRead) {
-          await _dbHelper.markMessageAsRead(message.id);
+          if (message.id != null) {
+            await _dbHelper.markMessageAsRead(message.id!);
+          }
         }
       }
-      
+
       // Mettre à jour la conversation
-      final conversationId = await _dbHelper.getOrCreateConversation(_currentUserId!, otherUserId);
+      final conversationId = await _dbHelper.getOrCreateSalon(
+        _currentUserId!,
+        otherUserId,
+      );
       await _dbHelper.markConversationAsRead(conversationId);
-      
+
       // Recharger les conversations pour mettre à jour l'UI
       await loadConversations();
     } catch (e) {
@@ -77,34 +88,40 @@ class MessageService with ChangeNotifier {
     String? imageUrl,
   }) async {
     if (_currentUserId == null) return false;
-    
+
+    final receiverIdInt = int.tryParse(receiverId);
+    if (receiverIdInt == null) return false;
+
     try {
       // Créer un nouveau message
-      final message = Message.create(
-        senderId: _currentUserId!,
-        receiverId: receiverId,
+      final message = MarketplaceMessage.create(
+        senderId: _currentUserId,
+        receiverId: receiverIdInt,
         content: content,
         imageUrl: imageUrl,
       );
-      
+
       // Insérer le message dans la base de données
       await _dbHelper.insertMessage(message);
-      
+
       // Mettre à jour ou créer la conversation
-      final conversationId = await _dbHelper.getOrCreateConversation(_currentUserId!, receiverId);
+      final conversationId = await _dbHelper.getOrCreateSalon(
+        _currentUserId!,
+        receiverIdInt,
+      );
       await _dbHelper.updateConversationLastMessage(
         conversationId,
         content,
         message.timestamp,
         true,
       );
-      
+
       // Ajouter le message à la liste locale
       _messages.add(message);
-      
+
       // Recharger les conversations pour mettre à jour l'UI
       await loadConversations();
-      
+
       notifyListeners();
       return true;
     } catch (e) {
@@ -114,7 +131,10 @@ class MessageService with ChangeNotifier {
   }
 
   // Supprimer un message
-  Future<bool> deleteMessage(String messageId) async {
+  Future<bool> deleteMessage(String messageIdStr) async {
+    final messageId = int.tryParse(messageIdStr);
+    if (messageId == null) return false;
+
     try {
       await _dbHelper.deleteMessage(messageId);
       _messages.removeWhere((message) => message.id == messageId);
@@ -127,7 +147,10 @@ class MessageService with ChangeNotifier {
   }
 
   // Supprimer une conversation
-  Future<bool> deleteConversation(String conversationId) async {
+  Future<bool> deleteConversation(String conversationIdStr) async {
+    final conversationId = int.tryParse(conversationIdStr);
+    if (conversationId == null) return false;
+
     try {
       await _dbHelper.deleteConversation(conversationId);
       await loadConversations();
@@ -141,11 +164,11 @@ class MessageService with ChangeNotifier {
   // Obtenir le nombre de messages non lus
   Future<int> getUnreadMessagesCount() async {
     if (_currentUserId == null) return 0;
-    
+
     try {
       int count = 0;
       for (var conversation in _conversations) {
-        if (conversation['hasUnreadMessages'] == 1 && 
+        if (conversation['hasUnreadMessages'] == 1 &&
             conversation['otherUserId'] != _currentUserId) {
           count++;
         }

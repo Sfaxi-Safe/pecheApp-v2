@@ -5,7 +5,7 @@ import '../../services/message_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_helper.dart';
 import 'chat_screen.dart';
-import '../../models/user.dart';
+import '../../models/marketplace_user.dart';
 
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({Key? key}) : super(key: key);
@@ -20,10 +20,13 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authService = Provider.of<AuthService>(context, listen: false);
-      final messageService = Provider.of<MessageService>(context, listen: false);
-      
+      final messageService = Provider.of<MessageService>(
+        context,
+        listen: false,
+      );
+
       if (authService.currentUser != null) {
-        messageService.init(authService.currentUser!.id);
+        messageService.init(authService.currentUser!.id.toString());
       }
     });
   }
@@ -31,15 +34,11 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Conversations'),
-      ),
+      appBar: AppBar(title: const Text('Conversations')),
       body: Consumer<MessageService>(
         builder: (context, messageService, child) {
           if (messageService.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
           if (messageService.conversations.isEmpty) {
@@ -55,18 +54,13 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                   const SizedBox(height: 16),
                   const Text(
                     'Aucune conversation',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   const Text(
                     'Commencez à discuter avec un pêcheur ou un client',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.grey,
-                    ),
+                    style: TextStyle(color: Colors.grey),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
@@ -95,28 +89,34 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               final otherUserName = conversation['otherUserName'];
               final otherUserImageUrl = conversation['otherUserImageUrl'];
               final otherUserType = conversation['otherUserType'];
-              final lastMessageContent = conversation['lastMessageContent'] ?? 'Nouvelle conversation';
-              final lastMessageTime = DateTime.parse(conversation['lastMessageTime']);
+              final lastMessageContent =
+                  conversation['lastMessageContent'] ?? 'Nouvelle conversation';
+              final lastMessageTime = DateTime.parse(
+                conversation['lastMessageTime'],
+              );
               final hasUnreadMessages = conversation['hasUnreadMessages'] == 1;
-              
+
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundImage: otherUserImageUrl != null
-                      ? NetworkImage(otherUserImageUrl)
-                      : null,
-                  child: otherUserImageUrl == null
-                      ? Icon(
-                          otherUserType == 'fisherman'
-                              ? Icons.sailing
-                              : Icons.person,
-                          color: Colors.white,
-                        )
-                      : null,
+                  backgroundImage:
+                      otherUserImageUrl != null
+                          ? NetworkImage(otherUserImageUrl)
+                          : null,
+                  child:
+                      otherUserImageUrl == null
+                          ? Icon(
+                            otherUserType == 'fisherman'
+                                ? Icons.sailing
+                                : Icons.person,
+                            color: Colors.white,
+                          )
+                          : null,
                 ),
                 title: Text(
                   otherUserName,
                   style: TextStyle(
-                    fontWeight: hasUnreadMessages ? FontWeight.bold : FontWeight.normal,
+                    fontWeight:
+                        hasUnreadMessages ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
                 subtitle: Text(
@@ -124,7 +124,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontWeight: hasUnreadMessages ? FontWeight.bold : FontWeight.normal,
+                    fontWeight:
+                        hasUnreadMessages ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
                 trailing: Column(
@@ -146,10 +147,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           color: Colors.blue,
                           shape: BoxShape.circle,
                         ),
-                        child: const Text(
-                          '',
-                          style: TextStyle(fontSize: 8),
-                        ),
+                        child: const Text('', style: TextStyle(fontSize: 8)),
                       ),
                   ],
                 ),
@@ -157,10 +155,11 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ChatScreen(
-                        otherUserId: otherUserId,
-                        otherUserName: otherUserName,
-                      ),
+                      builder:
+                          (context) => ChatScreen(
+                            otherUserId: otherUserId,
+                            otherUserName: otherUserName,
+                          ),
                     ),
                   );
                 },
@@ -204,24 +203,33 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   void _showDeleteDialog(BuildContext context, String conversationId) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Supprimer la conversation'),
-        content: const Text('Êtes-vous sûr de vouloir supprimer cette conversation ? Cette action est irréversible.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Supprimer la conversation'),
+            content: const Text(
+              'Êtes-vous sûr de vouloir supprimer cette conversation ? Cette action est irréversible.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Annuler'),
+              ),
+              TextButton(
+                onPressed: () {
+                  final messageService = Provider.of<MessageService>(
+                    context,
+                    listen: false,
+                  );
+                  messageService.deleteConversation(conversationId);
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  'Supprimer',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              final messageService = Provider.of<MessageService>(context, listen: false);
-              messageService.deleteConversation(conversationId);
-              Navigator.pop(context);
-            },
-            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -234,8 +242,8 @@ class NewConversationScreen extends StatefulWidget {
 }
 
 class _NewConversationScreenState extends State<NewConversationScreen> {
-  List<User> _users = [];
-  List<User> _filteredUsers = [];
+  List<MarketplaceUser> _users = [];
+  List<MarketplaceUser> _filteredUsers = [];
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
 
@@ -254,7 +262,7 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
       final dbHelper = DatabaseHelper();
       final authService = Provider.of<AuthService>(context, listen: false);
       final currentUserId = authService.currentUser!.id;
-      
+
       // Charger tous les utilisateurs sauf l'utilisateur actuel
       final allUsers = await dbHelper.getAllUsers();
       _users = allUsers.where((user) => user.id != currentUserId).toList();
@@ -273,11 +281,14 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
       if (query.isEmpty) {
         _filteredUsers = List.from(_users);
       } else {
-        _filteredUsers = _users
-            .where((user) =>
-                user.name.toLowerCase().contains(query.toLowerCase()) ||
-                user.email.toLowerCase().contains(query.toLowerCase()))
-            .toList();
+        _filteredUsers =
+            _users.where((user) {
+              final fullName = "${user.prenom} ${user.nom}".toLowerCase();
+              return fullName.contains(query.toLowerCase()) ||
+                  (user.email?.toLowerCase() ?? "").contains(
+                    query.toLowerCase(),
+                  );
+            }).toList();
       }
     });
   }
@@ -285,9 +296,7 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Nouvelle conversation'),
-      ),
+      appBar: AppBar(title: const Text('Nouvelle conversation')),
       body: Column(
         children: [
           Padding(
@@ -303,50 +312,49 @@ class _NewConversationScreenState extends State<NewConversationScreen> {
             ),
           ),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredUsers.isEmpty
-                    ? const Center(
-                        child: Text('Aucun utilisateur trouvé'),
-                      )
+            child:
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _filteredUsers.isEmpty
+                    ? const Center(child: Text('Aucun utilisateur trouvé'))
                     : ListView.builder(
-                        itemCount: _filteredUsers.length,
-                        itemBuilder: (context, index) {
-                          final user = _filteredUsers[index];
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundImage: user.profileImageUrl != null
-                                  ? NetworkImage(user.profileImageUrl!)
-                                  : null,
-                              child: user.profileImageUrl == null
-                                  ? Icon(
-                                      user.userType == 'fisherman'
+                      itemCount: _filteredUsers.length,
+                      itemBuilder: (context, index) {
+                        final user = _filteredUsers[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage:
+                                user.photo != null
+                                    ? NetworkImage(user.photo!)
+                                    : null,
+                            child:
+                                user.photo == null
+                                    ? Icon(
+                                      user.isPecheur
                                           ? Icons.sailing
                                           : Icons.person,
                                       color: Colors.white,
                                     )
-                                  : null,
-                            ),
-                            title: Text(user.name),
-                            subtitle: Text(
-                              user.userType == 'fisherman'
-                                  ? 'Pêcheur'
-                                  : 'Client',
-                            ),
-                            onTap: () {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ChatScreen(
-                                    otherUserId: user.id,
-                                    otherUserName: user.name,
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
+                                    : null,
+                          ),
+                          title: Text("${user.prenom} ${user.nom}"),
+                          subtitle: Text(user.isPecheur ? 'Pêcheur' : 'Client'),
+                          onTap: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) => ChatScreen(
+                                      otherUserId: user.id.toString(),
+                                      otherUserName:
+                                          "${user.prenom} ${user.nom}",
+                                    ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
           ),
         ],
       ),

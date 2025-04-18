@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:peche_app/models/fish.dart';
+import 'package:peche_app/models/marketplace_produit.dart';
 import 'package:peche_app/screens/client/fish_detail_screen.dart';
 import 'package:peche_app/services/fish_service.dart';
 import 'package:peche_app/utils/app_theme.dart';
@@ -54,19 +54,21 @@ class AllFishScreen extends StatelessWidget {
 
   Widget _buildFishCard(
     BuildContext context,
-    Fish fish,
+    MarketplaceProduit fish,
     FishService fishService,
   ) {
-    final averageRating = fishService.getAverageRating(fish.id);
+    final averageRating = fishService.getAverageRating(fish.id.toString());
     final formattedDate =
-        "${fish.captureDate.day}/${fish.captureDate.month}/${fish.captureDate.year}";
+        fish.dateDePeche != null
+            ? fish.dateDePeche!.substring(0, 10)
+            : 'Date inconnue';
 
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => FishDetailScreen(fishId: fish.id),
+            builder: (context) => FishDetailScreen(fishId: fish.id.toString()),
           ),
         );
       },
@@ -81,8 +83,8 @@ class AllFishScreen extends StatelessWidget {
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(12),
               ),
-              child: Image.network(
-                fish.imageUrl,
+              child: Image.asset(
+                'assets/images/fish_placeholder.jpg',
                 height: 120,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -94,7 +96,7 @@ class AllFishScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    fish.species,
+                    fish.nom,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -105,7 +107,7 @@ class AllFishScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${fish.weight} kg',
+                    '${fish.prix} €/kg',
                     style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
                   ),
                   const SizedBox(height: 4),

@@ -1,29 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../../models/order.dart';
-import '../../models/payment.dart';
+import '../../models/marketplace_aommande.dart';
+import '../../models/marketplace_produit.dart';
+import '../../models/marketplace_produitvendus.dart';
 import '../../services/payment_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/order_service.dart';
 import '../../services/database_helper.dart';
-import '../../models/fish.dart';
 
 class PaymentScreen extends StatefulWidget {
-  final PecheOrder order;
+  final MarketplaceAommande order;
 
-  const PaymentScreen({Key? key, required this.order}) : super(key: key);
+  const PaymentScreen({super.key, required this.order});
 
   @override
-  _PaymentScreenState createState() => _PaymentScreenState();
+  State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
   PaymentMethod _selectedMethod = PaymentMethod.creditCard;
   bool _isProcessing = false;
   String? _errorMessage;
-  Fish? _fish;
-  
+  MarketplaceProduit? _produit;
+  List<MarketplaceProduitVendus> _produitsVendus = [];
+
   // Contrôleurs pour les champs de carte de crédit
   final TextEditingController _cardNumberController = TextEditingController();
   final TextEditingController _cardHolderController = TextEditingController();
@@ -33,23 +34,43 @@ class _PaymentScreenState extends State<PaymentScreen> {
   @override
   void initState() {
     super.initState();
-    _loadFishDetails();
+    _loadProductDetails();
   }
 
-  Future<void> _loadFishDetails() async {
+  Future<void> _loadProductDetails() async {
     try {
       final dbHelper = DatabaseHelper();
-      final fish = await dbHelper.getFishById(widget.order.fishId);
-      setState(() {
-        _fish = fish;
-      });
+
+      // Récupérer les produits vendus associés à la commande
+      if (widget.order.id != null) {
+        final produitsVendus = await dbHelper.getProduitVendusByCommandeId(
+          widget.order.id!,
+        );
+
+        // Si nous avons des produits vendus, récupérer le premier produit pour l'afficher
+        if (produitsVendus.isNotEmpty && produitsVendus[0].produitId != null) {
+          final produit = await dbHelper.getProduitById(
+            produitsVendus[0].produitId!,
+          );
+
+          setState(() {
+            _produit = produit;
+            _produitsVendus = produitsVendus;
+          });
+        }
+      }
     } catch (e) {
-      print('Erreur lors du chargement des détails du poisson: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Erreur lors du chargement des détails du produit';
+        });
+      }
     }
   }
 
   Future<void> _processPayment() async {
-    if (_selectedMethod == PaymentMethod.creditCard && !_validateCardDetails()) {
+    if (_selectedMethod == PaymentMethod.creditCard &&
+        !_validateCardDetails()) {
       return;
     }
 
@@ -59,12 +80,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
     });
 
     try {
-      final paymentService = Provider.of<PaymentService>(context, listen: false);
+      final paymentService = Provider.of<PaymentService>(
+        context,
+        listen: false,
+      );
       final authService = Provider.of<AuthService>(context, listen: false);
       final orderService = Provider.of<OrderService>(context, listen: false);
-      
+
       bool success = false;
-      
+
       if (_selectedMethod == PaymentMethod.creditCard) {
         // Créer un objet CreditCard avec les informations saisies
         final creditCard = CreditCard(
@@ -73,48 +97,54 @@ class _PaymentScreenState extends State<PaymentScreen> {
           expiryDate: _expiryDateController.text,
           cvv: _cvvController.text,
         );
-        
+
         success = await paymentService.processCardPayment(
           orderId: widget.order.id,
-          userId: authService.currentUser!.id,
-          amount: widget.order.totalPrice,
+          userId: authService.currentUser!.id.toString(),
+          amount: widget.order.totale,
           creditCard: creditCard,
         );
       } else if (_selectedMethod == PaymentMethod.cash) {
         success = await paymentService.processCashPayment(
           orderId: widget.order.id,
-          userId: authService.currentUser!.id,
-          amount: widget.order.totalPrice,
+          userId: authService.currentUser!.id.toString(),
+          amount: widget.order.totale,
         );
       }
-      
+
       if (success) {
         // Mettre à jour le statut de la commande
-        await orderService.updateOrderStatus(widget.order.id, OrderStatus.confirmed);
-        
-        // Afficher un message de succès et retourner à l'écran précédent
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Paiement effectué avec succès !'),
-            backgroundColor: Colors.green,
-          ),
+        await orderService.updateOrderStatus(
+          widget.order.id.toString(),
+          'confirmed',
         );
-        
-        Navigator.pop(context, true);
+
+        // Afficher un message de succès et retourner à l'écran précédent
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Paiement effectué avec succès !'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          Navigator.pop(context, true);
+        }
       } else {
         setState(() {
           _errorMessage = 'Le paiement a échoué. Veuillez réessayer.';
         });
       }
     } catch (e) {
-      print('Erreur lors du traitement du paiement: $e');
       setState(() {
         _errorMessage = 'Une erreur est survenue. Veuillez réessayer.';
       });
     } finally {
-      setState(() {
-        _isProcessing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
     }
   }
 
@@ -125,39 +155,39 @@ class _PaymentScreenState extends State<PaymentScreen> {
       });
       return false;
     }
-    
+
     if (_cardHolderController.text.isEmpty) {
       setState(() {
         _errorMessage = 'Nom du titulaire requis';
       });
       return false;
     }
-    
-    if (_expiryDateController.text.isEmpty || !_expiryDateController.text.contains('/')) {
+
+    if (_expiryDateController.text.isEmpty ||
+        !_expiryDateController.text.contains('/')) {
       setState(() {
         _errorMessage = 'Date d\'expiration invalide (MM/AA)';
       });
       return false;
     }
-    
+
     if (_cvvController.text.length < 3) {
       setState(() {
         _errorMessage = 'CVV invalide';
       });
       return false;
     }
-    
+
     return true;
   }
 
   @override
   Widget build(BuildContext context) {
     final formatter = NumberFormat.currency(locale: 'fr_FR', symbol: '€');
-    
+    final totalPrice = widget.order.totale;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Paiement'),
-      ),
+      appBar: AppBar(title: const Text('Paiement')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -179,22 +209,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       ),
                     ),
                     const Divider(),
-                    if (_fish != null) ...[
+                    if (_produit != null) ...[
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            _fish!.imageUrl,
+                          child: Image.asset(
+                            'assets/images/fish_placeholder.jpg',
                             width: 60,
                             height: 60,
                             fit: BoxFit.cover,
                           ),
                         ),
-                        title: Text(_fish!.species),
-                        subtitle: Text('${widget.order.quantity} kg'),
+                        title: Text(_produit!.nom),
+                        subtitle: Text(
+                          'Quantité: ${_produitsVendus.isNotEmpty ? _produitsVendus[0].quantite : 1}',
+                        ),
                         trailing: Text(
-                          formatter.format(widget.order.totalPrice),
+                          formatter.format(totalPrice),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -220,7 +252,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           ),
                         ),
                         Text(
-                          formatter.format(widget.order.totalPrice),
+                          formatter.format(totalPrice),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
@@ -233,7 +265,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 ),
               ),
             ),
-            
+
             // Méthodes de paiement
             Card(
               margin: const EdgeInsets.only(bottom: 16),
@@ -250,7 +282,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Options de paiement
                     RadioListTile<PaymentMethod>(
                       title: const Row(
@@ -268,7 +300,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         });
                       },
                     ),
-                    
+
                     RadioListTile<PaymentMethod>(
                       title: const Row(
                         children: [
@@ -289,7 +321,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 ),
               ),
             ),
-            
+
             // Formulaire de carte de crédit
             if (_selectedMethod == PaymentMethod.creditCard)
               Card(
@@ -307,7 +339,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Numéro de carte
                       TextField(
                         controller: _cardNumberController,
@@ -320,16 +352,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         maxLength: 19,
                         onChanged: (value) {
                           // Formater le numéro de carte avec des espaces tous les 4 chiffres
-                          if (value.length > 0 && value.length % 5 == 0 && !value.endsWith(' ')) {
-                            _cardNumberController.text = value.substring(0, value.length - 1) + ' ' + value.substring(value.length - 1);
-                            _cardNumberController.selection = TextSelection.fromPosition(
-                              TextPosition(offset: _cardNumberController.text.length),
+                          if (value.isNotEmpty &&
+                              value.length % 5 == 0 &&
+                              !value.endsWith(' ')) {
+                            _cardNumberController.text =
+                                '${value.substring(0, value.length - 1)} ${value.substring(value.length - 1)}';
+                            _cardNumberController
+                                .selection = TextSelection.fromPosition(
+                              TextPosition(
+                                offset: _cardNumberController.text.length,
+                              ),
                             );
                           }
                         },
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Nom du titulaire
                       TextField(
                         controller: _cardHolderController,
@@ -341,7 +379,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         textCapitalization: TextCapitalization.words,
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Date d'expiration et CVV
                       Row(
                         children: [
@@ -358,9 +396,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
                               onChanged: (value) {
                                 // Formater la date d'expiration (MM/AA)
                                 if (value.length == 2 && !value.contains('/')) {
-                                  _expiryDateController.text = value + '/';
-                                  _expiryDateController.selection = TextSelection.fromPosition(
-                                    TextPosition(offset: _expiryDateController.text.length),
+                                  _expiryDateController.text = '$value/';
+                                  _expiryDateController
+                                      .selection = TextSelection.fromPosition(
+                                    TextPosition(
+                                      offset: _expiryDateController.text.length,
+                                    ),
                                   );
                                 }
                               },
@@ -386,7 +427,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   ),
                 ),
               ),
-            
+
             // Message d'erreur
             if (_errorMessage != null)
               Padding(
@@ -400,20 +441,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   textAlign: TextAlign.center,
                 ),
               ),
-            
+
             // Bouton de paiement
             ElevatedButton(
               onPressed: _isProcessing ? null : _processPayment,
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: _isProcessing
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : Text(
-                      _selectedMethod == PaymentMethod.creditCard
-                          ? 'Payer ${formatter.format(widget.order.totalPrice)}'
-                          : 'Confirmer le paiement à la livraison',
-                    ),
+              child:
+                  _isProcessing
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Text(
+                        _selectedMethod == PaymentMethod.creditCard
+                            ? 'Payer ${formatter.format(totalPrice)}'
+                            : 'Confirmer le paiement à la livraison',
+                      ),
             ),
           ],
         ),

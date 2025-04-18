@@ -1,23 +1,23 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
-import '../models/user.dart';
-import '../models/fisherman.dart';
+import '../models/marketplace_user.dart';
+import '../models/marketplace_pecheur.dart';
+
 import 'database_helper.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
 class AuthService with ChangeNotifier {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  User? _currentUser;
+  MarketplaceUser? _currentUser;
   bool _isLoading = false;
 
   // Getters
-  User? get currentUser => _currentUser;
+  MarketplaceUser? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _currentUser != null;
-  bool get isFisherman => _currentUser?.userType == 'fisherman';
-  bool get isClient => _currentUser?.userType == 'client';
+  bool get isFisherman => _currentUser?.isPecheur ?? false;
+  bool get isClient => _currentUser?.isClient ?? false;
 
   // Constructeur
   AuthService() {
@@ -31,12 +31,15 @@ class AuthService with ChangeNotifier {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getString('userId');
+      final userIdStr = prefs.getString('userId');
 
-      if (userId != null) {
-        final user = await _dbHelper.getUserById(userId);
-        if (user != null) {
-          _currentUser = user;
+      if (userIdStr != null) {
+        final userId = int.tryParse(userIdStr);
+        if (userId != null) {
+          final user = await _dbHelper.getUserById(userId);
+          if (user != null) {
+            _currentUser = user;
+          }
         }
       }
     } catch (e) {
@@ -48,10 +51,10 @@ class AuthService with ChangeNotifier {
   }
 
   // Sauvegarder l'ID de l'utilisateur dans les préférences partagées
-  Future<void> _saveUserToPrefs(String userId) async {
+  Future<void> _saveUserToPrefs(int userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('userId', userId);
+      await prefs.setString('userId', userId.toString());
     } catch (e) {
       print('Erreur lors de la sauvegarde de l\'utilisateur: $e');
     }
@@ -97,34 +100,43 @@ class AuthService with ChangeNotifier {
       // Hacher le mot de passe
       final hashedPassword = _hashPassword(password);
 
+      // Extraire le prénom et le nom
+      final nameParts = name.split(' ');
+      final prenom = nameParts.isNotEmpty ? nameParts[0] : '';
+      final nom = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+      // Définir les rôles en fonction du type d'utilisateur
+      List<String> roles = [];
+      if (userType == 'fisherman') {
+        roles.add('ROLE_PECHEUR');
+      } else {
+        roles.add('ROLE_CLIENT');
+      }
+
       // Créer un nouvel utilisateur
-      final userId = const Uuid().v4();
-      final newUser = User(
-        id: userId,
+      final newUser = MarketplaceUser.create(
         email: email,
         password: hashedPassword,
-        name: name,
-        phoneNumber: phoneNumber,
-        userType: userType,
-        createdAt: DateTime.now(),
+        nom: nom,
+        prenom: prenom,
+        telephone: int.tryParse(phoneNumber),
+        roles: roles,
+        isVerified: true,
+        isBlocked: false,
       );
 
       // Insérer l'utilisateur dans la base de données
-      await _dbHelper.insertUser(newUser);
+      final userId = await _dbHelper.insertUser(newUser);
 
       // Si c'est un pêcheur, créer également une entrée dans la table fishermen
       if (userType == 'fisherman') {
-        // Extraire le prénom et le nom
-        final nameParts = name.split(' ');
-        final prenom = nameParts.isNotEmpty ? nameParts[0] : '';
-        final nom = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
-
-        final newFisherman = Fisherman(
-          id: userId,
+        final newFisherman = MarketplacePecheur.create(
           email: email,
+          password: hashedPassword,
           nom: nom,
           prenom: prenom,
-          telephone: phoneNumber,
+          telephone: int.tryParse(phoneNumber),
+          roles: roles,
           isValid: false, // Par défaut, le pêcheur n'est pas validé
         );
 
@@ -132,8 +144,11 @@ class AuthService with ChangeNotifier {
       }
 
       // Mettre à jour l'état d'authentification
-      _currentUser = newUser;
-      await _saveUserToPrefs(userId);
+      final createdUser = await _dbHelper.getUserById(userId);
+      if (createdUser != null) {
+        _currentUser = createdUser;
+        await _saveUserToPrefs(userId);
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -170,7 +185,9 @@ class AuthService with ChangeNotifier {
 
       // Mettre à jour l'état d'authentification
       _currentUser = user;
-      await _saveUserToPrefs(user.id);
+      if (user.id != null) {
+        await _saveUserToPrefs(user.id!);
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -211,10 +228,16 @@ class AuthService with ChangeNotifier {
     notifyListeners();
 
     try {
+      // Extraire le prénom et le nom
+      final nameParts = name.split(' ');
+      final prenom = nameParts.isNotEmpty ? nameParts[0] : '';
+      final nom = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
       final updatedUser = _currentUser!.copyWith(
-        name: name,
-        phoneNumber: phoneNumber,
-        profileImageUrl: profileImageUrl,
+        nom: nom,
+        prenom: prenom,
+        telephone: int.tryParse(phoneNumber),
+        photo: profileImageUrl,
       );
 
       await _dbHelper.updateUser(updatedUser);
@@ -249,9 +272,7 @@ class AuthService with ChangeNotifier {
 
       // Mettre à jour le mot de passe
       final hashedNewPassword = _hashPassword(newPassword);
-      final updatedUser = _currentUser!.copyWith(
-        password: hashedNewPassword,
-      );
+      final updatedUser = _currentUser!.copyWith(password: hashedNewPassword);
 
       await _dbHelper.updateUser(updatedUser);
       _currentUser = updatedUser;
@@ -271,32 +292,38 @@ class AuthService with ChangeNotifier {
   Future<void> addTestUsers() async {
     try {
       // Vérifier si les utilisateurs de test existent déjà
-      final existingPecheur = await _dbHelper.getUserByEmail('pecheur@example.com');
-      final existingClient = await _dbHelper.getUserByEmail('client@example.com');
+      final existingPecheur = await _dbHelper.getUserByEmail(
+        'pecheur@example.com',
+      );
+      final existingClient = await _dbHelper.getUserByEmail(
+        'client@example.com',
+      );
 
       if (existingPecheur == null) {
         // Créer un pêcheur de test
-        final pecheurId = const Uuid().v4();
-        final pecheur = User(
-          id: pecheurId,
+        final pecheur = MarketplaceUser.create(
           email: 'pecheur@example.com',
           password: _hashPassword('password123'),
-          name: 'Pierre Dupont',
-          phoneNumber: '0612345678',
-          userType: 'fisherman',
-          profileImageUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-          createdAt: DateTime.now().subtract(const Duration(days: 30)),
-        );
-
-        await _dbHelper.insertUser(pecheur);
-
-        // Créer l'entrée correspondante dans la table fishermen
-        final fisherman = Fisherman(
-          id: pecheurId,
-          email: 'pecheur@example.com',
           nom: 'Dupont',
           prenom: 'Pierre',
-          telephone: '0612345678',
+          telephone: 612345678,
+          roles: ['ROLE_PECHEUR'],
+          isVerified: true,
+          isBlocked: false,
+          photo:
+              'https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
+        );
+
+        final userId = await _dbHelper.insertUser(pecheur);
+
+        // Créer l'entrée correspondante dans la table fishermen
+        final fisherman = MarketplacePecheur.create(
+          email: 'pecheur@example.com',
+          password: _hashPassword('password123'),
+          nom: 'Dupont',
+          prenom: 'Pierre',
+          telephone: 612345678,
+          roles: ['ROLE_PECHEUR'],
           isValid: true,
         );
 
@@ -305,15 +332,17 @@ class AuthService with ChangeNotifier {
 
       if (existingClient == null) {
         // Créer un client de test
-        final client = User(
-          id: const Uuid().v4(),
+        final client = MarketplaceUser.create(
           email: 'client@example.com',
           password: _hashPassword('password123'),
-          name: 'Jean Martin',
-          phoneNumber: '0687654321',
-          userType: 'client',
-          profileImageUrl: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-          createdAt: DateTime.now().subtract(const Duration(days: 15)),
+          nom: 'Martin',
+          prenom: 'Jean',
+          telephone: 687654321,
+          roles: ['ROLE_CLIENT'],
+          isVerified: true,
+          isBlocked: false,
+          photo:
+              'https://images.unsplash.com/photo-1566492031773-4f4e44671857?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
         );
 
         await _dbHelper.insertUser(client);

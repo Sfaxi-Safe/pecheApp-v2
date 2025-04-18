@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../services/message_service.dart';
 import '../../services/auth_service.dart';
-import '../../models/message.dart';
+import '../../models/marketplace_message.dart';
 
 class ChatScreen extends StatefulWidget {
   final String otherUserId;
@@ -41,9 +41,12 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      final messageService = Provider.of<MessageService>(context, listen: false);
+      final messageService = Provider.of<MessageService>(
+        context,
+        listen: false,
+      );
       await messageService.loadMessages(widget.otherUserId);
-      
+
       // Faire défiler vers le bas après le chargement des messages
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
@@ -72,26 +75,29 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      final messageService = Provider.of<MessageService>(context, listen: false);
-      
+      final messageService = Provider.of<MessageService>(
+        context,
+        listen: false,
+      );
+
       // TODO: Implémenter le téléchargement d'image et obtenir l'URL
       String? imageUrl;
       if (_selectedImage != null) {
         // Pour l'instant, nous utilisons un placeholder
         imageUrl = 'https://via.placeholder.com/300';
       }
-      
+
       await messageService.sendMessage(
         receiverId: widget.otherUserId,
         content: content,
         imageUrl: imageUrl,
       );
-      
+
       _messageController.clear();
       setState(() {
         _selectedImage = null;
       });
-      
+
       // Faire défiler vers le bas après l'envoi du message
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
@@ -123,7 +129,7 @@ class _ChatScreenState extends State<ChatScreen> {
         source: ImageSource.gallery,
         imageQuality: 70,
       );
-      
+
       if (pickedFile != null) {
         setState(() {
           _selectedImage = File(pickedFile.path);
@@ -155,44 +161,48 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           // Messages
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : Consumer<MessageService>(
-                    builder: (context, messageService, child) {
-                      final messages = messageService.messages;
-                      
-                      if (messages.isEmpty) {
-                        return const Center(
-                          child: Text('Aucun message. Commencez à discuter !'),
-                        );
-                      }
-                      
-                      return ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: messages.length,
-                        itemBuilder: (context, index) {
-                          final message = messages[index];
-                          final isMe = message.senderId == currentUserId;
-                          final showDate = index == 0 ||
-                              !_isSameDay(
-                                messages[index].timestamp,
-                                messages[index - 1].timestamp,
-                              );
-                          
-                          return Column(
-                            children: [
-                              if (showDate)
-                                _buildDateSeparator(message.timestamp),
-                              _buildMessageBubble(message, isMe),
-                            ],
+            child:
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : Consumer<MessageService>(
+                      builder: (context, messageService, child) {
+                        final messages = messageService.messages;
+
+                        if (messages.isEmpty) {
+                          return const Center(
+                            child: Text(
+                              'Aucun message. Commencez à discuter !',
+                            ),
                           );
-                        },
-                      );
-                    },
-                  ),
+                        }
+
+                        return ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(16),
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final message = messages[index];
+                            final isMe = message.senderId == currentUserId;
+                            final showDate =
+                                index == 0 ||
+                                !_isSameDay(
+                                  messages[index].timestamp,
+                                  messages[index - 1].timestamp,
+                                );
+
+                            return Column(
+                              children: [
+                                if (showDate)
+                                  _buildDateSeparator(message.timestamp),
+                                _buildMessageBubble(message, isMe),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    ),
           ),
-          
+
           // Image sélectionnée
           if (_selectedImage != null)
             Container(
@@ -229,7 +239,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
-          
+
           // Zone de saisie
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -237,7 +247,7 @@ class _ChatScreenState extends State<ChatScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
+                  color: Colors.grey.withAlpha(50),
                   spreadRadius: 1,
                   blurRadius: 3,
                   offset: const Offset(0, -1),
@@ -263,13 +273,14 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: _isSending
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.send),
+                  icon:
+                      _isSending
+                          ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Icon(Icons.send),
                   onPressed: _isSending ? null : _sendMessage,
                   color: Theme.of(context).primaryColor,
                 ),
@@ -291,10 +302,7 @@ class _ChatScreenState extends State<ChatScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text(
               _formatDate(date),
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
             ),
           ),
           const Expanded(child: Divider()),
@@ -303,7 +311,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(Message message, bool isMe) {
+  Widget _buildMessageBubble(MarketplaceMessage message, bool isMe) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -335,27 +343,22 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    message.content,
-                    style: const TextStyle(fontSize: 16),
-                  ),
+                  Text(message.content, style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 4),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         DateFormat.Hm().format(message.timestamp),
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
                       ),
                       if (isMe) ...[
                         const SizedBox(width: 4),
                         Icon(
                           message.isRead ? Icons.done_all : Icons.done,
                           size: 12,
-                          color: message.isRead ? Colors.blue : Colors.grey[600],
+                          color:
+                              message.isRead ? Colors.blue : Colors.grey[600],
                         ),
                       ],
                     ],

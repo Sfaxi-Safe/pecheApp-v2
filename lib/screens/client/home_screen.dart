@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/fish_service.dart';
 import '../../services/auth_service.dart';
-import '../../models/fish.dart';
+import '../../models/marketplace_produit.dart';
 import '../../utils/responsive.dart';
 import '../../widgets/animated_list_item.dart';
 import '../../widgets/animated_button.dart';
@@ -10,14 +10,17 @@ import '../../widgets/theme_switch.dart';
 import '../messaging/conversations_screen.dart';
 import '../../utils/page_transitions.dart';
 
+import '../client/fish_detail_screen.dart';
+
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -27,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    
+
     // Charger les poissons au démarrage
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<FishService>(context, listen: false).loadFishes();
@@ -66,40 +69,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final authService = Provider.of<AuthService>(context);
     final fishService = Provider.of<FishService>(context);
     final user = authService.currentUser;
-    
+
     // Filtrer les poissons en fonction de la recherche
-    List<Fish> filteredFishes = _searchQuery.isEmpty
-        ? fishService.fishes
-        : fishService.fishes.where((fish) {
-            return fish.species.toLowerCase().contains(_searchQuery.toLowerCase());
-          }).toList();
+    List<MarketplaceProduit> filteredFishes =
+        _searchQuery.isEmpty
+            ? fishService.fishes
+            : fishService.fishes.where((fish) {
+              return fish.nom.toLowerCase().contains(
+                _searchQuery.toLowerCase(),
+              );
+            }).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                decoration: const InputDecoration(
-                  hintText: 'Rechercher un poisson...',
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(color: Colors.white70),
-                ),
-                style: const TextStyle(color: Colors.white),
-                autofocus: true,
-                onChanged: _updateSearchQuery,
-              )
-            : const Text('Pêche App'),
+        title:
+            _isSearching
+                ? TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    hintText: 'Rechercher un poisson...',
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(color: Colors.white70),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                  autofocus: true,
+                  onChanged: _updateSearchQuery,
+                )
+                : const Text('Pêche App'),
         actions: [
           if (_isSearching)
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: _stopSearch,
-            )
+            IconButton(icon: const Icon(Icons.close), onPressed: _stopSearch)
           else
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: _startSearch,
-            ),
+            IconButton(icon: const Icon(Icons.search), onPressed: _startSearch),
           IconButton(
             icon: const Icon(Icons.message),
             onPressed: () {
@@ -111,41 +112,46 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           const ThemeSwitch(),
         ],
-        bottom: _isSearching
-            ? null
-            : TabBar(
-                controller: _tabController,
-                tabs: const [
-                  Tab(text: 'Tous'),
-                  Tab(text: 'Populaires'),
-                  Tab(text: 'Récents'),
-                ],
-              ),
+        bottom:
+            _isSearching
+                ? null
+                : TabBar(
+                  controller: _tabController,
+                  tabs: const [
+                    Tab(text: 'Tous'),
+                    Tab(text: 'Populaires'),
+                    Tab(text: 'Récents'),
+                  ],
+                ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
           // Onglet "Tous"
           _buildFishGrid(context, filteredFishes),
-          
+
           // Onglet "Populaires"
           _buildFishGrid(
             context,
             filteredFishes
-                .where((fish) => fishService.getAverageRating(fish.id) >= 4.0)
+                .where(
+                  (fish) =>
+                      fishService.getAverageRating(fish.id.toString()) >= 4.0,
+                )
                 .toList(),
           ),
-          
+
           // Onglet "Récents"
           _buildFishGrid(
             context,
-            filteredFishes
-                .where((fish) {
-                  final now = DateTime.now();
-                  final difference = now.difference(fish.captureDate);
-                  return difference.inDays <= 7; // Poissons capturés dans les 7 derniers jours
-                })
-                .toList(),
+            filteredFishes.where((fish) {
+              final now = DateTime.now();
+              final dateDePeche =
+                  DateTime.tryParse(fish.dateDePeche ?? '') ?? now;
+              final difference = now.difference(dateDePeche);
+              return difference.inDays <=
+                  7; // Poissons capturés dans les 7 derniers jours
+            }).toList(),
           ),
         ],
       ),
@@ -154,19 +160,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           padding: EdgeInsets.zero,
           children: [
             UserAccountsDrawerHeader(
-              accountName: Text(user?.name ?? 'Utilisateur'),
+              accountName: Text(
+                user != null ? "${user.prenom} ${user.nom}" : 'Utilisateur',
+              ),
               accountEmail: Text(user?.email ?? ''),
               currentAccountPicture: CircleAvatar(
-                backgroundImage: user?.profileImageUrl != null
-                    ? NetworkImage(user!.profileImageUrl!)
-                    : null,
-                child: user?.profileImageUrl == null
-                    ? const Icon(Icons.person, size: 40)
-                    : null,
+                child: const Icon(Icons.person, size: 40),
               ),
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-              ),
+              decoration: BoxDecoration(color: Theme.of(context).primaryColor),
             ),
             ListTile(
               leading: const Icon(Icons.home),
@@ -180,7 +181,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               title: const Text('Mes commandes'),
               onTap: () {
                 Navigator.pop(context);
-                // Naviguer vers l'écran des commandes
+                Navigator.pushNamed(context, '/orders');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.bar_chart),
+              title: const Text('Statistiques'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/statistics');
               },
             ),
             ListTile(
@@ -207,8 +216,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               leading: const Icon(Icons.exit_to_app),
               title: const Text('Déconnexion'),
               onTap: () async {
-                await authService.logout();
                 Navigator.pop(context);
+                await authService.logout();
               },
             ),
           ],
@@ -217,50 +226,45 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildFishGrid(BuildContext context, List<Fish> fishes) {
-    if (fishes.isEmpty) {
-      return const Center(
-        child: Text('Aucun poisson trouvé'),
-      );
+  Widget _buildFishGrid(
+    BuildContext context,
+    List<MarketplaceProduit> produits,
+  ) {
+    if (produits.isEmpty) {
+      return const Center(child: Text('Aucun produit trouvé'));
     }
 
     return GridView.builder(
       padding: context.responsivePadding(const EdgeInsets.all(16)),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: context.responsive(
-          mobile: 2,
-          tablet: 3,
-          desktop: 4,
-        ),
+        crossAxisCount: context.responsive(mobile: 2, tablet: 3, desktop: 4),
         childAspectRatio: 0.75,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
-      itemCount: fishes.length,
+      itemCount: produits.length,
       itemBuilder: (context, index) {
-        final fish = fishes[index];
+        final produit = produits[index];
         return AnimatedListItem(
           index: index,
           animationType: AnimationType.fade,
-          child: _buildFishCard(context, fish),
+          child: _buildFishCard(context, produit),
         );
       },
     );
   }
 
-  Widget _buildFishCard(BuildContext context, Fish fish) {
+  Widget _buildFishCard(BuildContext context, MarketplaceProduit produit) {
     final fishService = Provider.of<FishService>(context);
-    final averageRating = fishService.getAverageRating(fish.id);
-    
+    final averageRating = fishService.getAverageRating(produit.id.toString());
+
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image du poisson
+          // Image du produit
           ClipRRect(
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(12),
@@ -269,31 +273,32 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             child: AspectRatio(
               aspectRatio: 1.2,
               child: Image.network(
-                fish.imageUrl,
+                'https://via.placeholder.com/150', // Remplacer par l'URL de l'image du produit
                 fit: BoxFit.cover,
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;
                   return Center(
                     child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                          : null,
+                      value:
+                          loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
                     ),
                   );
                 },
               ),
             ),
           ),
-          
-          // Informations du poisson
+
+          // Informations du produit
           Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  fish.species,
+                  produit.nom,
                   style: TextStyle(
                     fontSize: context.responsiveFontSize(16),
                     fontWeight: FontWeight.bold,
@@ -323,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${fish.weight} kg - ${fish.length} cm',
+                  '${produit.prix} € - ${produit.stock} en stock',
                   style: TextStyle(
                     fontSize: context.responsiveFontSize(12),
                     color: Colors.grey[600],
@@ -332,13 +337,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ],
             ),
           ),
-          
+
           // Bouton Voir détails
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: AnimatedButton(
               onPressed: () {
-                // Naviguer vers l'écran de détails du poisson
+                // Naviguer vers l'écran de détails du produit
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) =>
+                            FishDetailScreen(fishId: produit.id.toString()),
+                  ),
+                );
               },
               color: Theme.of(context).primaryColor,
               child: const Text('Voir détails'),

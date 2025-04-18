@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:peche_app/models/fish.dart';
-import 'package:peche_app/models/review.dart';
+import 'package:peche_app/models/marketplace_avis.dart';
 import 'package:peche_app/services/auth_service.dart';
 import 'package:peche_app/services/fish_service.dart';
 import 'package:peche_app/utils/app_theme.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 
 class ReviewScreen extends StatefulWidget {
   final String fishId;
@@ -52,14 +50,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
         return;
       }
 
-      final review = Review(
-        id: const Uuid().v4(),
-        fishId: widget.fishId,
-        userId: user.id,
-        userName: user.name,
-        userImageUrl: user.profileImageUrl,
-        rating: _rating,
-        comment: _commentController.text.trim(),
+      final review = MarketplaceAvis(
+        produitId: int.tryParse(widget.fishId),
+        userId: int.tryParse(user.id.toString()),
+        etoileNb: _rating.toInt(),
+        commentaire: _commentController.text.trim(),
         createdAt: DateTime.now(),
       );
 
@@ -93,9 +88,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
           backgroundColor: AppTheme.primaryColor,
           foregroundColor: Colors.white,
         ),
-        body: const Center(
-          child: Text('Poisson non trouvé'),
-        ),
+        body: const Center(child: Text('Poisson non trouvé')),
       );
     }
 
@@ -124,8 +117,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          fish.imageUrl,
+                        child: Image.asset(
+                          'assets/images/fish_placeholder.jpg',
                           width: 80,
                           height: 80,
                           fit: BoxFit.cover,
@@ -137,7 +130,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              fish.species,
+                              fish.nom,
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -146,14 +139,14 @@ class _ReviewScreenState extends State<ReviewScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Poids: ${fish.weight} kg',
+                              'Prix: ${fish.prix} €/kg',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey.shade700,
                               ),
                             ),
                             Text(
-                              'Taille: ${fish.length} cm',
+                              'Stock: ${fish.stock} kg',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey.shade700,
@@ -167,7 +160,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Note
               const Text(
                 'Votre note',
@@ -188,8 +181,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         index < _rating.floor()
                             ? Icons.star
                             : index < _rating
-                                ? Icons.star_half
-                                : Icons.star_border,
+                            ? Icons.star_half
+                            : Icons.star_border,
                         color: Colors.amber,
                         size: 36,
                       ),
@@ -214,7 +207,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Commentaire
               const Text(
                 'Votre commentaire',
@@ -243,7 +236,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 },
               ),
               const SizedBox(height: 24),
-              
+
               // Bouton de soumission
               SizedBox(
                 width: double.infinity,
@@ -254,19 +247,20 @@ class _ReviewScreenState extends State<ReviewScreen> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
+                  child:
+                      _isSubmitting
+                          ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                          : const Text(
+                            'Soumettre l\'avis',
+                            style: TextStyle(fontSize: 16),
                           ),
-                        )
-                      : const Text(
-                          'Soumettre l\'avis',
-                          style: TextStyle(fontSize: 16),
-                        ),
                 ),
               ),
             ],
@@ -276,4 +270,3 @@ class _ReviewScreenState extends State<ReviewScreen> {
     );
   }
 }
-

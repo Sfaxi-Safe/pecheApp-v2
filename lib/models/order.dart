@@ -1,124 +1,168 @@
 import 'package:uuid/uuid.dart';
+import 'marketplace_aommande.dart';
+import 'marketplace_produitvendus.dart';
 
+/// Énumération des statuts possibles pour une commande
 enum OrderStatus {
-  pending,
-  confirmed,
-  inProgress,
-  delivered,
-  cancelled,
+  pending,    // En Attente
+  confirmed,  // Confirmée
+  inProgress, // En Cours
+  delivered,  // Livrée
+  cancelled,  // Annulée
 }
 
-class PecheOrder {
-  final String id;
-  final String clientId;
-  final String fishId;
-  final String fishermanId;
-  final double quantity;
-  final double totalPrice;
+/// Classe représentant une commande dans l'application
+/// Cette classe fait le pont entre le modèle SQLite et le modèle MySQL
+class Order {
+  final int? id;
+  final int? userId;
+  final String methodeDePaiement;
+  final String? commentaire;
+  final double totale;
   final OrderStatus status;
-  final DateTime orderDate;
-  final DateTime? deliveryDate;
-  final String? deliveryAddress;
-  final String? notes;
+  final DateTime createdAt;
+  final DateTime dateModification;
+  final String reference;
+  final int? fournisseurId;
+  final List<MarketplaceProduitVendus> produits;
 
-  PecheOrder({
-    required this.id,
-    required this.clientId,
-    required this.fishId,
-    required this.fishermanId,
-    required this.quantity,
-    required this.totalPrice,
+  Order({
+    this.id,
+    this.userId,
+    required this.methodeDePaiement,
+    this.commentaire,
+    required this.totale,
     required this.status,
-    required this.orderDate,
-    this.deliveryDate,
-    this.deliveryAddress,
-    this.notes,
+    required this.createdAt,
+    required this.dateModification,
+    required this.reference,
+    this.fournisseurId,
+    this.produits = const [],
   });
 
-  // Créer une nouvelle commande avec un ID généré
-  factory PecheOrder.create({
-    required String clientId,
-    required String fishId,
-    required String fishermanId,
-    required double quantity,
-    required double totalPrice,
-    String? deliveryAddress,
-    String? notes,
+  /// Convertit un statut de commande en chaîne de caractères
+  static String statusToString(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.pending:
+        return 'En Attente';
+      case OrderStatus.confirmed:
+        return 'Confirmée';
+      case OrderStatus.inProgress:
+        return 'En Cours';
+      case OrderStatus.delivered:
+        return 'Livrée';
+      case OrderStatus.cancelled:
+        return 'Annulée';
+      default:
+        return 'En Attente';
+    }
+  }
+
+  /// Convertit une chaîne de caractères en statut de commande
+  static OrderStatus stringToStatus(String statusStr) {
+    switch (statusStr) {
+      case 'En Attente':
+        return OrderStatus.pending;
+      case 'Confirmée':
+        return OrderStatus.confirmed;
+      case 'En Cours':
+        return OrderStatus.inProgress;
+      case 'Livrée':
+        return OrderStatus.delivered;
+      case 'Annulée':
+        return OrderStatus.cancelled;
+      default:
+        return OrderStatus.pending;
+    }
+  }
+
+  /// Crée une nouvelle commande avec une référence générée
+  factory Order.create({
+    int? userId,
+    required String methodeDePaiement,
+    String? commentaire,
+    required double totale,
+    OrderStatus status = OrderStatus.pending,
+    int? fournisseurId,
+    List<MarketplaceProduitVendus> produits = const [],
   }) {
-    return PecheOrder(
-      id: const Uuid().v4(),
-      clientId: clientId,
-      fishId: fishId,
-      fishermanId: fishermanId,
-      quantity: quantity,
-      totalPrice: totalPrice,
-      status: OrderStatus.pending,
-      orderDate: DateTime.now(),
-      deliveryAddress: deliveryAddress,
-      notes: notes,
+    final now = DateTime.now();
+    return Order(
+      userId: userId,
+      methodeDePaiement: methodeDePaiement,
+      commentaire: commentaire,
+      totale: totale,
+      status: status,
+      createdAt: now,
+      dateModification: now,
+      reference: 'GIPP${const Uuid().v4().substring(0, 16).toUpperCase()}',
+      fournisseurId: fournisseurId,
+      produits: produits,
     );
   }
 
-  // Convertir un PecheOrder en Map pour SQLite
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'clientId': clientId,
-      'fishId': fishId,
-      'fishermanId': fishermanId,
-      'quantity': quantity,
-      'totalPrice': totalPrice,
-      'status': status.index,
-      'orderDate': orderDate.toIso8601String(),
-      'deliveryDate': deliveryDate?.toIso8601String(),
-      'deliveryAddress': deliveryAddress,
-      'notes': notes,
-    };
-  }
-
-  // Créer un PecheOrder à partir d'un Map de SQLite
-  factory PecheOrder.fromMap(Map<String, dynamic> map) {
-    return PecheOrder(
-      id: map['id'],
-      clientId: map['clientId'],
-      fishId: map['fishId'],
-      fishermanId: map['fishermanId'],
-      quantity: map['quantity'] is int ? (map['quantity'] as int).toDouble() : map['quantity'],
-      totalPrice: map['totalPrice'] is int ? (map['totalPrice'] as int).toDouble() : map['totalPrice'],
-      status: OrderStatus.values[map['status']],
-      orderDate: DateTime.parse(map['orderDate']),
-      deliveryDate: map['deliveryDate'] != null ? DateTime.parse(map['deliveryDate']) : null,
-      deliveryAddress: map['deliveryAddress'],
-      notes: map['notes'],
+  /// Convertit une commande en MarketplaceAommande pour la base de données
+  MarketplaceAommande toMarketplaceAommande() {
+    return MarketplaceAommande(
+      id: id,
+      userId: userId,
+      methodeDePaiement: methodeDePaiement,
+      commentaire: commentaire,
+      totale: totale,
+      statutCommande: statusToString(status),
+      createdAt: createdAt,
+      dateModification: dateModification,
+      reference: reference,
+      fournisseurId: fournisseurId,
     );
   }
 
-  // Créer une copie d'un PecheOrder avec des modifications
-  PecheOrder copyWith({
-    String? id,
-    String? clientId,
-    String? fishId,
-    String? fishermanId,
-    double? quantity,
-    double? totalPrice,
+  /// Crée une commande à partir d'un MarketplaceAommande et de ses produits
+  factory Order.fromMarketplaceAommande(
+    MarketplaceAommande aommande, 
+    List<MarketplaceProduitVendus> produits,
+  ) {
+    return Order(
+      id: aommande.id,
+      userId: aommande.userId,
+      methodeDePaiement: aommande.methodeDePaiement,
+      commentaire: aommande.commentaire,
+      totale: aommande.totale,
+      status: stringToStatus(aommande.statutCommande),
+      createdAt: aommande.createdAt,
+      dateModification: aommande.dateModification,
+      reference: aommande.reference,
+      fournisseurId: aommande.fournisseurId,
+      produits: produits,
+    );
+  }
+
+  /// Crée une copie de la commande avec des modifications
+  Order copyWith({
+    int? id,
+    int? userId,
+    String? methodeDePaiement,
+    String? commentaire,
+    double? totale,
     OrderStatus? status,
-    DateTime? orderDate,
-    DateTime? deliveryDate,
-    String? deliveryAddress,
-    String? notes,
+    DateTime? createdAt,
+    DateTime? dateModification,
+    String? reference,
+    int? fournisseurId,
+    List<MarketplaceProduitVendus>? produits,
   }) {
-    return PecheOrder(
+    return Order(
       id: id ?? this.id,
-      clientId: clientId ?? this.clientId,
-      fishId: fishId ?? this.fishId,
-      fishermanId: fishermanId ?? this.fishermanId,
-      quantity: quantity ?? this.quantity,
-      totalPrice: totalPrice ?? this.totalPrice,
+      userId: userId ?? this.userId,
+      methodeDePaiement: methodeDePaiement ?? this.methodeDePaiement,
+      commentaire: commentaire ?? this.commentaire,
+      totale: totale ?? this.totale,
       status: status ?? this.status,
-      orderDate: orderDate ?? this.orderDate,
-      deliveryDate: deliveryDate ?? this.deliveryDate,
-      deliveryAddress: deliveryAddress ?? this.deliveryAddress,
-      notes: notes ?? this.notes,
+      createdAt: createdAt ?? this.createdAt,
+      dateModification: dateModification ?? this.dateModification,
+      reference: reference ?? this.reference,
+      fournisseurId: fournisseurId ?? this.fournisseurId,
+      produits: produits ?? this.produits,
     );
   }
 }

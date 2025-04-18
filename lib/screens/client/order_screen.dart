@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:peche_app/models/fish.dart';
-import 'package:peche_app/models/order.dart';
+import 'package:peche_app/models/marketplace_produitvendus.dart';
 import 'package:peche_app/services/auth_service.dart';
 import 'package:peche_app/services/fish_service.dart';
 import 'package:peche_app/services/order_service.dart';
@@ -22,7 +21,7 @@ class _OrderScreenState extends State<OrderScreen> {
   final _addressController = TextEditingController();
   final _notesController = TextEditingController();
   bool _isSubmitting = false;
-  double _pricePerKg = 15.90; // Prix fixe pour l'exemple
+  final double _pricePerKg = 15.90; // Prix fixe pour l'exemple
 
   @override
   void dispose() {
@@ -67,14 +66,22 @@ class _OrderScreenState extends State<OrderScreen> {
       final quantity = double.tryParse(_quantityController.text) ?? 0.0;
 
       try {
-        await orderService.createOrder(
-          clientId: user.id,
-          fishId: fish.id,
-          fishermanId: fish.fishermanId,
-          quantity: quantity,
-          totalPrice: _totalPrice,
-          deliveryAddress: _addressController.text.trim(),
-          notes: _notesController.text.trim(),
+        // Créer un produit vendu pour le poisson
+        final produit = MarketplaceProduitVendus.create(
+          produitId: fish.id,
+          nom: fish.nom,
+          quantite: quantity.toInt(),
+          prix: _pricePerKg,
+        );
+
+        // Créer la commande
+        final success = await orderService.createOrder(
+          userId: user.id ?? 0,
+          methodeDePaiement: 'Carte bancaire',
+          commentaire: _notesController.text.trim(),
+          totale: _totalPrice,
+          fournisseurId: fish.userId ?? 0,
+          produits: [produit],
         );
 
         setState(() {
@@ -82,14 +89,23 @@ class _OrderScreenState extends State<OrderScreen> {
         });
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Commande passée avec succès'),
-            backgroundColor: Colors.green,
-          ),
-        );
 
-        Navigator.pop(context);
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Commande passée avec succès'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erreur lors de la création de la commande'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       } catch (e) {
         setState(() {
           _isSubmitting = false;
@@ -143,8 +159,8 @@ class _OrderScreenState extends State<OrderScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          fish.imageUrl,
+                        child: Image.asset(
+                          'assets/images/fish_placeholder.jpg',
                           width: 80,
                           height: 80,
                           fit: BoxFit.cover,
@@ -156,7 +172,7 @@ class _OrderScreenState extends State<OrderScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              fish.species,
+                              fish.nom,
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -165,7 +181,7 @@ class _OrderScreenState extends State<OrderScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Poids disponible: ${fish.weight} kg',
+                              'Stock disponible: ${fish.stock} kg',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey.shade700,
@@ -219,8 +235,8 @@ class _OrderScreenState extends State<OrderScreen> {
                   if (quantity <= 0) {
                     return 'La quantité doit être supérieure à 0';
                   }
-                  if (quantity > fish.weight) {
-                    return 'La quantité ne peut pas dépasser ${fish.weight} kg';
+                  if (quantity > fish.stock) {
+                    return 'La quantité ne peut pas dépasser ${fish.stock} kg';
                   }
                   return null;
                 },
@@ -292,7 +308,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withAlpha(25),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -308,7 +324,7 @@ class _OrderScreenState extends State<OrderScreen> {
                             ),
                           ),
                           Text(
-                            fish.species,
+                            fish.nom,
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,

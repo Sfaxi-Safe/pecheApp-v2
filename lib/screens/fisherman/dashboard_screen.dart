@@ -13,11 +13,18 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
     final statisticsService = Provider.of<StatisticsService>(context);
-    
+
     // Obtenir les statistiques pour le pêcheur connecté
-    final fishermanId = authService.currentUser?.id ?? '1'; // Utiliser '1' par défaut pour la démo
-    final capturesThisMonth = statisticsService.getCapturesThisMonth(fishermanId);
-    final differentSpeciesCount = statisticsService.getDifferentSpeciesCount(fishermanId);
+    final fishermanId =
+        authService.currentUser?.id != null
+            ? authService.currentUser!.id.toString()
+            : '1'; // Utiliser '1' par défaut pour la démo
+    final capturesThisMonth = statisticsService.getCapturesThisMonth(
+      fishermanId,
+    );
+    final differentSpeciesCount = statisticsService.getDifferentSpeciesCount(
+      fishermanId,
+    );
     final totalWeight = statisticsService.getTotalWeight(fishermanId);
     final lastCapture = statisticsService.getLastCapture(fishermanId);
 
@@ -40,10 +47,7 @@ class DashboardScreen extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Colors.blue.shade50,
-              Colors.blue.shade100,
-            ],
+            colors: [Colors.blue.shade50, Colors.blue.shade100],
           ),
         ),
         child: SafeArea(
@@ -54,7 +58,7 @@ class DashboardScreen extends StatelessWidget {
               children: [
                 // En-tête avec salutation
                 Text(
-                  'Bonjour, ${authService.currentUser?.name ?? 'Pêcheur'}!',
+                  'Bonjour, ${authService.currentUser != null ? "${authService.currentUser!.prenom} ${authService.currentUser!.nom}" : 'Pêcheur'}!',
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -64,13 +68,10 @@ class DashboardScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 const Text(
                   'Que souhaitez-vous faire aujourd\'hui?',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: AppTheme.textColor,
-                  ),
+                  style: TextStyle(fontSize: 16, color: AppTheme.textColor),
                 ),
                 const SizedBox(height: 30),
-                
+
                 // Cartes d'actions principales
                 Row(
                   children: [
@@ -109,9 +110,40 @@ class DashboardScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                
+
+                const SizedBox(height: 16),
+
+                // Deuxième rangée d'actions
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildActionCard(
+                        context,
+                        'Commandes',
+                        Icons.shopping_cart,
+                        Colors.orange.shade700,
+                        () {
+                          Navigator.pushNamed(context, '/orders');
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildActionCard(
+                        context,
+                        'Statistiques',
+                        Icons.bar_chart,
+                        Colors.purple.shade700,
+                        () {
+                          Navigator.pushNamed(context, '/statistics');
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+
                 const SizedBox(height: 30),
-                
+
                 // Statistiques rapides
                 const Text(
                   'Statistiques rapides',
@@ -122,7 +154,7 @@ class DashboardScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Cartes de statistiques
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -131,7 +163,7 @@ class DashboardScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withAlpha(25),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -186,9 +218,9 @@ class DashboardScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 30),
-                
+
                 // Dernière capture
                 const Text(
                   'Dernière capture',
@@ -199,78 +231,77 @@ class DashboardScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Carte de dernière capture
                 lastCapture == null
                     ? Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'Aucune capture récente',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey,
-                            ),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
-                        ),
-                      )
-                    : Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                lastCapture.imageUrl,
-                                width: 80,
-                                height: 80,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    lastCapture.species,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text('Poids: ${lastCapture.weight} kg'),
-                                  Text('Taille: ${lastCapture.length} cm'),
-                                  Text('Capturé le: ${lastCapture.captureDate.day}/${lastCapture.captureDate.month}/${lastCapture.captureDate.year}'),
-                                ],
-                              ),
-                            ),
-                          ],
+                        ],
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'Aucune capture récente',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
                         ),
                       ),
+                    )
+                    : Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              'assets/images/fish_placeholder.jpg',
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  lastCapture.nom,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text('Prix: ${lastCapture.prix} €/kg'),
+                                Text('Stock: ${lastCapture.stock} kg'),
+                                Text(
+                                  'Date: ${lastCapture.dateDePeche != null ? lastCapture.dateDePeche!.substring(0, 10) : "Non spécifié"}',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
               ],
             ),
           ),
@@ -295,7 +326,7 @@ class DashboardScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.3),
+              color: color.withAlpha(75),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -304,11 +335,7 @@ class DashboardScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 48,
-              color: Colors.white,
-            ),
+            Icon(icon, size: 48, color: Colors.white),
             const SizedBox(height: 12),
             Text(
               title,
@@ -339,23 +366,16 @@ class DashboardScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withAlpha(25),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
+            child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(
-                fontSize: 16,
-                color: AppTheme.textColor,
-              ),
+              style: const TextStyle(fontSize: 16, color: AppTheme.textColor),
             ),
           ),
           Text(
@@ -371,4 +391,3 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 }
-

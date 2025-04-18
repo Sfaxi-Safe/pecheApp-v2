@@ -1,36 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/lazy_loading_service.dart';
-import '../../models/fish.dart';
+import '../../models/marketplace_produit.dart';
 import '../../services/database_helper.dart';
 import '../../utils/image_cache_manager.dart';
 import '../../utils/responsive.dart';
 import '../../widgets/animated_list_item.dart';
 
 class FishListScreen extends StatefulWidget {
-  const FishListScreen({Key? key}) : super(key: key);
+  const FishListScreen({super.key});
 
   @override
-  _FishListScreenState createState() => _FishListScreenState();
+  FishListScreenState createState() => FishListScreenState();
 }
 
-class _FishListScreenState extends State<FishListScreen> {
-  late LazyLoadingService<Fish> _lazyLoadingService;
+class FishListScreenState extends State<FishListScreen> {
+  late LazyLoadingService<MarketplaceProduit> _lazyLoadingService;
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    
+
     // Initialiser le service de chargement paresseux
-    _lazyLoadingService = LazyLoadingService<Fish>(
+    _lazyLoadingService = LazyLoadingService<MarketplaceProduit>(
       loadItemsFunction: _loadFishes,
       pageSize: 10,
     );
-    
+
     // Charger la première page
     _lazyLoadingService.loadFirstPage();
-    
+
     // Ajouter un écouteur de défilement pour charger plus de données
     _scrollController.addListener(_onScroll);
   }
@@ -43,19 +43,21 @@ class _FishListScreenState extends State<FishListScreen> {
   }
 
   // Fonction de chargement des poissons avec pagination
-  Future<List<Fish>> _loadFishes(int page, int pageSize) async {
+  Future<List<MarketplaceProduit>> _loadFishes(int page, int pageSize) async {
     final dbHelper = DatabaseHelper();
-    final fishes = await dbHelper.getFishesPaginated(page, pageSize);
-    
+    final fishes = await dbHelper.getProduitsPaginated(page, pageSize);
+
     // Précharger les images pour une meilleure expérience utilisateur
-    final imageUrls = fishes.map((fish) => fish.imageUrl).toList();
-    CustomCacheManager.preloadImages(imageUrls);
-    
+    // Utiliser une image par défaut car les URLs d'images ne sont pas disponibles
+    // dans le nouveau modèle
+    CustomCacheManager.preloadImages(['assets/images/fish_placeholder.jpg']);
+
     return fishes;
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
       _lazyLoadingService.loadNextPage();
     }
   }
@@ -76,12 +78,10 @@ class _FishListScreenState extends State<FishListScreen> {
       ),
       body: ChangeNotifierProvider.value(
         value: _lazyLoadingService,
-        child: Consumer<LazyLoadingService<Fish>>(
+        child: Consumer<LazyLoadingService<MarketplaceProduit>>(
           builder: (context, service, child) {
             if (service.items.isEmpty && service.isLoading) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
+              return const Center(child: CircularProgressIndicator());
             }
 
             if (service.items.isEmpty && service.errorMessage != null) {
@@ -91,10 +91,7 @@ class _FishListScreenState extends State<FishListScreen> {
                   children: [
                     const Icon(Icons.error, size: 48, color: Colors.red),
                     const SizedBox(height: 16),
-                    Text(
-                      service.errorMessage!,
-                      textAlign: TextAlign.center,
-                    ),
+                    Text(service.errorMessage!, textAlign: TextAlign.center),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () {
@@ -108,9 +105,7 @@ class _FishListScreenState extends State<FishListScreen> {
             }
 
             if (service.items.isEmpty) {
-              return const Center(
-                child: Text('Aucun poisson disponible'),
-              );
+              return const Center(child: Text('Aucun poisson disponible'));
             }
 
             return RefreshIndicator(
@@ -118,7 +113,8 @@ class _FishListScreenState extends State<FishListScreen> {
               child: ListView.builder(
                 controller: _scrollController,
                 padding: context.responsivePadding(const EdgeInsets.all(16)),
-                itemCount: service.items.length + (service.hasMoreItems ? 1 : 0),
+                itemCount:
+                    service.items.length + (service.hasMoreItems ? 1 : 0),
                 itemBuilder: (context, index) {
                   if (index == service.items.length) {
                     return const Center(
@@ -143,12 +139,10 @@ class _FishListScreenState extends State<FishListScreen> {
     );
   }
 
-  Widget _buildFishCard(BuildContext context, Fish fish) {
+  Widget _buildFishCard(BuildContext context, MarketplaceProduit fish) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
           // Naviguer vers l'écran de détails du poisson
@@ -158,21 +152,19 @@ class _FishListScreenState extends State<FishListScreen> {
           children: [
             // Image du poisson avec mise en cache
             CachedImage(
-              imageUrl: fish.imageUrl,
+              imageUrl: 'assets/images/fish_placeholder.jpg',
               width: context.responsiveWidth(120),
               height: context.responsiveWidth(120),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(12),
                 bottomLeft: Radius.circular(12),
               ),
-              placeholder: const Center(
-                child: CircularProgressIndicator(),
-              ),
+              placeholder: const Center(child: CircularProgressIndicator()),
               errorWidget: const Center(
                 child: Icon(Icons.error, color: Colors.red),
               ),
             ),
-            
+
             // Informations du poisson
             Expanded(
               child: Padding(
@@ -181,7 +173,7 @@ class _FishListScreenState extends State<FishListScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      fish.species,
+                      fish.nom,
                       style: TextStyle(
                         fontSize: context.responsiveFontSize(18),
                         fontWeight: FontWeight.bold,
@@ -189,25 +181,25 @@ class _FishListScreenState extends State<FishListScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Poids: ${fish.weight} kg',
+                      'Prix: ${fish.prix} €/kg',
                       style: TextStyle(
                         fontSize: context.responsiveFontSize(14),
                       ),
                     ),
                     Text(
-                      'Taille: ${fish.length} cm',
+                      'Stock: ${fish.stock} kg',
                       style: TextStyle(
                         fontSize: context.responsiveFontSize(14),
                       ),
                     ),
                     Text(
-                      'Lieu: ${fish.location}',
+                      'Lieu: ${fish.zoneDePeche ?? "Non spécifié"}',
                       style: TextStyle(
                         fontSize: context.responsiveFontSize(14),
                       ),
                     ),
                     Text(
-                      'Méthode: ${fish.fishingMethod}',
+                      'Type: ${fish.typologie ?? "Non spécifié"}',
                       style: TextStyle(
                         fontSize: context.responsiveFontSize(14),
                       ),

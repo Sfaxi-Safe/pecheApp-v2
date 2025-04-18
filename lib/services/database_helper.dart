@@ -1,17 +1,18 @@
-import 'package:uuid/uuid.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import '../models/user.dart';
-import '../models/fisherman.dart';
-import '../models/fish.dart';
-import '../models/review.dart';
-import '../models/order.dart';
-import '../models/lot.dart';
-import '../models/catch.dart';
-import '../models/message.dart';
-import '../models/payment.dart';
+import '../models/marketplace_aommande.dart';
+import '../models/marketplace_produitvendus.dart';
+import '../models/marketplace_user.dart';
+import '../models/marketplace_pecheur.dart';
+import '../models/marketplace_produit.dart';
+import '../models/marketplace_avis.dart';
+import '../models/marketplace_lots.dart';
+import '../models/marketplace_prise.dart';
+import '../models/marketplace_message.dart';
+import '../models/marketplace_salon.dart';
+import '../models/marketplace_panier.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -19,19 +20,20 @@ class DatabaseHelper {
 
   // Nom de la base de données
   static const String dbName = 'peche_app.db';
-  
+
   // Noms des tables
-  static const String userTable = 'users';
-  static const String fishermanTable = 'fishermen';
-  static const String fishTable = 'fishes';
-  static const String reviewTable = 'reviews';
-  static const String orderTable = 'orders';
-  static const String lotTable = 'lots';
-  static const String catchTable = 'catches';
-  static const String messageTable = 'messages';
-  static const String conversationTable = 'conversations';
-  static const String paymentTable = 'payments';
-  
+  static const String userTable = 'marketplace_user';
+  static const String fishermanTable = 'marketplace_pecheur';
+  static const String fishTable = 'marketplace_produit';
+  static const String reviewTable = 'marketplace_avis';
+  static const String orderTable = 'marketplace_aommande';
+  static const String produitVendusTable = 'marketplace_produitvendus';
+  static const String lotTable = 'marketplace_lots';
+  static const String catchTable = 'marketplace_prise';
+  static const String messageTable = 'marketplace_message';
+  static const String conversationTable = 'marketplace_salon';
+  static const String paymentTable = 'marketplace_panier';
+
   // Singleton pattern
   factory DatabaseHelper() {
     return _instance;
@@ -60,40 +62,59 @@ class DatabaseHelper {
   // Optimisation: Ajouter des index lors de l'ouverture de la base de données
   Future<void> _onOpen(Database db) async {
     // Vérifier si les index existent déjà
-    final indexesResult = await db.rawQuery("SELECT name FROM sqlite_master WHERE type = 'index'");
-    final existingIndexes = indexesResult.map((e) => e['name'] as String).toList();
+    final indexesResult = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'index'",
+    );
+    final existingIndexes =
+        indexesResult.map((e) => e['name'] as String).toList();
 
     // Créer des index pour les colonnes fréquemment utilisées dans les requêtes
     if (!existingIndexes.contains('idx_fish_fishermanId')) {
-      await db.execute('CREATE INDEX idx_fish_fishermanId ON $fishTable (fishermanId)');
+      await db.execute(
+        'CREATE INDEX idx_fish_fishermanId ON $fishTable (fishermanId)',
+      );
     }
-    
+
     if (!existingIndexes.contains('idx_review_fishId')) {
-      await db.execute('CREATE INDEX idx_review_fishId ON $reviewTable (fishId)');
+      await db.execute(
+        'CREATE INDEX idx_review_fishId ON $reviewTable (fishId)',
+      );
     }
-    
+
     if (!existingIndexes.contains('idx_order_clientId')) {
-      await db.execute('CREATE INDEX idx_order_clientId ON $orderTable (clientId)');
+      await db.execute(
+        'CREATE INDEX idx_order_clientId ON $orderTable (clientId)',
+      );
     }
-    
+
     if (!existingIndexes.contains('idx_order_fishermanId')) {
-      await db.execute('CREATE INDEX idx_order_fishermanId ON $orderTable (fishermanId)');
+      await db.execute(
+        'CREATE INDEX idx_order_fishermanId ON $orderTable (fishermanId)',
+      );
     }
-    
+
     if (!existingIndexes.contains('idx_message_senderId_receiverId')) {
-      await db.execute('CREATE INDEX idx_message_senderId_receiverId ON $messageTable (senderId, receiverId)');
+      await db.execute(
+        'CREATE INDEX idx_message_senderId_receiverId ON $messageTable (senderId, receiverId)',
+      );
     }
-    
+
     if (!existingIndexes.contains('idx_conversation_user1Id_user2Id')) {
-      await db.execute('CREATE INDEX idx_conversation_user1Id_user2Id ON $conversationTable (user1Id, user2Id)');
+      await db.execute(
+        'CREATE INDEX idx_conversation_user1Id_user2Id ON $conversationTable (user1Id, user2Id)',
+      );
     }
-    
+
     if (!existingIndexes.contains('idx_payment_orderId')) {
-      await db.execute('CREATE INDEX idx_payment_orderId ON $paymentTable (orderId)');
+      await db.execute(
+        'CREATE INDEX idx_payment_orderId ON $paymentTable (orderId)',
+      );
     }
-    
+
     if (!existingIndexes.contains('idx_payment_userId')) {
-      await db.execute('CREATE INDEX idx_payment_userId ON $paymentTable (userId)');
+      await db.execute(
+        'CREATE INDEX idx_payment_userId ON $paymentTable (userId)',
+      );
     }
   }
 
@@ -336,39 +357,45 @@ class DatabaseHelper {
   }
 
   // Optimisation: Utiliser des transactions pour les opérations multiples
-  Future<void> batchInsert<T>(String table, List<Map<String, dynamic>> items) async {
+  Future<void> batchInsert<T>(
+    String table,
+    List<Map<String, dynamic>> items,
+  ) async {
     final db = await database;
     final batch = db.batch();
-    
+
     for (var item in items) {
       batch.insert(table, item, conflictAlgorithm: ConflictAlgorithm.replace);
     }
-    
+
     await batch.commit(noResult: true);
   }
 
-  // Optimisation: Pagination pour les requêtes de grande taille
-  Future<List<Fish>> getFishesPaginated(int page, int pageSize) async {
+  // Optimisation: Pagination pour les requêtes de grande taille (ancienne méthode, remplacée par celle ci-dessous)
+  // Cette méthode est conservée pour référence mais n'est plus utilisée
+  /*
+  Future<List<MarketplaceProduit>> getFishesPaginatedOld(int page, int pageSize) async {
     final db = await database;
     final offset = page * pageSize;
-    
+
     final List<Map<String, dynamic>> maps = await db.query(
       fishTable,
       limit: pageSize,
       offset: offset,
-      orderBy: 'captureDate DESC',
+      orderBy: 'date_de_peche DESC',
     );
-    
-    return List.generate(maps.length, (i) => Fish.fromMap(maps[i]));
+
+    return List.generate(maps.length, (i) => MarketplaceProduit.fromMap(maps[i]));
   }
+  */
 
   // Optimisation: Requête avec jointure pour récupérer les poissons avec leurs avis
   Future<List<Map<String, dynamic>>> getFishesWithReviews() async {
     final db = await database;
-    
+
     return await db.rawQuery('''
-      SELECT f.*, 
-             COUNT(r.id) as reviewCount, 
+      SELECT f.*,
+             COUNT(r.id) as reviewCount,
              AVG(r.rating) as averageRating
       FROM $fishTable f
       LEFT JOIN $reviewTable r ON f.id = r.fishId
@@ -378,27 +405,34 @@ class DatabaseHelper {
   }
 
   // Optimisation: Requête avec jointure pour récupérer les commandes avec les détails du poisson
-  Future<List<Map<String, dynamic>>> getOrdersWithDetails(String userId, String userType) async {
+  Future<List<Map<String, dynamic>>> getOrdersWithDetails(
+    String userId,
+    String userType,
+  ) async {
     final db = await database;
-    final whereClause = userType == 'client' ? 'o.clientId = ?' : 'o.fishermanId = ?';
-    
-    return await db.rawQuery('''
-      SELECT o.*, 
-             f.species, 
+    final whereClause =
+        userType == 'client' ? 'o.clientId = ?' : 'o.fishermanId = ?';
+
+    return await db.rawQuery(
+      '''
+      SELECT o.*,
+             f.species,
              f.imageUrl,
              u.name as otherUserName,
              u.profileImageUrl as otherUserImageUrl
       FROM $orderTable o
       JOIN $fishTable f ON o.fishId = f.id
       JOIN $userTable u ON (
-        CASE 
-          WHEN ? = 'client' THEN o.fishermanId 
-          ELSE o.clientId 
+        CASE
+          WHEN ? = 'client' THEN o.fishermanId
+          ELSE o.clientId
         END = u.id
       )
       WHERE $whereClause
       ORDER BY o.orderDate DESC
-    ''', [userType, userId]);
+    ''',
+      [userType, userId],
+    );
   }
 
   // Optimisation: Requête pour vérifier si un email existe déjà
@@ -408,70 +442,88 @@ class DatabaseHelper {
       'SELECT COUNT(*) as count FROM $userTable WHERE email = ?',
       [email],
     );
-    
+
     return (result.first.values.first as int) > 0;
   }
 
   // Optimisation: Requête pour obtenir le nombre de commandes par statut
-  Future<Map<OrderStatus, int>> getOrderCountsByStatus(String userId, String userType) async {
+  Future<Map<String, int>> getOrderCountsByStatus(
+    String userId,
+    String userType,
+  ) async {
     final db = await database;
-    final whereClause = userType == 'client' ? 'clientId = ?' : 'fishermanId = ?';
-    
+    final whereClause =
+        userType == 'client' ? 'user_id = ?' : 'fournisseur_id = ?';
+
     final result = await db.rawQuery(
-      'SELECT status, COUNT(*) as count FROM $orderTable WHERE $whereClause GROUP BY status',
-      [userId],
+      'SELECT statut_commande, COUNT(*) as count FROM $orderTable WHERE $whereClause GROUP BY statut_commande',
+      [int.tryParse(userId)],
     );
-    
-    final Map<OrderStatus, int> counts = {};
-    for (var status in OrderStatus.values) {
-      counts[status] = 0;
-    }
-    
+
+    final Map<String, int> counts = {
+      'pending': 0,
+      'confirmed': 0,
+      'in_progress': 0,
+      'delivered': 0,
+      'cancelled': 0,
+    };
+
     for (var row in result) {
-      final status = OrderStatus.values[row['status'] as int];
+      final status = row['statut_commande'] as String? ?? 'pending';
       counts[status] = row['count'] as int;
     }
-    
+
     return counts;
   }
 
   // Optimisation: Requête pour obtenir les statistiques de vente par mois
-  Future<List<Map<String, dynamic>>> getMonthlySalesStats(String fishermanId) async {
+  Future<List<Map<String, dynamic>>> getMonthlySalesStats(
+    String fishermanId,
+  ) async {
     final db = await database;
-    
-    return await db.rawQuery('''
-      SELECT 
-        strftime('%Y-%m', orderDate) as month,
+
+    return await db.rawQuery(
+      '''
+      SELECT
+        strftime('%Y-%m', created_at) as month,
         COUNT(*) as orderCount,
-        SUM(totalPrice) as totalSales
+        SUM(totale) as totalSales
       FROM $orderTable
-      WHERE fishermanId = ? AND status != ?
+      WHERE fournisseur_id = ? AND statut_commande != ?
       GROUP BY month
       ORDER BY month DESC
       LIMIT 12
-    ''', [fishermanId, OrderStatus.cancelled.index]);
+    ''',
+      [int.tryParse(fishermanId), 'cancelled'],
+    );
   }
 
   // Optimisation: Requête pour obtenir les espèces les plus vendues
-  Future<List<Map<String, dynamic>>> getTopSellingSpecies(String fishermanId) async {
+  Future<List<Map<String, dynamic>>> getTopSellingSpecies(
+    String fishermanId,
+  ) async {
     final db = await database;
-    
-    return await db.rawQuery('''
-      SELECT 
-        f.species,
-        COUNT(o.id) as orderCount,
-        SUM(o.quantity) as totalQuantity
-      FROM $orderTable o
-      JOIN $fishTable f ON o.fishId = f.id
-      WHERE o.fishermanId = ? AND o.status != ?
-      GROUP BY f.species
+
+    return await db.rawQuery(
+      '''
+      SELECT
+        p.nom as species,
+        COUNT(pv.id) as orderCount,
+        SUM(pv.quantite) as totalQuantity
+      FROM $produitVendusTable pv
+      JOIN $orderTable o ON pv.commande_id = o.id
+      JOIN $fishTable p ON pv.produit_id = p.id
+      WHERE o.fournisseur_id = ? AND o.statut_commande != ?
+      GROUP BY p.nom
       ORDER BY orderCount DESC
       LIMIT 5
-    ''', [fishermanId, OrderStatus.cancelled.index]);
+    ''',
+      [int.tryParse(fishermanId), 'cancelled'],
+    );
   }
 
   // Méthodes CRUD pour les utilisateurs
-  Future<int> insertUser(User user) async {
+  Future<int> insertUser(MarketplaceUser user) async {
     Database db = await database;
     return await db.insert(
       userTable,
@@ -480,7 +532,7 @@ class DatabaseHelper {
     );
   }
 
-  Future<User?> getUserById(String id) async {
+  Future<MarketplaceUser?> getUserById(int id) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       userTable,
@@ -489,12 +541,12 @@ class DatabaseHelper {
     );
 
     if (maps.isNotEmpty) {
-      return User.fromMap(maps.first);
+      return MarketplaceUser.fromMap(maps.first);
     }
     return null;
   }
 
-  Future<User?> getUserByEmail(String email) async {
+  Future<MarketplaceUser?> getUserByEmail(String email) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       userTable,
@@ -503,18 +555,18 @@ class DatabaseHelper {
     );
 
     if (maps.isNotEmpty) {
-      return User.fromMap(maps.first);
+      return MarketplaceUser.fromMap(maps.first);
     }
     return null;
   }
 
-  Future<List<User>> getAllUsers() async {
+  Future<List<MarketplaceUser>> getAllUsers() async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(userTable);
-    return List.generate(maps.length, (i) => User.fromMap(maps[i]));
+    return List.generate(maps.length, (i) => MarketplaceUser.fromMap(maps[i]));
   }
 
-  Future<int> updateUser(User user) async {
+  Future<int> updateUser(MarketplaceUser user) async {
     Database db = await database;
     return await db.update(
       userTable,
@@ -524,17 +576,13 @@ class DatabaseHelper {
     );
   }
 
-  Future<int> deleteUser(String id) async {
+  Future<int> deleteUser(int id) async {
     Database db = await database;
-    return await db.delete(
-      userTable,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete(userTable, where: 'id = ?', whereArgs: [id]);
   }
 
   // Méthodes CRUD pour les pêcheurs
-  Future<int> insertFisherman(Fisherman fisherman) async {
+  Future<int> insertFisherman(MarketplacePecheur fisherman) async {
     Database db = await database;
     return await db.insert(
       fishermanTable,
@@ -543,7 +591,7 @@ class DatabaseHelper {
     );
   }
 
-  Future<Fisherman?> getFishermanById(String id) async {
+  Future<MarketplacePecheur?> getFishermanById(int id) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       fishermanTable,
@@ -552,12 +600,12 @@ class DatabaseHelper {
     );
 
     if (maps.isNotEmpty) {
-      return Fisherman.fromMap(maps.first);
+      return MarketplacePecheur.fromMap(maps.first);
     }
     return null;
   }
 
-  Future<Fisherman?> getFishermanByEmail(String email) async {
+  Future<MarketplacePecheur?> getFishermanByEmail(String email) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       fishermanTable,
@@ -566,18 +614,21 @@ class DatabaseHelper {
     );
 
     if (maps.isNotEmpty) {
-      return Fisherman.fromMap(maps.first);
+      return MarketplacePecheur.fromMap(maps.first);
     }
     return null;
   }
 
-  Future<List<Fisherman>> getAllFishermen() async {
+  Future<List<MarketplacePecheur>> getAllFishermen() async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(fishermanTable);
-    return List.generate(maps.length, (i) => Fisherman.fromMap(maps[i]));
+    return List.generate(
+      maps.length,
+      (i) => MarketplacePecheur.fromMap(maps[i]),
+    );
   }
 
-  Future<int> updateFisherman(Fisherman fisherman) async {
+  Future<int> updateFisherman(MarketplacePecheur fisherman) async {
     Database db = await database;
     return await db.update(
       fishermanTable,
@@ -587,26 +638,22 @@ class DatabaseHelper {
     );
   }
 
-  Future<int> deleteFisherman(String id) async {
+  Future<int> deleteFisherman(int id) async {
     Database db = await database;
-    return await db.delete(
-      fishermanTable,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete(fishermanTable, where: 'id = ?', whereArgs: [id]);
   }
 
-  // Méthodes CRUD pour les poissons
-  Future<int> insertFish(Fish fish) async {
+  // Méthodes CRUD pour les produits (poissons)
+  Future<int> insertProduit(MarketplaceProduit produit) async {
     Database db = await database;
     return await db.insert(
       fishTable,
-      fish.toMap(),
+      produit.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  Future<Fish?> getFishById(String id) async {
+  Future<MarketplaceProduit?> getProduitById(dynamic id) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       fishTable,
@@ -615,57 +662,88 @@ class DatabaseHelper {
     );
 
     if (maps.isNotEmpty) {
-      return Fish.fromMap(maps.first);
+      return MarketplaceProduit.fromMap(maps.first);
     }
     return null;
   }
 
-  Future<List<Fish>> getAllFishes() async {
+  Future<List<MarketplaceProduit>> getAllProduits() async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(fishTable);
-    return List.generate(maps.length, (i) => Fish.fromMap(maps[i]));
+    return List.generate(
+      maps.length,
+      (i) => MarketplaceProduit.fromMap(maps[i]),
+    );
   }
 
-  Future<List<Fish>> getFishesByFisherman(String fishermanId) async {
+  Future<List<MarketplaceProduit>> getProduitsByUser(int userId) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       fishTable,
-      where: 'fishermanId = ?',
-      whereArgs: [fishermanId],
+      where: 'user_id = ?',
+      whereArgs: [userId],
     );
-    return List.generate(maps.length, (i) => Fish.fromMap(maps[i]));
+    return List.generate(
+      maps.length,
+      (i) => MarketplaceProduit.fromMap(maps[i]),
+    );
   }
 
-  Future<int> updateFish(Fish fish) async {
+  Future<int> updateProduit(MarketplaceProduit produit) async {
     Database db = await database;
     return await db.update(
       fishTable,
-      fish.toMap(),
+      produit.toMap(),
       where: 'id = ?',
-      whereArgs: [fish.id],
+      whereArgs: [produit.id],
     );
   }
 
-  Future<int> deleteFish(String id) async {
+  Future<int> deleteProduit(int id) async {
     Database db = await database;
-    return await db.delete(
+    return await db.delete(fishTable, where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Pour la compatibilité avec l'ancien code
+  Future<List<MarketplaceProduit>> getFishesPaginated(
+    int page,
+    int pageSize,
+  ) async {
+    return getProduitsPaginated(page, pageSize);
+  }
+
+  // Méthode pour récupérer les produits avec pagination
+  Future<List<MarketplaceProduit>> getProduitsPaginated(
+    int page,
+    int pageSize,
+  ) async {
+    final db = await database;
+    final offset = page * pageSize;
+
+    final List<Map<String, dynamic>> maps = await db.query(
       fishTable,
-      where: 'id = ?',
-      whereArgs: [id],
+      limit: pageSize,
+      offset: offset,
+      orderBy: 'id DESC',
+    );
+
+    return List.generate(
+      maps.length,
+      (i) => MarketplaceProduit.fromMap(maps[i]),
     );
   }
 
   // Méthodes CRUD pour les avis
-  Future<int> insertReview(Review review) async {
+  Future<int> insertAvis(MarketplaceAvis avis) async {
     Database db = await database;
     return await db.insert(
       reviewTable,
-      review.toMap(),
+      avis.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  Future<Review?> getReviewById(String id) async {
+  Future<MarketplaceAvis?> getAvisById(int id) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       reviewTable,
@@ -674,115 +752,272 @@ class DatabaseHelper {
     );
 
     if (maps.isNotEmpty) {
-      return Review.fromMap(maps.first);
+      return MarketplaceAvis.fromMap(maps.first);
     }
     return null;
   }
 
-  Future<List<Review>> getReviewsByFish(String fishId) async {
+  Future<List<MarketplaceAvis>> getAvisByProduit(int produitId) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       reviewTable,
-      where: 'fishId = ?',
-      whereArgs: [fishId],
+      where: 'produit_id = ?',
+      whereArgs: [produitId],
     );
-    return List.generate(maps.length, (i) => Review.fromMap(maps[i]));
+    return List.generate(maps.length, (i) => MarketplaceAvis.fromMap(maps[i]));
   }
 
-  Future<List<Review>> getReviewsByUser(String userId) async {
+  Future<List<MarketplaceAvis>> getAvisByUser(int userId) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       reviewTable,
-      where: 'userId = ?',
+      where: 'user_id = ?',
       whereArgs: [userId],
     );
-    return List.generate(maps.length, (i) => Review.fromMap(maps[i]));
+    return List.generate(maps.length, (i) => MarketplaceAvis.fromMap(maps[i]));
   }
 
-  Future<int> updateReview(Review review) async {
+  // Récupérer tous les avis
+  Future<List<MarketplaceAvis>> getAllAvis() async {
+    Database db = await database;
+    List<Map<String, dynamic>> maps = await db.query(reviewTable);
+    return List.generate(maps.length, (i) => MarketplaceAvis.fromMap(maps[i]));
+  }
+
+  Future<int> updateAvis(MarketplaceAvis avis) async {
     Database db = await database;
     return await db.update(
       reviewTable,
-      review.toMap(),
+      avis.toMap(),
       where: 'id = ?',
-      whereArgs: [review.id],
+      whereArgs: [avis.id],
     );
   }
 
-  Future<int> deleteReview(String id) async {
+  Future<int> deleteAvis(int id) async {
     Database db = await database;
-    return await db.delete(
-      reviewTable,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete(reviewTable, where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Pour la compatibilité avec l'ancien code
+  Future<List<MarketplaceAvis>> getReviewsByFish(int fishId) async {
+    return getAvisByProduit(fishId);
   }
 
   // Méthodes CRUD pour les commandes
-  Future<int> insertOrder(PecheOrder order) async {
+  Future<int> insertCommande(
+    MarketplaceAommande commande,
+    List<MarketplaceProduitVendus> produits,
+  ) async {
     Database db = await database;
-    return await db.insert(
+    final batch = db.batch();
+
+    // Insérer la commande
+    batch.insert(
       orderTable,
-      order.toMap(),
+      commande.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+
+    // Insérer les produits vendus
+    for (var produit in produits) {
+      batch.insert(
+        produitVendusTable,
+        produit.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    await batch.commit(noResult: true);
+    return 1; // Succès
   }
 
-  Future<PecheOrder?> getOrderById(String id) async {
+  Future<MarketplaceAommande?> getOrderById(dynamic id) async {
     Database db = await database;
-    List<Map<String, dynamic>> maps = await db.query(
+
+    // Récupérer la commande
+    List<Map<String, dynamic>> orderMaps = await db.query(
       orderTable,
       where: 'id = ?',
       whereArgs: [id],
     );
 
+    if (orderMaps.isEmpty) {
+      return null;
+    }
+
+    return MarketplaceAommande.fromMap(orderMaps.first);
+  }
+
+  // Récupérer les produits vendus associés à une commande
+  Future<List<MarketplaceProduitVendus>> getProduitVendusByCommandeId(
+    int commandeId,
+  ) async {
+    Database db = await database;
+
+    List<Map<String, dynamic>> produitsMaps = await db.query(
+      produitVendusTable,
+      where: 'commande_id = ?',
+      whereArgs: [commandeId],
+    );
+
+    return produitsMaps
+        .map((map) => MarketplaceProduitVendus.fromMap(map))
+        .toList();
+  }
+
+  Future<List<MarketplaceAommande>> getAllOrders() async {
+    Database db = await database;
+    List<Map<String, dynamic>> orderMaps = await db.query(orderTable);
+
+    return orderMaps.map((map) => MarketplaceAommande.fromMap(map)).toList();
+  }
+
+  Future<List<MarketplaceAommande>> getOrdersByClient(int userId) async {
+    Database db = await database;
+    List<Map<String, dynamic>> orderMaps = await db.query(
+      orderTable,
+      where: 'user_id = ?',
+      whereArgs: [userId],
+    );
+
+    return orderMaps.map((map) => MarketplaceAommande.fromMap(map)).toList();
+  }
+
+  Future<List<MarketplaceAommande>> getOrdersByFisherman(
+    int fournisseurId,
+  ) async {
+    Database db = await database;
+    List<Map<String, dynamic>> orderMaps = await db.query(
+      orderTable,
+      where: 'fournisseur_id = ?',
+      whereArgs: [fournisseurId],
+    );
+
+    return orderMaps.map((map) => MarketplaceAommande.fromMap(map)).toList();
+  }
+
+  Future<int> updateCommande(MarketplaceAommande commande) async {
+    Database db = await database;
+    return await db.update(
+      orderTable,
+      commande.toMap(),
+      where: 'id = ?',
+      whereArgs: [commande.id],
+    );
+  }
+
+  // Mettre à jour le statut d'une commande
+  Future<int> updateOrderStatus(dynamic orderId, String newStatus) async {
+    Database db = await database;
+    return await db.update(
+      orderTable,
+      {
+        'statut_commande': newStatus,
+        'date_modification': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [orderId],
+    );
+  }
+
+  // Mettre à jour une commande avec ses produits vendus
+  Future<int> updateCommandeWithProduits(
+    MarketplaceAommande commande,
+    List<MarketplaceProduitVendus> produits,
+  ) async {
+    Database db = await database;
+    final batch = db.batch();
+
+    // Mettre à jour la commande
+    batch.update(
+      orderTable,
+      commande.toMap(),
+      where: 'id = ?',
+      whereArgs: [commande.id],
+    );
+
+    // Supprimer les anciens produits vendus
+    batch.delete(
+      produitVendusTable,
+      where: 'commande_id = ?',
+      whereArgs: [commande.id],
+    );
+
+    // Insérer les nouveaux produits vendus
+    for (var produit in produits) {
+      batch.insert(
+        produitVendusTable,
+        produit.copyWith(commandeId: commande.id).toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    await batch.commit(noResult: true);
+    return 1; // Succès
+  }
+
+  Future<int> deleteCommande(int id) async {
+    Database db = await database;
+    final batch = db.batch();
+
+    // Supprimer les produits vendus associés à cette commande
+    batch.delete(produitVendusTable, where: 'commande_id = ?', whereArgs: [id]);
+
+    // Supprimer la commande
+    batch.delete(orderTable, where: 'id = ?', whereArgs: [id]);
+
+    await batch.commit(noResult: true);
+    return 1; // Succès
+  }
+
+  // Méthodes CRUD pour les produits vendus
+  Future<int> insertProduitVendu(MarketplaceProduitVendus produit) async {
+    Database db = await database;
+    return await db.insert(
+      produitVendusTable,
+      produit.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<MarketplaceProduitVendus?> getProduitVenduById(int id) async {
+    Database db = await database;
+    List<Map<String, dynamic>> maps = await db.query(
+      produitVendusTable,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
     if (maps.isNotEmpty) {
-      return PecheOrder.fromMap(maps.first);
+      return MarketplaceProduitVendus.fromMap(maps.first);
     }
     return null;
   }
 
-  Future<List<PecheOrder>> getOrdersByClient(String clientId) async {
-    Database db = await database;
-    List<Map<String, dynamic>> maps = await db.query(
-      orderTable,
-      where: 'clientId = ?',
-      whereArgs: [clientId],
-    );
-    return List.generate(maps.length, (i) => PecheOrder.fromMap(maps[i]));
-  }
+  // Cette méthode a été déplacée plus haut dans le fichier
 
-  Future<List<PecheOrder>> getOrdersByFisherman(String fishermanId) async {
-    Database db = await database;
-    List<Map<String, dynamic>> maps = await db.query(
-      orderTable,
-      where: 'fishermanId = ?',
-      whereArgs: [fishermanId],
-    );
-    return List.generate(maps.length, (i) => PecheOrder.fromMap(maps[i]));
-  }
-
-  Future<int> updateOrder(PecheOrder order) async {
+  Future<int> updateProduitVendu(MarketplaceProduitVendus produit) async {
     Database db = await database;
     return await db.update(
-      orderTable,
-      order.toMap(),
+      produitVendusTable,
+      produit.toMap(),
       where: 'id = ?',
-      whereArgs: [order.id],
+      whereArgs: [produit.id],
     );
   }
 
-  Future<int> deleteOrder(String id) async {
+  Future<int> deleteProduitVendu(int id) async {
     Database db = await database;
     return await db.delete(
-      orderTable,
+      produitVendusTable,
       where: 'id = ?',
       whereArgs: [id],
     );
   }
 
   // Méthodes CRUD pour les lots
-  Future<int> insertLot(Lot lot) async {
+  Future<int> insertLot(MarketplaceLots lot) async {
     Database db = await database;
     return await db.insert(
       lotTable,
@@ -791,7 +1026,7 @@ class DatabaseHelper {
     );
   }
 
-  Future<Lot?> getLotById(String id) async {
+  Future<MarketplaceLots?> getLotById(int id) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       lotTable,
@@ -800,18 +1035,18 @@ class DatabaseHelper {
     );
 
     if (maps.isNotEmpty) {
-      return Lot.fromMap(maps.first);
+      return MarketplaceLots.fromMap(maps.first);
     }
     return null;
   }
 
-  Future<List<Lot>> getAllLots() async {
+  Future<List<MarketplaceLots>> getAllLots() async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(lotTable);
-    return List.generate(maps.length, (i) => Lot.fromMap(maps[i]));
+    return List.generate(maps.length, (i) => MarketplaceLots.fromMap(maps[i]));
   }
 
-  Future<int> updateLot(Lot lot) async {
+  Future<int> updateLot(MarketplaceLots lot) async {
     Database db = await database;
     return await db.update(
       lotTable,
@@ -821,26 +1056,22 @@ class DatabaseHelper {
     );
   }
 
-  Future<int> deleteLot(String id) async {
+  Future<int> deleteLot(int id) async {
     Database db = await database;
-    return await db.delete(
-      lotTable,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete(lotTable, where: 'id = ?', whereArgs: [id]);
   }
 
-  // Méthodes CRUD pour les captures
-  Future<int> insertCatch(Catch catch_) async {
+  // Méthodes CRUD pour les captures (prises)
+  Future<int> insertPrise(MarketplacePrise prise) async {
     Database db = await database;
     return await db.insert(
       catchTable,
-      catch_.toMap(),
+      prise.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  Future<Catch?> getCatchById(String id) async {
+  Future<MarketplacePrise?> getPriseById(int id) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       catchTable,
@@ -849,42 +1080,43 @@ class DatabaseHelper {
     );
 
     if (maps.isNotEmpty) {
-      return Catch.fromMap(maps.first);
+      return MarketplacePrise.fromMap(maps.first);
     }
     return null;
   }
 
-  Future<List<Catch>> getCatchesByFisherman(String fishermanId) async {
+  Future<List<MarketplacePrise>> getPrisesByPecheur(int pecheurId) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       catchTable,
-      where: 'fishermanId = ?',
-      whereArgs: [fishermanId],
+      where: 'pecheur_id = ?',
+      whereArgs: [pecheurId],
     );
-    return List.generate(maps.length, (i) => Catch.fromMap(maps[i]));
+    return List.generate(maps.length, (i) => MarketplacePrise.fromMap(maps[i]));
   }
 
-  Future<int> updateCatch(Catch catch_) async {
+  Future<int> updatePrise(MarketplacePrise prise) async {
     Database db = await database;
     return await db.update(
       catchTable,
-      catch_.toMap(),
+      prise.toMap(),
       where: 'id = ?',
-      whereArgs: [catch_.id],
+      whereArgs: [prise.id],
     );
   }
 
-  Future<int> deleteCatch(String id) async {
+  Future<int> deletePrise(int id) async {
     Database db = await database;
-    return await db.delete(
-      catchTable,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete(catchTable, where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Pour la compatibilité avec l'ancien code
+  Future<List<MarketplacePrise>> getCatchesByFisherman(int fishermanId) async {
+    return getPrisesByPecheur(fishermanId);
   }
 
   // Méthodes CRUD pour les messages
-  Future<int> insertMessage(Message message) async {
+  Future<int> insertMessage(MarketplaceMessage message) async {
     Database db = await database;
     return await db.insert(
       messageTable,
@@ -893,7 +1125,7 @@ class DatabaseHelper {
     );
   }
 
-  Future<Message?> getMessageById(String id) async {
+  Future<MarketplaceMessage?> getMessageById(int id) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       messageTable,
@@ -902,167 +1134,173 @@ class DatabaseHelper {
     );
 
     if (maps.isNotEmpty) {
-      return Message.fromMap(maps.first);
+      return MarketplaceMessage.fromMap(maps.first);
     }
     return null;
   }
 
-  Future<List<Message>> getMessagesBetweenUsers(String userId1, String userId2) async {
+  Future<List<MarketplaceMessage>> getMessagesBetweenUsers(
+    int userId1,
+    int userId2,
+  ) async {
     Database db = await database;
-    List<Map<String, dynamic>> maps = await db.rawQuery('''
-      SELECT * FROM $messageTable 
-      WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?)
+    List<Map<String, dynamic>> maps = await db.rawQuery(
+      '''
+      SELECT * FROM $messageTable
+      WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
       ORDER BY timestamp ASC
-    ''', [userId1, userId2, userId2, userId1]);
-    
-    return List.generate(maps.length, (i) => Message.fromMap(maps[i]));
+    ''',
+      [userId1, userId2, userId2, userId1],
+    );
+
+    return List.generate(
+      maps.length,
+      (i) => MarketplaceMessage.fromMap(maps[i]),
+    );
   }
 
-  Future<int> markMessageAsRead(String messageId) async {
+  Future<int> markMessageAsRead(int messageId) async {
     Database db = await database;
     return await db.update(
       messageTable,
-      {'isRead': 1},
+      {'is_read': 1},
       where: 'id = ?',
       whereArgs: [messageId],
     );
   }
 
-  Future<int> markAllMessagesAsRead(String receiverId, String senderId) async {
+  Future<int> markAllMessagesAsRead(int receiverId, int senderId) async {
     Database db = await database;
     return await db.update(
       messageTable,
-      {'isRead': 1},
-      where: 'receiverId = ? AND senderId = ? AND isRead = 0',
+      {'is_read': 1},
+      where: 'receiver_id = ? AND sender_id = ? AND is_read = 0',
       whereArgs: [receiverId, senderId],
     );
   }
 
-  Future<int> deleteMessage(String id) async {
+  Future<int> deleteMessage(int id) async {
     Database db = await database;
-    return await db.delete(
-      messageTable,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete(messageTable, where: 'id = ?', whereArgs: [id]);
   }
 
-  // Méthodes CRUD pour les conversations
-  Future<String> getOrCreateConversation(String user1Id, String user2Id) async {
+  // Méthodes CRUD pour les conversations (salons)
+  Future<int> getOrCreateSalon(int user1Id, int user2Id) async {
     Database db = await database;
-    
-    // Vérifier si une conversation existe déjà entre ces deux utilisateurs
-    List<Map<String, dynamic>> maps = await db.rawQuery('''
-      SELECT * FROM $conversationTable 
-      WHERE (user1Id = ? AND user2Id = ?) OR (user1Id = ? AND user2Id = ?)
-    ''', [user1Id, user2Id, user2Id, user1Id]);
-    
+
+    // Vérifier si un salon existe déjà entre ces deux utilisateurs
+    List<Map<String, dynamic>> maps = await db.rawQuery(
+      '''
+      SELECT * FROM $conversationTable
+      WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?)
+    ''',
+      [user1Id, user2Id, user2Id, user1Id],
+    );
+
     if (maps.isNotEmpty) {
-      return maps.first['id'] as String;
+      return maps.first['id'] as int;
     }
-    
-    // Créer une nouvelle conversation
-    final conversationId = const Uuid().v4();
-    await db.insert(
-      conversationTable,
-      {
-        'id': conversationId,
-        'user1Id': user1Id,
-        'user2Id': user2Id,
-        'lastMessageTime': DateTime.now().toIso8601String(),
-        'lastMessageContent': null,
-        'hasUnreadMessages': 0,
-      },
-    );
-    
-    return conversationId;
+
+    // Créer un nouveau salon
+    final Map<String, dynamic> salonData = {
+      'titre': 'Conversation',
+      'description': 'Conversation entre utilisateurs',
+      'date': DateTime.now().toIso8601String().split('T')[0],
+      'temps_debut': '${DateTime.now().hour}:${DateTime.now().minute}:00',
+      'temps_fin': '23:59:59',
+      'lieu': 'En ligne',
+      'max_invitation': 2,
+      'affiche': '',
+    };
+
+    return await db.insert(conversationTable, salonData);
   }
 
-  Future<List<Map<String, dynamic>>> getConversationsForUser(String userId) async {
+  Future<List<MarketplaceSalon>> getSalonsForUser(int userId) async {
     Database db = await database;
-    
-    // Récupérer toutes les conversations où l'utilisateur est impliqué
-    List<Map<String, dynamic>> conversations = await db.rawQuery('''
-      SELECT c.*, 
-             CASE 
-               WHEN c.user1Id = ? THEN c.user2Id 
-               ELSE c.user1Id 
-             END as otherUserId,
-             u.name as otherUserName,
-             u.profileImageUrl as otherUserImageUrl,
-             u.userType as otherUserType
-      FROM $conversationTable c
-      JOIN $userTable u ON (
-        CASE 
-          WHEN c.user1Id = ? THEN c.user2Id 
-          ELSE c.user1Id 
-        END = u.id
-      )
-      WHERE c.user1Id = ? OR c.user2Id = ?
-      ORDER BY c.lastMessageTime DESC
-    ''', [userId, userId, userId, userId]);
-    
+    List<Map<String, dynamic>> maps = await db.query(conversationTable);
+    return List.generate(maps.length, (i) => MarketplaceSalon.fromMap(maps[i]));
+  }
+
+  // Pour la compatibilité avec l'ancien code
+  Future<List<Map<String, dynamic>>> getConversationsForUser(int userId) async {
+    Database db = await database;
+    List<Map<String, dynamic>> salons = await db.query(conversationTable);
+
+    // Convertir les salons en format compatible avec l'ancien code
+    List<Map<String, dynamic>> conversations = [];
+    for (var salon in salons) {
+      conversations.add({
+        'id': salon['id'],
+        'titre': salon['titre'],
+        'description': salon['description'],
+        'date': salon['date'],
+        'temps_debut': salon['temps_debut'],
+        'temps_fin': salon['temps_fin'],
+        'lieu': salon['lieu'],
+        'max_invitation': salon['max_invitation'],
+        'affiche': salon['affiche'],
+      });
+    }
+
     return conversations;
   }
 
-  Future<int> updateConversationLastMessage(String conversationId, String content, DateTime timestamp, bool hasUnread) async {
+  Future<int> updateSalon(int salonId, String titre, String description) async {
     Database db = await database;
     return await db.update(
       conversationTable,
-      {
-        'lastMessageContent': content,
-        'lastMessageTime': timestamp.toIso8601String(),
-        'hasUnreadMessages': hasUnread ? 1 : 0,
-      },
+      {'titre': titre, 'description': description},
       where: 'id = ?',
-      whereArgs: [conversationId],
+      whereArgs: [salonId],
     );
   }
 
-  Future<int> markConversationAsRead(String conversationId) async {
-    Database db = await database;
-    return await db.update(
-      conversationTable,
-      {'hasUnreadMessages': 0},
-      where: 'id = ?',
-      whereArgs: [conversationId],
-    );
+  // Pour la compatibilité avec l'ancien code
+  Future<int> updateConversationLastMessage(
+    int conversationId,
+    String content,
+    DateTime timestamp,
+    bool hasUnread,
+  ) async {
+    return await updateSalon(conversationId, 'Conversation', content);
   }
 
-  Future<int> deleteConversation(String conversationId) async {
+  Future<int> markConversationAsRead(int conversationId) async {
+    // Cette fonction n'a plus d'effet direct, mais est conservée pour la compatibilité
+    return 1;
+  }
+
+  Future<int> deleteSalon(int salonId) async {
     Database db = await database;
-    
-    // Supprimer tous les messages de la conversation
-    await db.rawDelete('''
-      DELETE FROM $messageTable 
-      WHERE id IN (
-        SELECT m.id FROM $messageTable m
-        JOIN $conversationTable c ON 
-          ((m.senderId = c.user1Id AND m.receiverId = c.user2Id) OR 
-           (m.senderId = c.user2Id AND m.receiverId = c.user1Id))
-        WHERE c.id = ?
-      )
-    ''', [conversationId]);
-    
-    // Supprimer la conversation
+
+    // Supprimer tous les messages associés au salon
+    await db.delete(messageTable, where: 'salon_id = ?', whereArgs: [salonId]);
+
+    // Supprimer le salon
     return await db.delete(
       conversationTable,
       where: 'id = ?',
-      whereArgs: [conversationId],
+      whereArgs: [salonId],
     );
   }
 
-  // Méthodes CRUD pour les paiements
-  Future<int> insertPayment(Payment payment) async {
+  // Pour la compatibilité avec l'ancien code
+  Future<int> deleteConversation(int conversationId) async {
+    return await deleteSalon(conversationId);
+  }
+
+  // Méthodes CRUD pour les paiements (paniers)
+  Future<int> insertPanier(MarketplacePanier panier) async {
     Database db = await database;
     return await db.insert(
       paymentTable,
-      payment.toMap(),
+      panier.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  Future<Payment?> getPaymentById(String id) async {
+  Future<MarketplacePanier?> getPanierById(int id) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       paymentTable,
@@ -1071,49 +1309,49 @@ class DatabaseHelper {
     );
 
     if (maps.isNotEmpty) {
-      return Payment.fromMap(maps.first);
+      return MarketplacePanier.fromMap(maps.first);
     }
     return null;
   }
 
-  Future<List<Payment>> getPaymentsByOrder(String orderId) async {
+  Future<List<MarketplacePanier>> getPaniersByProduit(int produitId) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       paymentTable,
-      where: 'orderId = ?',
-      whereArgs: [orderId],
+      where: 'produit_id = ?',
+      whereArgs: [produitId],
     );
-    return List.generate(maps.length, (i) => Payment.fromMap(maps[i]));
+    return List.generate(
+      maps.length,
+      (i) => MarketplacePanier.fromMap(maps[i]),
+    );
   }
 
-  Future<List<Payment>> getPaymentsByUser(String userId) async {
+  Future<List<MarketplacePanier>> getPaniersByUser(int userId) async {
     Database db = await database;
     List<Map<String, dynamic>> maps = await db.query(
       paymentTable,
-      where: 'userId = ?',
+      where: 'user_id = ?',
       whereArgs: [userId],
     );
-    return List.generate(maps.length, (i) => Payment.fromMap(maps[i]));
+    return List.generate(
+      maps.length,
+      (i) => MarketplacePanier.fromMap(maps[i]),
+    );
   }
 
-  Future<int> updatePayment(Payment payment) async {
+  Future<int> updatePanier(MarketplacePanier panier) async {
     Database db = await database;
     return await db.update(
       paymentTable,
-      payment.toMap(),
+      panier.toMap(),
       where: 'id = ?',
-      whereArgs: [payment.id],
+      whereArgs: [panier.id],
     );
   }
 
-  Future<int> deletePayment(String id) async {
+  Future<int> deletePanier(int id) async {
     Database db = await database;
-    return await db.delete(
-      paymentTable,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete(paymentTable, where: 'id = ?', whereArgs: [id]);
   }
 }
-
-

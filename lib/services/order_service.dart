@@ -1,27 +1,27 @@
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
-import '../models/order.dart';
+import '../models/marketplace_aommande.dart';
+import '../models/marketplace_produitvendus.dart';
 import 'database_helper.dart';
 import 'notification_service.dart';
 
 class OrderService with ChangeNotifier {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final NotificationService _notificationService = NotificationService();
-  List<PecheOrder> _orders = [];
+  List<MarketplaceAommande> _orders = [];
   bool _isLoading = false;
 
   // Getters
-  List<PecheOrder> get orders => _orders;
+  List<MarketplaceAommande> get orders => _orders;
   bool get isLoading => _isLoading;
 
   // Initialiser le service
   Future<void> init(String userId, String userType) async {
-    await loadOrders(userId, userType);
+    await loadOrders(int.tryParse(userId) ?? 0, userType);
     await _notificationService.init();
   }
 
   // Charger les commandes depuis la base de données
-  Future<void> loadOrders(String userId, String userType) async {
+  Future<void> loadOrders(int userId, String userType) async {
     _isLoading = true;
     notifyListeners();
 
@@ -41,35 +41,31 @@ class OrderService with ChangeNotifier {
 
   // Créer une nouvelle commande
   Future<bool> createOrder({
-    required String clientId,
-    required String fishId,
-    required String fishermanId,
-    required double quantity,
-    required double totalPrice,
-    String? deliveryAddress,
-    String? notes,
+    required int userId,
+    required String methodeDePaiement,
+    String? commentaire,
+    required double totale,
+    required int fournisseurId,
+    required List<MarketplaceProduitVendus> produits,
   }) async {
     try {
-      final newOrder = PecheOrder(
-        id: const Uuid().v4(),
-        clientId: clientId,
-        fishId: fishId,
-        fishermanId: fishermanId,
-        quantity: quantity,
-        totalPrice: totalPrice,
-        status: OrderStatus.pending,
-        orderDate: DateTime.now(),
-        deliveryAddress: deliveryAddress,
-        notes: notes,
+      final now = DateTime.now();
+      final newOrder = MarketplaceAommande.create(
+        userId: userId,
+        methodeDePaiement: methodeDePaiement,
+        commentaire: commentaire,
+        totale: totale,
+        statutCommande: 'pending',
+        fournisseurId: fournisseurId,
       );
 
-      await _dbHelper.insertOrder(newOrder);
+      await _dbHelper.insertCommande(newOrder, produits);
       _orders.add(newOrder);
       notifyListeners();
-      
+
       // Envoyer une notification au pêcheur
-      _sendNewOrderNotification(fishermanId, newOrder.id);
-      
+      _sendNewOrderNotification(fournisseurId, newOrder.id ?? 0);
+
       return true;
     } catch (e) {
       print('Erreur lors de la création de la commande: $e');
@@ -78,35 +74,28 @@ class OrderService with ChangeNotifier {
   }
 
   // Mettre à jour le statut d'une commande
-  Future<bool> updateOrderStatus(String orderId, OrderStatus newStatus) async {
+  Future<bool> updateOrderStatus(dynamic orderId, String newStatus) async {
     try {
       final order = await _dbHelper.getOrderById(orderId);
       if (order == null) return false;
 
-      final updatedOrder = PecheOrder(
-        id: order.id,
-        clientId: order.clientId,
-        fishId: order.fishId,
-        fishermanId: order.fishermanId,
-        quantity: order.quantity,
-        totalPrice: order.totalPrice,
-        status: newStatus,
-        orderDate: order.orderDate,
-        deliveryDate: newStatus == OrderStatus.delivered ? DateTime.now() : order.deliveryDate,
-        deliveryAddress: order.deliveryAddress,
-        notes: order.notes,
-      );
+      // Mettre à jour le statut de la commande
+      await _dbHelper.updateOrderStatus(orderId, newStatus);
 
-      await _dbHelper.updateOrder(updatedOrder);
-
+      // Mettre à jour la commande en mémoire
       final index = _orders.indexWhere((o) => o.id == orderId);
       if (index != -1) {
-        _orders[index] = updatedOrder;
+        _orders[index] = order.copyWith(
+          statutCommande: newStatus,
+          dateModification: DateTime.now(),
+        );
         notifyListeners();
       }
-      
+
       // Envoyer une notification au client
-      _sendOrderStatusUpdateNotification(order.clientId, orderId, newStatus);
+      if (order.userId != null) {
+        _sendOrderStatusUpdateNotification(order.userId!, orderId, newStatus);
+      }
 
       return true;
     } catch (e) {
@@ -116,7 +105,7 @@ class OrderService with ChangeNotifier {
   }
 
   // Obtenir une commande par son ID
-  PecheOrder? getOrderById(String id) {
+  MarketplaceAommande? getOrderById(dynamic id) {
     try {
       return _orders.firstWhere((order) => order.id == id);
     } catch (e) {
@@ -125,88 +114,151 @@ class OrderService with ChangeNotifier {
   }
 
   // Obtenir les commandes d'un client
-  List<PecheOrder> getOrdersByClient(String clientId) {
-    return _orders.where((order) => order.clientId == clientId).toList();
+  List<MarketplaceAommande> getOrdersByClient(int userId) {
+    return _orders.where((order) => order.userId == userId).toList();
   }
 
   // Obtenir les commandes d'un pêcheur
-  List<PecheOrder> getOrdersByFisherman(String fishermanId) {
-    return _orders.where((order) => order.fishermanId == fishermanId).toList();
+  List<MarketplaceAommande> getOrdersByFisherman(int fournisseurId) {
+    return _orders
+        .where((order) => order.fournisseurId == fournisseurId)
+        .toList();
   }
 
   // Annuler une commande
-  Future<bool> cancelOrder(String orderId) async {
-    return await updateOrderStatus(orderId, OrderStatus.cancelled);
+  Future<bool> cancelOrder(dynamic orderId) async {
+    return await updateOrderStatus(orderId, 'cancelled');
   }
-  
+
   // Envoyer une notification pour une nouvelle commande
-  Future<void> _sendNewOrderNotification(String fishermanId, String orderId) async {
+  Future<void> _sendNewOrderNotification(
+    int fournisseurId,
+    dynamic orderId,
+  ) async {
     try {
       // Récupérer les informations du pêcheur
-      final fisherman = await _dbHelper.getFishermanById(fishermanId);
+      final fisherman = await _dbHelper.getFishermanById(fournisseurId);
       if (fisherman == null) return;
-      
+
       // Récupérer les informations de la commande
       final order = await _dbHelper.getOrderById(orderId);
       if (order == null) return;
-      
-      // Récupérer les informations du poisson
-      final fish = await _dbHelper.getFishById(order.fishId);
-      if (fish == null) return;
-      
+
       // Envoyer la notification
       await _notificationService.showNotification(
         title: 'Nouvelle commande !',
-        body: 'Vous avez reçu une commande pour ${order.quantity} kg de ${fish.species}.',
+        body: 'Vous avez reçu une nouvelle commande de ${order.totale} €.',
         payload: 'order:$orderId',
       );
     } catch (e) {
       print('Erreur lors de l\'envoi de la notification: $e');
     }
   }
-  
+
   // Envoyer une notification pour une mise à jour de statut de commande
-  Future<void> _sendOrderStatusUpdateNotification(String clientId, String orderId, OrderStatus status) async {
+  Future<void> _sendOrderStatusUpdateNotification(
+    int userId,
+    dynamic orderId,
+    String status,
+  ) async {
     try {
       // Récupérer les informations du client
-      final client = await _dbHelper.getUserById(clientId);
+      final client = await _dbHelper.getUserById(userId);
       if (client == null) return;
-      
+
       // Récupérer les informations de la commande
       final order = await _dbHelper.getOrderById(orderId);
       if (order == null) return;
-      
-      // Récupérer les informations du poisson
-      final fish = await _dbHelper.getFishById(order.fishId);
-      if (fish == null) return;
-      
+
       // Déterminer le message en fonction du statut
       String statusMessage;
       switch (status) {
-        case OrderStatus.confirmed:
+        case 'confirmed':
           statusMessage = 'Votre commande a été confirmée.';
           break;
-        case OrderStatus.inProgress:
+        case 'in_progress':
           statusMessage = 'Votre commande est en cours de préparation.';
           break;
-        case OrderStatus.delivered:
+        case 'delivered':
           statusMessage = 'Votre commande a été livrée.';
           break;
-        case OrderStatus.cancelled:
+        case 'cancelled':
           statusMessage = 'Votre commande a été annulée.';
           break;
         default:
           statusMessage = 'Le statut de votre commande a été mis à jour.';
       }
-      
+
       // Envoyer la notification
       await _notificationService.showNotification(
         title: 'Mise à jour de commande',
-        body: '$statusMessage (${fish.species})',
+        body: '$statusMessage (Commande #${order.reference})',
         payload: 'order:$orderId',
       );
     } catch (e) {
       print('Erreur lors de l\'envoi de la notification: $e');
     }
+  }
+
+  // Rechercher des commandes
+  List<MarketplaceAommande> searchOrders(String query) {
+    if (query.isEmpty) {
+      return _orders;
+    }
+
+    final lowercaseQuery = query.toLowerCase();
+    return _orders.where((order) {
+      return order.reference.toLowerCase().contains(lowercaseQuery) ||
+          (order.commentaire != null &&
+              order.commentaire!.toLowerCase().contains(lowercaseQuery));
+    }).toList();
+  }
+
+  // Filtrer les commandes par statut
+  List<MarketplaceAommande> filterOrdersByStatus(String status) {
+    return _orders.where((order) => order.statutCommande == status).toList();
+  }
+
+  // Filtrer les commandes par période
+  List<MarketplaceAommande> filterOrdersByPeriod(
+    DateTime startDate,
+    DateTime endDate,
+  ) {
+    return _orders.where((order) {
+      return order.createdAt.isAfter(startDate) &&
+          order.createdAt.isBefore(endDate.add(const Duration(days: 1)));
+    }).toList();
+  }
+
+  // Trier les commandes
+  List<MarketplaceAommande> sortOrders(
+    List<MarketplaceAommande> orders,
+    String sortBy,
+    bool ascending,
+  ) {
+    switch (sortBy) {
+      case 'date':
+        orders.sort((a, b) {
+          return ascending
+              ? a.createdAt.compareTo(b.createdAt)
+              : b.createdAt.compareTo(a.createdAt);
+        });
+        break;
+      case 'status':
+        orders.sort((a, b) {
+          return ascending
+              ? a.statutCommande.compareTo(b.statutCommande)
+              : b.statutCommande.compareTo(a.statutCommande);
+        });
+        break;
+      case 'amount':
+        orders.sort((a, b) {
+          return ascending
+              ? a.totale.compareTo(b.totale)
+              : b.totale.compareTo(a.totale);
+        });
+        break;
+    }
+    return orders;
   }
 }

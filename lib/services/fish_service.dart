@@ -1,17 +1,16 @@
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
-import '../models/fish.dart';
-import '../models/review.dart';
+import '../models/marketplace_produit.dart';
+import '../models/marketplace_avis.dart';
 import 'database_helper.dart';
 
 class FishService with ChangeNotifier {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  List<Fish> _fishes = [];
-  List<Review> _reviews = [];
+  List<MarketplaceProduit> _fishes = [];
+  List<MarketplaceAvis> _reviews = [];
   bool _isLoading = false;
 
   // Getters
-  List<Fish> get fishes => _fishes;
+  List<MarketplaceProduit> get fishes => _fishes;
   bool get isLoading => _isLoading;
 
   // Constructeur
@@ -32,7 +31,7 @@ class FishService with ChangeNotifier {
     notifyListeners();
 
     try {
-      _fishes = await _dbHelper.getAllFishes();
+      _fishes = await _dbHelper.getAllProduits();
     } catch (e) {
       print('Erreur lors du chargement des poissons: $e');
     } finally {
@@ -46,15 +45,7 @@ class FishService with ChangeNotifier {
     try {
       // Pour simplifier, nous chargeons tous les avis
       // Dans une vraie app, vous pourriez les charger à la demande
-      final allFishes = await _dbHelper.getAllFishes();
-
-      List<Review> allReviews = [];
-      for (var fish in allFishes) {
-        final fishReviews = await _dbHelper.getReviewsByFish(fish.id);
-        allReviews.addAll(fishReviews);
-      }
-
-      _reviews = allReviews;
+      _reviews = await _dbHelper.getAllAvis();
       notifyListeners();
     } catch (e) {
       print('Erreur lors du chargement des avis: $e');
@@ -62,27 +53,35 @@ class FishService with ChangeNotifier {
   }
 
   // Obtenir tous les poissons
-  List<Fish> getAllFishes() {
+  List<MarketplaceProduit> getAllFishes() {
     return _fishes;
   }
 
   // Obtenir un poisson par son ID
-  Fish? getFishById(String id) {
+  MarketplaceProduit? getFishById(String id) {
     try {
-      return _fishes.firstWhere((fish) => fish.id == id);
+      final idInt = int.tryParse(id);
+      if (idInt == null) return null;
+      return _fishes.firstWhere((fish) => fish.id == idInt);
     } catch (e) {
       return null;
     }
   }
 
   // Obtenir les poissons d'un pêcheur
-  List<Fish> getFishesByFishermanId(String fishermanId) {
-    return _fishes.where((fish) => fish.fishermanId == fishermanId).toList();
+  List<MarketplaceProduit> getFishesByFishermanId(String fishermanId) {
+    final fishermanIdInt = int.tryParse(fishermanId);
+    if (fishermanIdInt == null) return [];
+
+    return _fishes.where((fish) => fish.userId == fishermanIdInt).toList();
   }
 
   // Obtenir les avis pour un poisson
-  List<Review> getReviewsForFish(String fishId) {
-    return _reviews.where((review) => review.fishId == fishId).toList();
+  List<MarketplaceAvis> getReviewsForFish(String fishId) {
+    final fishIdInt = int.tryParse(fishId);
+    if (fishIdInt == null) return [];
+
+    return _reviews.where((review) => review.produitId == fishIdInt).toList();
   }
 
   // Calculer la note moyenne pour un poisson
@@ -90,17 +89,32 @@ class FishService with ChangeNotifier {
     final reviews = getReviewsForFish(fishId);
     if (reviews.isEmpty) return 0;
 
-    final totalRating = reviews.fold(0.0, (sum, review) => sum + review.rating);
+    final totalRating = reviews.fold(
+      0.0,
+      (sum, review) => sum + review.etoileNb.toDouble(),
+    );
     return totalRating / reviews.length;
   }
 
   // Ajouter un avis
-  Future<bool> addReview(Review review) async {
+  Future<bool> addReview(MarketplaceAvis review) async {
     try {
-      await _dbHelper.insertReview(review);
-      _reviews.add(review);
-      notifyListeners();
-      return true;
+      final id = await _dbHelper.insertAvis(review);
+      if (id > 0) {
+        // Créer une nouvelle instance avec l'ID
+        final newReview = MarketplaceAvis(
+          id: id,
+          produitId: review.produitId,
+          userId: review.userId,
+          etoileNb: review.etoileNb,
+          commentaire: review.commentaire,
+          createdAt: review.createdAt,
+        );
+        _reviews.add(newReview);
+        notifyListeners();
+        return true;
+      }
+      return false;
     } catch (e) {
       print('Erreur lors de l\'ajout de l\'avis: $e');
       return false;
@@ -108,12 +122,31 @@ class FishService with ChangeNotifier {
   }
 
   // Ajouter un poisson
-  Future<bool> addFish(Fish fish) async {
+  Future<bool> addFish(MarketplaceProduit fish) async {
     try {
-      await _dbHelper.insertFish(fish);
-      _fishes.add(fish);
-      notifyListeners();
-      return true;
+      final id = await _dbHelper.insertProduit(fish);
+      if (id > 0) {
+        // Créer une nouvelle instance avec l'ID
+        final newFish = MarketplaceProduit(
+          id: id,
+          userId: fish.userId,
+          nom: fish.nom,
+          description: fish.description,
+          stock: fish.stock,
+          prix: fish.prix,
+          min: fish.min,
+          max: fish.max,
+          vu: fish.vu,
+          visibilite: fish.visibilite,
+          typologie: fish.typologie,
+          dateDePeche: fish.dateDePeche,
+          zoneDePeche: fish.zoneDePeche,
+        );
+        _fishes.add(newFish);
+        notifyListeners();
+        return true;
+      }
+      return false;
     } catch (e) {
       print('Erreur lors de l\'ajout du poisson: $e');
       return false;
@@ -121,15 +154,18 @@ class FishService with ChangeNotifier {
   }
 
   // Mettre à jour un poisson
-  Future<bool> updateFish(Fish fish) async {
+  Future<bool> updateFish(MarketplaceProduit fish) async {
     try {
-      await _dbHelper.updateFish(fish);
-      final index = _fishes.indexWhere((f) => f.id == fish.id);
-      if (index != -1) {
-        _fishes[index] = fish;
-        notifyListeners();
+      final result = await _dbHelper.updateProduit(fish);
+      if (result > 0) {
+        final index = _fishes.indexWhere((f) => f.id == fish.id);
+        if (index != -1) {
+          _fishes[index] = fish;
+          notifyListeners();
+        }
+        return true;
       }
-      return true;
+      return false;
     } catch (e) {
       print('Erreur lors de la mise à jour du poisson: $e');
       return false;
@@ -139,10 +175,16 @@ class FishService with ChangeNotifier {
   // Supprimer un poisson
   Future<bool> deleteFish(String id) async {
     try {
-      await _dbHelper.deleteFish(id);
-      _fishes.removeWhere((fish) => fish.id == id);
-      notifyListeners();
-      return true;
+      final idInt = int.tryParse(id);
+      if (idInt == null) return false;
+
+      final result = await _dbHelper.deleteProduit(idInt);
+      if (result > 0) {
+        _fishes.removeWhere((fish) => fish.id == idInt);
+        notifyListeners();
+        return true;
+      }
+      return false;
     } catch (e) {
       print('Erreur lors de la suppression du poisson: $e');
       return false;
@@ -150,14 +192,14 @@ class FishService with ChangeNotifier {
   }
 
   // Rechercher des poissons
-  List<Fish> searchFishes(String query) {
+  List<MarketplaceProduit> searchFishes(String query) {
     if (query.isEmpty) {
       return [];
     }
 
     final lowercaseQuery = query.toLowerCase();
     return _fishes.where((fish) {
-      return fish.species.toLowerCase().contains(lowercaseQuery);
+      return fish.nom.toLowerCase().contains(lowercaseQuery);
     }).toList();
   }
 
@@ -165,76 +207,86 @@ class FishService with ChangeNotifier {
   Future<void> _addTestFishesIfEmpty() async {
     try {
       // Vérifier si des poissons existent déjà
-      final existingFishes = await _dbHelper.getAllFishes();
+      final existingFishes = await _dbHelper.getAllProduits();
       if (existingFishes.isNotEmpty) return;
 
       // Ajouter quelques poissons de test
       final testFishes = [
-        Fish(
-          id: const Uuid().v4(),
-          species: 'Bar commun',
-          imageUrl: 'https://images.unsplash.com/photo-1545816250-e12bedba42ba?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-          weight: 2.5,
-          length: 45.0,
-          location: 'Côte atlantique',
-          fishingMethod: 'Canne à pêche',
-          captureDate: DateTime.now().subtract(const Duration(days: 2)),
-          fishermanId: '1', // ID du pêcheur de test
+        MarketplaceProduit(
+          userId: 1, // ID du pêcheur de test
+          nom: 'Bar commun',
+          description: 'Bar frais pêché ce matin',
+          stock: 10,
+          prix: 12.5,
+          min: 1,
+          max: 100,
+          vu: 0,
+          visibilite: true,
+          typologie: 'Poisson',
+          dateDePeche:
+              DateTime.now().subtract(const Duration(days: 2)).toString(),
+          zoneDePeche: 'Côte atlantique',
         ),
-        Fish(
-          id: const Uuid().v4(),
-          species: 'Dorade royale',
-          imageUrl: 'https://images.unsplash.com/photo-1579168765467-3b235f938439?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-          weight: 1.8,
-          length: 35.0,
-          location: 'Méditerranée',
-          fishingMethod: 'Filet',
-          captureDate: DateTime.now().subtract(const Duration(days: 5)),
-          fishermanId: '1', // ID du pêcheur de test
+        MarketplaceProduit(
+          userId: 1, // ID du pêcheur de test
+          nom: 'Dorade royale',
+          description: 'Dorade fraîche de Méditerranée',
+          stock: 5,
+          prix: 15.0,
+          min: 1,
+          max: 100,
+          vu: 0,
+          visibilite: true,
+          typologie: 'Poisson',
+          dateDePeche:
+              DateTime.now().subtract(const Duration(days: 5)).toString(),
+          zoneDePeche: 'Méditerranée',
         ),
-        Fish(
-          id: const Uuid().v4(),
-          species: 'Maquereau',
-          imageUrl: 'https://images.unsplash.com/photo-1574781330855-d0db8cc6a79c?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-          weight: 0.9,
-          length: 28.0,
-          location: 'Manche',
-          fishingMethod: 'Ligne de traîne',
-          captureDate: DateTime.now().subtract(const Duration(days: 10)),
-          fishermanId: '1', // ID du pêcheur de test
+        MarketplaceProduit(
+          userId: 1, // ID du pêcheur de test
+          nom: 'Maquereau',
+          description: 'Maquereau frais pêché en Manche',
+          stock: 20,
+          prix: 8.5,
+          min: 1,
+          max: 100,
+          vu: 0,
+          visibilite: true,
+          typologie: 'Poisson',
+          dateDePeche:
+              DateTime.now().subtract(const Duration(days: 10)).toString(),
+          zoneDePeche: 'Manche',
         ),
       ];
 
       for (var fish in testFishes) {
-        await _dbHelper.insertFish(fish);
+        await _dbHelper.insertProduit(fish);
       }
 
       // Ajouter quelques avis de test
+      final loadedFishes = await _dbHelper.getAllProduits();
+      if (loadedFishes.isEmpty) return;
+
       final testReviews = [
-        Review(
-          id: const Uuid().v4(),
-          fishId: testFishes[0].id,
-          userId: '2', // ID du client de test
-          userName: 'Jean Martin',
-          userImageUrl: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-          rating: 4.5,
-          comment: 'Excellent poisson, très frais et savoureux !',
+        MarketplaceAvis(
+          produitId: loadedFishes[0].id,
+          userId: 2, // ID du client de test
+          etoileNb: 4,
+          commentaire: 'Excellent poisson, très frais et savoureux !',
           createdAt: DateTime.now().subtract(const Duration(days: 1)),
         ),
-        Review(
-          id: const Uuid().v4(),
-          fishId: testFishes[1].id,
-          userId: '2', // ID du client de test
-          userName: 'Jean Martin',
-          userImageUrl: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
-          rating: 5.0,
-          comment: 'La dorade était parfaite, je recommande vivement !',
+        MarketplaceAvis(
+          produitId:
+              loadedFishes.length > 1 ? loadedFishes[1].id : loadedFishes[0].id,
+          userId: 2, // ID du client de test
+          etoileNb: 5,
+          commentaire: 'La dorade était parfaite, je recommande vivement !',
           createdAt: DateTime.now().subtract(const Duration(days: 3)),
         ),
       ];
 
       for (var review in testReviews) {
-        await _dbHelper.insertReview(review);
+        await _dbHelper.insertAvis(review);
       }
 
       // Recharger les poissons et les avis
