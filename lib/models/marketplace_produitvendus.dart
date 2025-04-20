@@ -1,38 +1,34 @@
-/// Représente un produit vendu dans une commande, correspondant à la table `marketplace_produitvendus` dans la base de données.
+/// Représente un produit vendu dans le système, correspondant à la table `marketplace_produitvendus` dans la base de données.
 class MarketplaceProduitVendus {
   final int? id;
-  final int? commandeId;
   final int? produitId;
-  final String nom;
+  final int? commandeId;
   final int quantite;
   final double prix;
-  final double totale;
+  final double total;
 
   MarketplaceProduitVendus({
     this.id,
-    this.commandeId,
     this.produitId,
-    required this.nom,
+    this.commandeId,
     required this.quantite,
     required this.prix,
-    required this.totale,
+    required this.total,
   });
 
   /// Crée un nouveau produit vendu
   factory MarketplaceProduitVendus.create({
-    int? commandeId,
     int? produitId,
-    required String nom,
+    int? commandeId,
     required int quantite,
     required double prix,
   }) {
     return MarketplaceProduitVendus(
-      commandeId: commandeId,
       produitId: produitId,
-      nom: nom,
+      commandeId: commandeId,
       quantite: quantite,
       prix: prix,
-      totale: prix * quantite,
+      total: prix * quantite,
     );
   }
 
@@ -40,12 +36,11 @@ class MarketplaceProduitVendus {
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
-      'commande_id': commandeId,
-      'produit_id': produitId,
-      'nom': nom,
+      if (produitId != null) 'produit_id': produitId,
+      if (commandeId != null) 'commande_id': commandeId,
       'quantite': quantite,
       'prix': prix,
-      'totale': totale,
+      'total': total,
     };
   }
 
@@ -53,33 +48,40 @@ class MarketplaceProduitVendus {
   factory MarketplaceProduitVendus.fromMap(Map<String, dynamic> map) {
     return MarketplaceProduitVendus(
       id: map['id'],
-      commandeId: map['commande_id'],
       produitId: map['produit_id'],
-      nom: map['nom'],
-      quantite: map['quantite'],
-      prix: map['prix'] is int ? (map['prix'] as int).toDouble() : map['prix'],
-      totale: map['totale'] is int ? (map['totale'] as int).toDouble() : map['totale'],
+      commandeId: map['commande_id'],
+      quantite: map['quantite'] ?? 0,
+      prix: map['prix'] ?? 0.0,
+      total: map['total'] ?? 0.0,
     );
   }
 
   /// Crée une copie du produit vendu avec des modifications
   MarketplaceProduitVendus copyWith({
     int? id,
-    int? commandeId,
     int? produitId,
-    String? nom,
+    int? commandeId,
     int? quantite,
     double? prix,
-    double? totale,
+    double? total,
   }) {
     return MarketplaceProduitVendus(
       id: id ?? this.id,
-      commandeId: commandeId ?? this.commandeId,
       produitId: produitId ?? this.produitId,
-      nom: nom ?? this.nom,
+      commandeId: commandeId ?? this.commandeId,
       quantite: quantite ?? this.quantite,
       prix: prix ?? this.prix,
-      totale: totale ?? this.totale,
+      total: total ?? (prix != null || quantite != null 
+          ? (prix ?? this.prix) * (quantite ?? this.quantite) 
+          : this.total),
+    );
+  }
+
+  /// Met à jour la quantité et recalcule le total
+  MarketplaceProduitVendus updateQuantite(int newQuantite) {
+    return copyWith(
+      quantite: newQuantite,
+      total: prix * newQuantite,
     );
   }
 }

@@ -1,51 +1,43 @@
-/// Représente un pêcheur dans le système, correspondant à la table `marketplace_pecheur` dans la base de données.
-class MarketplacePecheur {
+/// Représente un maryeur dans le système, correspondant à la table `marketplace_maryeur` dans la base de données.
+class MarketplaceMaryeur {
   final int? id;
   final String nom;
   final String prenom;
   final String adresse;
   final String telephone;
   final String email;
-  final String? bateau;
-  final String? licence;
   final int? userId;
 
-  MarketplacePecheur({
+  MarketplaceMaryeur({
     this.id,
     required this.nom,
     required this.prenom,
     required this.adresse,
     required this.telephone,
     required this.email,
-    this.bateau,
-    this.licence,
     this.userId,
   });
 
-  /// Crée un nouveau pêcheur
-  factory MarketplacePecheur.create({
+  /// Crée un nouveau maryeur
+  factory MarketplaceMaryeur.create({
     required String nom,
     required String prenom,
     required String adresse,
     required String telephone,
     required String email,
-    String? bateau,
-    String? licence,
     int? userId,
   }) {
-    return MarketplacePecheur(
+    return MarketplaceMaryeur(
       nom: nom,
       prenom: prenom,
       adresse: adresse,
       telephone: telephone,
       email: email,
-      bateau: bateau,
-      licence: licence,
       userId: userId,
     );
   }
 
-  /// Convertit un pêcheur en Map pour SQLite
+  /// Convertit un maryeur en Map pour SQLite
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
@@ -54,52 +46,44 @@ class MarketplacePecheur {
       'adresse': adresse,
       'telephone': telephone,
       'email': email,
-      if (bateau != null) 'bateau': bateau,
-      if (licence != null) 'licence': licence,
       if (userId != null) 'user_id': userId,
     };
   }
 
-  /// Crée un pêcheur à partir d'un Map de SQLite
-  factory MarketplacePecheur.fromMap(Map<String, dynamic> map) {
-    return MarketplacePecheur(
+  /// Crée un maryeur à partir d'un Map de SQLite
+  factory MarketplaceMaryeur.fromMap(Map<String, dynamic> map) {
+    return MarketplaceMaryeur(
       id: map['id'],
       nom: map['nom'] ?? '',
       prenom: map['prenom'] ?? '',
       adresse: map['adresse'] ?? '',
       telephone: map['telephone'] ?? '',
       email: map['email'] ?? '',
-      bateau: map['bateau'],
-      licence: map['licence'],
       userId: map['user_id'],
     );
   }
 
-  /// Crée une copie du pêcheur avec des modifications
-  MarketplacePecheur copyWith({
+  /// Crée une copie du maryeur avec des modifications
+  MarketplaceMaryeur copyWith({
     int? id,
     String? nom,
     String? prenom,
     String? adresse,
     String? telephone,
     String? email,
-    String? bateau,
-    String? licence,
     int? userId,
   }) {
-    return MarketplacePecheur(
+    return MarketplaceMaryeur(
       id: id ?? this.id,
       nom: nom ?? this.nom,
       prenom: prenom ?? this.prenom,
       adresse: adresse ?? this.adresse,
       telephone: telephone ?? this.telephone,
       email: email ?? this.email,
-      bateau: bateau ?? this.bateau,
-      licence: licence ?? this.licence,
       userId: userId ?? this.userId,
     );
   }
 
-  /// Obtient le nom complet du pêcheur
+  /// Obtient le nom complet du maryeur
   String get fullName => '$prenom $nom';
 }

@@ -1,5 +1,3 @@
-import 'package:uuid/uuid.dart';
-
 /// Représente une commande dans le système, correspondant à la table `marketplace_aommande` dans la base de données.
 class MarketplaceAommande {
   final int? id;
@@ -26,7 +24,7 @@ class MarketplaceAommande {
     this.fournisseurId,
   });
 
-  /// Crée une nouvelle commande avec une référence générée
+  /// Crée une nouvelle commande
   factory MarketplaceAommande.create({
     int? userId,
     required String methodeDePaiement,
@@ -44,7 +42,7 @@ class MarketplaceAommande {
       statutCommande: statutCommande,
       createdAt: now,
       dateModification: now,
-      reference: 'GIPP${const Uuid().v4().substring(0, 16).toUpperCase()}',
+      reference: 'CMD-${DateTime.now().millisecondsSinceEpoch}',
       fournisseurId: fournisseurId,
     );
   }
@@ -53,15 +51,15 @@ class MarketplaceAommande {
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
-      'user_id': userId,
+      if (userId != null) 'user_id': userId,
       'methode_de_paiement': methodeDePaiement,
-      'commentaire': commentaire,
+      if (commentaire != null) 'commentaire': commentaire,
       'totale': totale,
       'statut_commande': statutCommande,
       'created_at': createdAt.toIso8601String(),
       'date_modification': dateModification.toIso8601String(),
       'reference': reference,
-      'fournisseur_id': fournisseurId,
+      if (fournisseurId != null) 'fournisseur_id': fournisseurId,
     };
   }
 
@@ -70,13 +68,17 @@ class MarketplaceAommande {
     return MarketplaceAommande(
       id: map['id'],
       userId: map['user_id'],
-      methodeDePaiement: map['methode_de_paiement'],
+      methodeDePaiement: map['methode_de_paiement'] ?? '',
       commentaire: map['commentaire'],
-      totale: map['totale'] is int ? (map['totale'] as int).toDouble() : map['totale'],
-      statutCommande: map['statut_commande'],
-      createdAt: DateTime.parse(map['created_at']),
-      dateModification: DateTime.parse(map['date_modification']),
-      reference: map['reference'],
+      totale: map['totale'] ?? 0.0,
+      statutCommande: map['statut_commande'] ?? 'En Attente',
+      createdAt: map['created_at'] != null 
+          ? DateTime.parse(map['created_at']) 
+          : DateTime.now(),
+      dateModification: map['date_modification'] != null 
+          ? DateTime.parse(map['date_modification']) 
+          : DateTime.now(),
+      reference: map['reference'] ?? '',
       fournisseurId: map['fournisseur_id'],
     );
   }

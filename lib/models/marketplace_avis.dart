@@ -1,34 +1,43 @@
 /// Représente un avis dans le système, correspondant à la table `marketplace_avis` dans la base de données.
 class MarketplaceAvis {
   final int? id;
-  final int? produitId;
-  final int? userId;
-  final int etoileNb;
+  final int note;
   final String commentaire;
-  final DateTime createdAt;
+  final DateTime dateCreation;
+  final int? userId;
+  final int? produitId;
+  final int? pecheurId;
 
   MarketplaceAvis({
     this.id,
-    this.produitId,
-    this.userId,
-    required this.etoileNb,
+    required this.note,
     required this.commentaire,
-    required this.createdAt,
+    required this.dateCreation,
+    this.userId,
+    this.produitId,
+    this.pecheurId,
   });
 
   /// Crée un nouvel avis
   factory MarketplaceAvis.create({
-    int? produitId,
-    int? userId,
-    required int etoileNb,
+    required int note,
     required String commentaire,
+    int? userId,
+    int? produitId,
+    int? pecheurId,
   }) {
+    // Validation de la note
+    if (note < 1 || note > 5) {
+      throw ArgumentError('La note doit être comprise entre 1 et 5');
+    }
+
     return MarketplaceAvis(
-      produitId: produitId,
-      userId: userId,
-      etoileNb: etoileNb,
+      note: note,
       commentaire: commentaire,
-      createdAt: DateTime.now(),
+      dateCreation: DateTime.now(),
+      userId: userId,
+      produitId: produitId,
+      pecheurId: pecheurId,
     );
   }
 
@@ -36,11 +45,12 @@ class MarketplaceAvis {
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
-      if (produitId != null) 'produit_id': produitId,
-      if (userId != null) 'user_id': userId,
-      'etoile_nb': etoileNb,
+      'note': note,
       'commentaire': commentaire,
-      'created_at': createdAt.toIso8601String(),
+      'date_creation': dateCreation.toIso8601String(),
+      if (userId != null) 'user_id': userId,
+      if (produitId != null) 'produit_id': produitId,
+      if (pecheurId != null) 'pecheur_id': pecheurId,
     };
   }
 
@@ -48,32 +58,35 @@ class MarketplaceAvis {
   factory MarketplaceAvis.fromMap(Map<String, dynamic> map) {
     return MarketplaceAvis(
       id: map['id'],
-      produitId: map['produit_id'],
-      userId: map['user_id'],
-      etoileNb: map['etoile_nb'] ?? 0,
+      note: map['note'] ?? 0,
       commentaire: map['commentaire'] ?? '',
-      createdAt: map['created_at'] != null
-          ? DateTime.parse(map['created_at'])
+      dateCreation: map['date_creation'] != null 
+          ? DateTime.parse(map['date_creation']) 
           : DateTime.now(),
+      userId: map['user_id'],
+      produitId: map['produit_id'],
+      pecheurId: map['pecheur_id'],
     );
   }
 
   /// Crée une copie de l'avis avec des modifications
   MarketplaceAvis copyWith({
     int? id,
-    int? produitId,
-    int? userId,
-    int? etoileNb,
+    int? note,
     String? commentaire,
-    DateTime? createdAt,
+    DateTime? dateCreation,
+    int? userId,
+    int? produitId,
+    int? pecheurId,
   }) {
     return MarketplaceAvis(
       id: id ?? this.id,
-      produitId: produitId ?? this.produitId,
-      userId: userId ?? this.userId,
-      etoileNb: etoileNb ?? this.etoileNb,
+      note: note ?? this.note,
       commentaire: commentaire ?? this.commentaire,
-      createdAt: createdAt ?? this.createdAt,
+      dateCreation: dateCreation ?? this.dateCreation,
+      userId: userId ?? this.userId,
+      produitId: produitId ?? this.produitId,
+      pecheurId: pecheurId ?? this.pecheurId,
     );
   }
 }

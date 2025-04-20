@@ -1,30 +1,30 @@
 /// Représente un panier dans le système, correspondant à la table `marketplace_panier` dans la base de données.
 class MarketplacePanier {
   final int? id;
-  final int? produitId;
   final int? userId;
+  final int? produitId;
   final int quantite;
-  final DateTime createdAt;
+  final DateTime dateAjout;
 
   MarketplacePanier({
     this.id,
-    this.produitId,
     this.userId,
+    this.produitId,
     required this.quantite,
-    required this.createdAt,
+    required this.dateAjout,
   });
 
   /// Crée un nouveau panier
   factory MarketplacePanier.create({
-    int? produitId,
     int? userId,
+    int? produitId,
     required int quantite,
   }) {
     return MarketplacePanier(
-      produitId: produitId,
       userId: userId,
+      produitId: produitId,
       quantite: quantite,
-      createdAt: DateTime.now(),
+      dateAjout: DateTime.now(),
     );
   }
 
@@ -32,10 +32,10 @@ class MarketplacePanier {
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
-      if (produitId != null) 'produit_id': produitId,
       if (userId != null) 'user_id': userId,
+      if (produitId != null) 'produit_id': produitId,
       'quantite': quantite,
-      'created_at': createdAt.toIso8601String(),
+      'date_ajout': dateAjout.toIso8601String(),
     };
   }
 
@@ -43,11 +43,11 @@ class MarketplacePanier {
   factory MarketplacePanier.fromMap(Map<String, dynamic> map) {
     return MarketplacePanier(
       id: map['id'],
-      produitId: map['produit_id'],
       userId: map['user_id'],
+      produitId: map['produit_id'],
       quantite: map['quantite'] ?? 0,
-      createdAt: map['created_at'] != null
-          ? DateTime.parse(map['created_at'])
+      dateAjout: map['date_ajout'] != null 
+          ? DateTime.parse(map['date_ajout']) 
           : DateTime.now(),
     );
   }
@@ -55,17 +55,22 @@ class MarketplacePanier {
   /// Crée une copie du panier avec des modifications
   MarketplacePanier copyWith({
     int? id,
-    int? produitId,
     int? userId,
+    int? produitId,
     int? quantite,
-    DateTime? createdAt,
+    DateTime? dateAjout,
   }) {
     return MarketplacePanier(
       id: id ?? this.id,
-      produitId: produitId ?? this.produitId,
       userId: userId ?? this.userId,
+      produitId: produitId ?? this.produitId,
       quantite: quantite ?? this.quantite,
-      createdAt: createdAt ?? this.createdAt,
+      dateAjout: dateAjout ?? this.dateAjout,
     );
+  }
+
+  /// Met à jour la quantité
+  MarketplacePanier updateQuantite(int newQuantite) {
+    return copyWith(quantite: newQuantite);
   }
 }

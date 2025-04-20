@@ -63,6 +63,11 @@ class MarketplaceUser {
     bool? isValid,
     String? adresse,
   }) {
+    // Validation de l'email
+    if (!email.contains('@')) {
+      throw ArgumentError('Email invalide');
+    }
+    
     return MarketplaceUser(
       email: email,
       roles: roles,
@@ -114,11 +119,11 @@ class MarketplaceUser {
   factory MarketplaceUser.fromMap(Map<String, dynamic> map) {
     return MarketplaceUser(
       id: map['id'],
-      email: map['email'],
+      email: map['email'] ?? '',
       roles: jsonToRolesList(map['roles']),
-      password: map['password'],
-      nom: map['nom'],
-      prenom: map['prenom'],
+      password: map['password'] ?? '',
+      nom: map['nom'] ?? '',
+      prenom: map['prenom'] ?? '',
       telephone: map['telephone'],
       isVerified: map['is_verified'] == 1,
       isBlocked: map['is_blocked'] == 1,

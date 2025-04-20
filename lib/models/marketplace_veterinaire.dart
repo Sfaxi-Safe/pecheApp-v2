@@ -1,51 +1,47 @@
-/// Représente un pêcheur dans le système, correspondant à la table `marketplace_pecheur` dans la base de données.
-class MarketplacePecheur {
+/// Représente un vétérinaire dans le système, correspondant à la table `marketplace_vitirinaire` dans la base de données.
+class MarketplaceVeterinaire {
   final int? id;
   final String nom;
   final String prenom;
   final String adresse;
   final String telephone;
   final String email;
-  final String? bateau;
-  final String? licence;
+  final String? specialite;
   final int? userId;
 
-  MarketplacePecheur({
+  MarketplaceVeterinaire({
     this.id,
     required this.nom,
     required this.prenom,
     required this.adresse,
     required this.telephone,
     required this.email,
-    this.bateau,
-    this.licence,
+    this.specialite,
     this.userId,
   });
 
-  /// Crée un nouveau pêcheur
-  factory MarketplacePecheur.create({
+  /// Crée un nouveau vétérinaire
+  factory MarketplaceVeterinaire.create({
     required String nom,
     required String prenom,
     required String adresse,
     required String telephone,
     required String email,
-    String? bateau,
-    String? licence,
+    String? specialite,
     int? userId,
   }) {
-    return MarketplacePecheur(
+    return MarketplaceVeterinaire(
       nom: nom,
       prenom: prenom,
       adresse: adresse,
       telephone: telephone,
       email: email,
-      bateau: bateau,
-      licence: licence,
+      specialite: specialite,
       userId: userId,
     );
   }
 
-  /// Convertit un pêcheur en Map pour SQLite
+  /// Convertit un vétérinaire en Map pour SQLite
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
@@ -54,52 +50,48 @@ class MarketplacePecheur {
       'adresse': adresse,
       'telephone': telephone,
       'email': email,
-      if (bateau != null) 'bateau': bateau,
-      if (licence != null) 'licence': licence,
+      if (specialite != null) 'specialite': specialite,
       if (userId != null) 'user_id': userId,
     };
   }
 
-  /// Crée un pêcheur à partir d'un Map de SQLite
-  factory MarketplacePecheur.fromMap(Map<String, dynamic> map) {
-    return MarketplacePecheur(
+  /// Crée un vétérinaire à partir d'un Map de SQLite
+  factory MarketplaceVeterinaire.fromMap(Map<String, dynamic> map) {
+    return MarketplaceVeterinaire(
       id: map['id'],
       nom: map['nom'] ?? '',
       prenom: map['prenom'] ?? '',
       adresse: map['adresse'] ?? '',
       telephone: map['telephone'] ?? '',
       email: map['email'] ?? '',
-      bateau: map['bateau'],
-      licence: map['licence'],
+      specialite: map['specialite'],
       userId: map['user_id'],
     );
   }
 
-  /// Crée une copie du pêcheur avec des modifications
-  MarketplacePecheur copyWith({
+  /// Crée une copie du vétérinaire avec des modifications
+  MarketplaceVeterinaire copyWith({
     int? id,
     String? nom,
     String? prenom,
     String? adresse,
     String? telephone,
     String? email,
-    String? bateau,
-    String? licence,
+    String? specialite,
     int? userId,
   }) {
-    return MarketplacePecheur(
+    return MarketplaceVeterinaire(
       id: id ?? this.id,
       nom: nom ?? this.nom,
       prenom: prenom ?? this.prenom,
       adresse: adresse ?? this.adresse,
       telephone: telephone ?? this.telephone,
       email: email ?? this.email,
-      bateau: bateau ?? this.bateau,
-      licence: licence ?? this.licence,
+      specialite: specialite ?? this.specialite,
       userId: userId ?? this.userId,
     );
   }
 
-  /// Obtient le nom complet du pêcheur
+  /// Obtient le nom complet du vétérinaire
   String get fullName => '$prenom $nom';
 }
