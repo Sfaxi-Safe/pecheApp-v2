@@ -167,15 +167,16 @@ class MessageService with ChangeNotifier {
 
     try {
       int count = 0;
-      final allMessages = await _dbHelper.getAllMessages();
       
-      for (var message in allMessages) {
-        if (message.destinataireId == _currentUserId && !message.estLu) {
-          count++;
-        }
-      }
+      // Récupérer tous les messages où l'utilisateur courant est le destinataire
+      final db = await _dbHelper.database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        DatabaseHelper.messageTable,
+        where: 'destinataire_id = ? AND est_lu = 0',
+        whereArgs: [_currentUserId],
+      );
       
-      return count;
+      return maps.length;
     } catch (e) {
       print('Erreur lors du comptage des messages non lus: $e');
       return 0;

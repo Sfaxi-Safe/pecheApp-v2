@@ -68,9 +68,9 @@ class NotificationService with ChangeNotifier {
   int get unreadCount => _notifications.where((n) => !n.isRead).length;
 
   // Initialiser le service avec l'ID de l'utilisateur
-  void init(String userId) {
+  Future<void> init(String userId) async {
     _userId = userId;
-    loadNotifications();
+    await loadNotifications(); // ← attend que les notifications soient chargées
   }
 
   /// Charger les notifications de l'utilisateur depuis la base de données

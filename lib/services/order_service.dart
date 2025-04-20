@@ -18,7 +18,7 @@ class OrderService with ChangeNotifier {
   // Initialiser le service
   Future<void> init(int userId, String userType) async {
     await loadOrders(userId, userType);
-    await _notificationService.init();
+    await _notificationService.init(userId.toString());
   }
 
   // Charger les commandes depuis la base de données
@@ -239,10 +239,11 @@ class OrderService with ChangeNotifier {
       if (order == null) return;
 
       // Envoyer la notification
-      await _notificationService.showNotification(
+      await _notificationService.addNotification(
         title: 'Nouvelle commande !',
-        body: 'Vous avez reçu une nouvelle commande de ${order.totale.toStringAsFixed(2)} €.',
-        payload: 'order:$orderId',
+        message: 'Vous avez reçu une nouvelle commande de ${order.totale.toStringAsFixed(2)} €.',
+        type: 'order',
+        actionData: '$orderId',
       );
     } catch (e) {
       print('Erreur lors de l\'envoi de la notification: $e');
@@ -284,10 +285,11 @@ class OrderService with ChangeNotifier {
       }
 
       // Envoyer la notification
-      await _notificationService.showNotification(
+      await _notificationService.addNotification(
         title: 'Mise à jour de commande',
-        body: '$statusMessage (Commande #${order.reference})',
-        payload: 'order:$orderId',
+        message: '$statusMessage (Commande #${order.reference})',
+        type: 'order',
+        actionData: '$orderId',
       );
     } catch (e) {
       print('Erreur lors de l\'envoi de la notification: $e');

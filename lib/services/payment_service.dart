@@ -233,10 +233,11 @@ class PaymentService with ChangeNotifier {
         await clearCart(userId);
         
         // Envoyer une notification
-        await _notificationService.showNotification(
+        await _notificationService.addNotification(
           title: 'Commande confirmée',
-          body: 'Votre commande de ${total.toStringAsFixed(2)} € a été confirmée.',
-          payload: 'order:$commandeId',
+          message: 'Votre commande de ${total.toStringAsFixed(2)} € a été confirmée.',
+          type: 'order',
+          actionData: '$commandeId',
         );
         
         return true;

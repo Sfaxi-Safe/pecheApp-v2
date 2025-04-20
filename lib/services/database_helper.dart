@@ -1538,4 +1538,14 @@ class DatabaseHelper {
     Database db = await database;
     return await db.delete(panierTable, where: 'id = ?', whereArgs: [id]);
   }
+
+  // Méthode pour récupérer tous les messages
+  Future<List<MarketplaceMessage>> getAllMessages() async {
+    Database db = await database;
+    List<Map<String, dynamic>> maps = await db.query(messageTable);
+    return List.generate(
+      maps.length,
+      (i) => MarketplaceMessage.fromMap(maps[i]),
+    );
+  }
 }

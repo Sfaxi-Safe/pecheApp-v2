@@ -64,15 +64,20 @@ class StatisticsService with ChangeNotifier {
   }
 
   // Obtenir le poids total des captures d'un pêcheur
-  Future<double> getTotalWeight(int pecheurId) async {
+   Future<double> getTotalWeight(int pecheurId) async {
     try {
       final prises = await _dbHelper.getPrisesByPecheur(pecheurId);
-      return prises.fold(0.0, (sum, prise) => sum + prise.poids);
+
+      return prises.fold<double>(0.0, (double sum, prise) {
+        final poids = prise.poids;
+        return sum + poids;
+      });
     } catch (e) {
       print('Erreur lors du calcul du poids total: $e');
       return 0.0;
     }
   }
+
 
   // Obtenir la dernière capture d'un pêcheur
   Future<MarketplacePrise?> getLastCapture(int pecheurId) async {
