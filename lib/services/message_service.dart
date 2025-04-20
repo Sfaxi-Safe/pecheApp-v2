@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import '../models/marketplace_message.dart';
-import '../models/marketplace_user.dart';
 import '../models/marketplace_salon.dart';
 
 import 'database_helper.dart';

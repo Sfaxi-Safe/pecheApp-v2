@@ -7,7 +7,8 @@ import 'package:fl_chart/fl_chart.dart';
 
 /// Écran d'affichage des statistiques
 class StatisticsScreen extends StatefulWidget {
-  const StatisticsScreen({super.key});
+  final int pecheurId; // Reçu depuis le parent
+  const StatisticsScreen({Key? key, required this.pecheurId}) : super(key: key);
 
   @override
   State<StatisticsScreen> createState() => _StatisticsScreenState();
@@ -19,16 +20,14 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   DateTime? _endDate;
   bool _isGeneratingReport = false;
   Map<String, dynamic>? _salesReport;
-  
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     
-    // Charger les statistiques au démarrage
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final statisticsService = Provider.of<StatisticsService>(context, listen: false);
-      statisticsService.loadAllStatistics();
+      statisticsService.loadAllStatistics(widget.pecheurId); // Utilisation du pecheurId passé en paramètre
     });
   }
   
@@ -88,6 +87,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
     try {
       final statisticsService = Provider.of<StatisticsService>(context, listen: false);
       final report = await statisticsService.generateSalesReport(
+        pecheurId: widget.pecheurId,
         startDate: _startDate,
         endDate: _endDate,
       );

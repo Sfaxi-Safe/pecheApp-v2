@@ -1,7 +1,6 @@
 // Importation des packages Flutter nécessaires
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../models/marketplace_user.dart';
 import 'database_helper.dart';
 
 /// Classe représentant une notification dans l'application

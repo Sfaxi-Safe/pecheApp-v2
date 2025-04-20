@@ -40,17 +40,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   Future<void> _loadProductDetails() async {
     try {
-      final dbHelper = DatabaseHelper();
-
+      // Utiliser la méthode get database pour obtenir l'instance de DatabaseHelper
+      final db = await DatabaseHelper().database;
+      
       // Récupérer les produits vendus associés à la commande
       if (widget.order.id != null) {
-        final produitsVendus = await dbHelper.getProduitVendusByCommandeId(
+        final produitsVendus = await DatabaseHelper().getProduitVendusByCommandeId(
           widget.order.id!,
         );
 
         // Si nous avons des produits vendus, récupérer le premier produit pour l'afficher
         if (produitsVendus.isNotEmpty && produitsVendus[0].produitId != null) {
-          final produit = await dbHelper.getProduitById(
+          final produit = await DatabaseHelper().getProduitById(
             produitsVendus[0].produitId!,
           );
 
@@ -99,26 +100,41 @@ class _PaymentScreenState extends State<PaymentScreen> {
           cvv: _cvvController.text,
         );
 
+        // Vérifier si l'utilisateur est connecté
+        if (authService.currentUser == null) {
+          setState(() {
+            _errorMessage = 'Vous devez être connecté pour effectuer un paiement';
+          });
+          return;
+        }
+
+        // Utiliser la méthode correcte avec les bons paramètres
         success = await paymentService.processCardPayment(
-          orderId: widget.order.id,
           userId: authService.currentUser!.id.toString(),
-          amount: widget.order.totale,
           creditCard: creditCard,
+          notes: 'Paiement pour commande #${widget.order.id}',
         );
       } else if (_selectedMethod == PaymentMethod.cash) {
-        success = await paymentService.processCashPayment(
-          orderId: widget.order.id,
-          userId: authService.currentUser!.id.toString(),
-          amount: widget.order.totale,
-        );
+        // Vérifier si l'utilisateur est connecté
+        if (authService.currentUser == null) {
+          setState(() {
+            _errorMessage = 'Vous devez être connecté pour effectuer un paiement';
+          });
+          return;
+        }
+
+        // Utiliser la méthode correcte
+        success = await paymentService.processCashPayment();
       }
 
       if (success) {
         // Mettre à jour le statut de la commande
-        await orderService.updateOrderStatus(
-          widget.order.id.toString(),
-          'confirmed',
-        );
+        if (widget.order.id != null) {
+          await orderService.updateOrderStatus(
+            widget.order.id.toString(),
+            'Confirmée',
+          );
+        }
 
         // Afficher un message de succès et retourner à l'écran précédent
         if (mounted) {
@@ -221,7 +237,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           borderRadius: BorderRadius.circular(8),
                           child: _produit!.images.isNotEmpty
                               ? Image.network(
-                                  _produit!.images[0],
+                                  _produit!.images[0].url,
                                   width: 60,
                                   height: 60,
                                   fit: BoxFit.cover,
@@ -246,7 +262,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           'Quantité: ${_produitsVendus.isNotEmpty ? _produitsVendus[0].quantite : 1}',
                         ),
                         trailing: Text(
-                          formatter.format(_produitsVendus.isNotEmpty ? _produitsVendus[0].totale : 0),
+                          formatter.format(_produitsVendus.isNotEmpty ? _produitsVendus[0].total : 0),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,

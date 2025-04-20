@@ -8,22 +8,12 @@ import '../models/marketplace_user.dart';
 import '../models/marketplace_pecheur.dart';
 import '../models/marketplace_produit.dart';
 import '../models/marketplace_avis.dart';
-import '../models/marketplace_lots.dart';
 import '../models/marketplace_prise.dart';
 import '../models/marketplace_message.dart';
 import '../models/marketplace_salon.dart';
 import '../models/marketplace_panier.dart';
 import '../models/marketplace_categorie.dart';
 import '../models/marketplace_image.dart';
-import '../models/marketplace_comments.dart';
-import '../models/marketplace_contact.dart';
-import '../models/marketplace_entreprise.dart';
-import '../models/marketplace_equipement.dart';
-import '../models/marketplace_forum.dart';
-import '../models/marketplace_maryeur.dart';
-import '../models/marketplace_publication.dart';
-import '../models/marketplace_rfid.dart';
-import '../models/marketplace_veterinaire.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
