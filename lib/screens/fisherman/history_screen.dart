@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:peche_app/models/marketplace_produit.dart';
+import 'package:peche_app/services/auth_service.dart';
+import 'package:peche_app/services/fish_service.dart';
 import 'package:peche_app/utils/app_theme.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
@@ -20,80 +24,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
     'Maquereau',
   ];
 
-  // Données simulées pour l'historique des captures
-  final List<Map<String, dynamic>> _captures = [
-    {
-      'id': '1',
-      'species': 'Bar commun',
-      'weight': 2.5,
-      'length': 45.0,
-      'location': 'Côte atlantique',
-      'fishingMethod': 'Canne à pêche',
-      'date': DateTime.now().subtract(const Duration(days: 2)),
-      'imageUrl':
-          'https://images.unsplash.com/photo-1545816250-e12bedba42ba?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80',
-    },
-    {
-      'id': '2',
-      'species': 'Dorade royale',
-      'weight': 1.8,
-      'length': 35.0,
-      'location': 'Méditerranée',
-      'fishingMethod': 'Filet',
-      'date': DateTime.now().subtract(const Duration(days: 5)),
-      'imageUrl':
-          'https://images.unsplash.com/photo-1579168765467-3b235f938439?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80',
-    },
-    {
-      'id': '3',
-      'species': 'Maquereau',
-      'weight': 0.9,
-      'length': 28.0,
-      'location': 'Manche',
-      'fishingMethod': 'Ligne de traîne',
-      'date': DateTime.now().subtract(const Duration(days: 10)),
-      'imageUrl':
-          'https://images.unsplash.com/photo-1574781330855-d0db8cc6a79c?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80',
-    },
-    {
-      'id': '4',
-      'species': 'Bar commun',
-      'weight': 3.2,
-      'length': 52.0,
-      'location': 'Golfe de Gascogne',
-      'fishingMethod': 'Canne à pêche',
-      'date': DateTime.now().subtract(const Duration(days: 15)),
-      'imageUrl':
-          'https://images.unsplash.com/photo-1534043464124-3be32fe000c9?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80',
-    },
-  ];
-
-  List<Map<String, dynamic>> get _filteredCaptures {
-    if (_selectedFilter == 'Tous') {
-      return _captures;
-    } else if (_selectedFilter == 'Ce mois') {
-      final now = DateTime.now();
-      final firstDayOfMonth = DateTime(now.year, now.month, 1);
-      return _captures
-          .where(
-            (capture) =>
-                capture['date'].isAfter(firstDayOfMonth) ||
-                capture['date'].isAtSameMomentAs(firstDayOfMonth),
-          )
-          .toList();
-    } else {
-      return _captures
-          .where(
-            (capture) => capture['species'].toLowerCase().contains(
-              _selectedFilter.toLowerCase(),
-            ),
-          )
-          .toList();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final authService = Provider.of<AuthService>(context);
+    final fishService = Provider.of<FishService>(context);
+    
+    // Récupérer l'ID du pêcheur connecté
+    final fishermanId = authService.currentUser?.id?.toString() ?? '0';
+    
+    // Récupérer les captures du pêcheur
+    final List<MarketplaceProduit> captures = fishService.getFishesByFisherman(fishermanId);
+    
+    // Filtrer les captures selon le filtre sélectionné
+    List<MarketplaceProduit> filteredCaptures = _filterCaptures(captures);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Historique des captures'),
@@ -161,7 +105,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           // Liste des captures
           Expanded(
             child:
-                _filteredCaptures.isEmpty
+                filteredCaptures.isEmpty
                     ? const Center(
                       child: Text(
                         'Aucune capture trouvée',
@@ -169,21 +113,61 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     )
                     : ListView.builder(
-                      itemCount: _filteredCaptures.length,
+                      itemCount: filteredCaptures.length,
                       itemBuilder: (context, index) {
-                        final capture = _filteredCaptures[index];
-                        return _buildCaptureCard(capture);
+                        final capture = filteredCaptures[index];
+                        return _buildCaptureCard(context, capture, fishService);
                       },
                     ),
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.pushNamed(context, '/fisherman/scan');
+        },
+        backgroundColor: AppTheme.primaryColor,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 
-  Widget _buildCaptureCard(Map<String, dynamic> capture) {
-    final dateFormat = DateFormat('dd/MM/yyyy');
-    final formattedDate = dateFormat.format(capture['date']);
+  List<MarketplaceProduit> _filterCaptures(List<MarketplaceProduit> captures) {
+    if (_selectedFilter == 'Tous') {
+      return captures;
+    } else if (_selectedFilter == 'Ce mois') {
+      final now = DateTime.now();
+      final firstDayOfMonth = DateTime(now.year, now.month, 1);
+      return captures.where((capture) {
+        if (capture.dateDePeche == null) return false;
+        final captureDate = DateTime.tryParse(capture.dateDePeche!);
+        if (captureDate == null) return false;
+        return captureDate.isAfter(firstDayOfMonth) || 
+               captureDate.isAtSameMomentAs(firstDayOfMonth);
+      }).toList();
+    } else {
+      // Filtrer par nom d'espèce
+      return captures.where((capture) => 
+        capture.nom.toLowerCase().contains(_selectedFilter.toLowerCase())
+      ).toList();
+    }
+  }
+
+  Widget _buildCaptureCard(
+    BuildContext context, 
+    MarketplaceProduit capture, 
+    FishService fishService
+  ) {
+    // Formater la date
+    String formattedDate = 'Date inconnue';
+    if (capture.dateDePeche != null) {
+      try {
+        final date = DateTime.parse(capture.dateDePeche!);
+        formattedDate = DateFormat('dd/MM/yyyy').format(date);
+      } catch (e) {
+        formattedDate = capture.dateDePeche!.substring(0, 10);
+      }
+    }
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -197,8 +181,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
             // Image du poisson
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                capture['imageUrl'],
+              child: Image.asset(
+                'assets/images/fish_placeholder.jpg',
                 width: 100,
                 height: 100,
                 fit: BoxFit.cover,
@@ -215,7 +199,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        capture['species'],
+                        capture.nom,
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -235,28 +219,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   Row(
                     children: [
                       _buildCaptureInfo(
-                        'Poids',
-                        '${capture['weight']} kg',
-                        Icons.monitor_weight,
+                        'Prix',
+                        '${capture.prix} €/kg',
+                        Icons.euro,
                       ),
                       const SizedBox(width: 16),
                       _buildCaptureInfo(
-                        'Taille',
-                        '${capture['length']} cm',
-                        Icons.straighten,
+                        'Stock',
+                        '${capture.stock} kg',
+                        Icons.inventory,
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   _buildCaptureInfo(
                     'Lieu',
-                    capture['location'],
+                    capture.zoneDePeche ?? 'Non spécifié',
                     Icons.location_on,
                   ),
                   const SizedBox(height: 8),
                   _buildCaptureInfo(
                     'Méthode',
-                    capture['fishingMethod'],
+                    capture.typologie ?? 'Non spécifié',
                     FontAwesomeIcons.fish,
                   ),
                   const SizedBox(height: 12),
@@ -267,7 +251,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     children: [
                       TextButton.icon(
                         onPressed: () {
-                          // Logique pour modifier
+                          // Naviguer vers l'écran de modification
+                          Navigator.pushNamed(
+                            context, 
+                            '/fisherman/edit_fish',
+                            arguments: capture.id
+                          );
                         },
                         icon: const Icon(Icons.edit, size: 18),
                         label: const Text('Modifier'),
@@ -277,8 +266,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                       TextButton.icon(
                         onPressed: () {
-                          // Logique pour supprimer
-                          _showDeleteConfirmation(context, capture);
+                          // Afficher la boîte de dialogue de confirmation
+                          _showDeleteConfirmation(context, capture, fishService);
                         },
                         icon: const Icon(Icons.delete, size: 18),
                         label: const Text('Supprimer'),
@@ -300,7 +289,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildCaptureInfo(String label, String value, IconData icon) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: Colors.grey.shade600),
+        icon == FontAwesomeIcons.fish
+            ? FaIcon(icon, size: 16, color: Colors.grey.shade600)
+            : Icon(icon, size: 16, color: Colors.grey.shade600),
         const SizedBox(width: 4),
         Text(
           '$label: ',
@@ -320,7 +311,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   void _showDeleteConfirmation(
     BuildContext context,
-    Map<String, dynamic> capture,
+    MarketplaceProduit capture,
+    FishService fishService,
   ) {
     showDialog(
       context: context,
@@ -328,7 +320,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         return AlertDialog(
           title: const Text('Confirmer la suppression'),
           content: Text(
-            'Êtes-vous sûr de vouloir supprimer cette capture de ${capture['species']} ?',
+            'Êtes-vous sûr de vouloir supprimer cette capture de ${capture.nom} ?',
           ),
           actions: [
             TextButton(
@@ -338,19 +330,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
               child: const Text('Annuler'),
             ),
             TextButton(
-              onPressed: () {
-                // Logique pour supprimer la capture
-                setState(() {
-                  _captures.removeWhere((item) => item['id'] == capture['id']);
-                });
+              onPressed: () async {
+                // Supprimer la capture
+                final success = await fishService.deleteFish(capture.id.toString());
+                
+                if (!context.mounted) return;
                 Navigator.of(context).pop();
-
+                
+                // Afficher un message de confirmation
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Capture supprimée avec succès'),
-                    backgroundColor: Colors.red,
+                  SnackBar(
+                    content: Text(
+                      success 
+                        ? 'Capture supprimée avec succès' 
+                        : 'Erreur lors de la suppression'
+                    ),
+                    backgroundColor: success ? Colors.green : Colors.red,
                   ),
                 );
+                
+                // Rafraîchir l'écran
+                setState(() {});
               },
               child: const Text(
                 'Supprimer',

@@ -18,6 +18,7 @@ class AuthService with ChangeNotifier {
   bool get isAuthenticated => _currentUser != null;
   bool get isFisherman => _currentUser?.isPecheur ?? false;
   bool get isClient => _currentUser?.isClient ?? false;
+  bool get isAdmin => _currentUser?.isAdmin ?? false;
 
   // Constructeur
   AuthService() {
@@ -78,13 +79,14 @@ class AuthService with ChangeNotifier {
   }
 
   // S'inscrire
-  Future<bool> register(
-    String email,
-    String password,
-    String name,
-    String phoneNumber,
-    String userType,
-  ) async {
+  Future<bool> register({
+    required String email,
+    required String password,
+    required String nom,
+    required String prenom,
+    required String telephone,
+    required List<String> roles,
+  }) async {
     _isLoading = true;
     notifyListeners();
 
@@ -100,26 +102,13 @@ class AuthService with ChangeNotifier {
       // Hacher le mot de passe
       final hashedPassword = _hashPassword(password);
 
-      // Extraire le prénom et le nom
-      final nameParts = name.split(' ');
-      final prenom = nameParts.isNotEmpty ? nameParts[0] : '';
-      final nom = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
-
-      // Définir les rôles en fonction du type d'utilisateur
-      List<String> roles = [];
-      if (userType == 'fisherman') {
-        roles.add('ROLE_PECHEUR');
-      } else {
-        roles.add('ROLE_CLIENT');
-      }
-
       // Créer un nouvel utilisateur
       final newUser = MarketplaceUser.create(
         email: email,
         password: hashedPassword,
         nom: nom,
         prenom: prenom,
-        telephone: int.tryParse(phoneNumber),
+        telephone: int.tryParse(telephone),
         roles: roles,
         isVerified: true,
         isBlocked: false,
@@ -128,16 +117,15 @@ class AuthService with ChangeNotifier {
       // Insérer l'utilisateur dans la base de données
       final userId = await _dbHelper.insertUser(newUser);
 
-      // Si c'est un pêcheur, créer également une entrée dans la table fishermen
-      if (userType == 'fisherman') {
+      // Si c'est un pêcheur, créer également une entrée dans la table pecheur
+      if (roles.contains('ROLE_PECHEUR')) {
         final newFisherman = MarketplacePecheur.create(
-          email: email,
-          password: hashedPassword,
           nom: nom,
           prenom: prenom,
-          telephone: int.tryParse(phoneNumber),
-          roles: roles,
-          isValid: false, // Par défaut, le pêcheur n'est pas validé
+          adresse: '',
+          telephone: telephone,
+          email: email,
+          userId: userId,
         );
 
         await _dbHelper.insertFisherman(newFisherman);
@@ -218,9 +206,11 @@ class AuthService with ChangeNotifier {
 
   // Mettre à jour le profil de l'utilisateur
   Future<bool> updateProfile({
-    required String name,
-    required String phoneNumber,
-    String? profileImageUrl,
+    required String nom,
+    required String prenom,
+    required String telephone,
+    String? photo,
+    String? adresse,
   }) async {
     if (_currentUser == null) return false;
 
@@ -228,16 +218,12 @@ class AuthService with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Extraire le prénom et le nom
-      final nameParts = name.split(' ');
-      final prenom = nameParts.isNotEmpty ? nameParts[0] : '';
-      final nom = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
-
       final updatedUser = _currentUser!.copyWith(
         nom: nom,
         prenom: prenom,
-        telephone: int.tryParse(phoneNumber),
-        photo: profileImageUrl,
+        telephone: int.tryParse(telephone),
+        photo: photo,
+        adresse: adresse,
       );
 
       await _dbHelper.updateUser(updatedUser);
@@ -292,12 +278,8 @@ class AuthService with ChangeNotifier {
   Future<void> addTestUsers() async {
     try {
       // Vérifier si les utilisateurs de test existent déjà
-      final existingPecheur = await _dbHelper.getUserByEmail(
-        'pecheur@example.com',
-      );
-      final existingClient = await _dbHelper.getUserByEmail(
-        'client@example.com',
-      );
+      final existingPecheur = await _dbHelper.getUserByEmail('pecheur@example.com');
+      final existingClient = await _dbHelper.getUserByEmail('client@example.com');
 
       if (existingPecheur == null) {
         // Créer un pêcheur de test
@@ -310,21 +292,21 @@ class AuthService with ChangeNotifier {
           roles: ['ROLE_PECHEUR'],
           isVerified: true,
           isBlocked: false,
-          photo:
-              'https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
+          photo: 'assets/images/fisherman.jpg',
         );
 
-        final userId = await _dbHelper.insertUser(pecheur);
+        final pecheurId = await _dbHelper.insertUser(pecheur);
 
-        // Créer l'entrée correspondante dans la table fishermen
+        // Créer l'entrée correspondante dans la table pecheur
         final fisherman = MarketplacePecheur.create(
-          email: 'pecheur@example.com',
-          password: _hashPassword('password123'),
           nom: 'Dupont',
           prenom: 'Pierre',
-          telephone: 612345678,
-          roles: ['ROLE_PECHEUR'],
-          isValid: true,
+          adresse: '123 Rue de la Mer',
+          telephone: '0612345678',
+          email: 'pecheur@example.com',
+          bateau: 'Le Grand Bleu',
+          licence: 'P12345',
+          userId: pecheurId,
         );
 
         await _dbHelper.insertFisherman(fisherman);
@@ -341,8 +323,7 @@ class AuthService with ChangeNotifier {
           roles: ['ROLE_CLIENT'],
           isVerified: true,
           isBlocked: false,
-          photo:
-              'https://images.unsplash.com/photo-1566492031773-4f4e44671857?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80',
+          photo: 'assets/images/client.jpg',
         );
 
         await _dbHelper.insertUser(client);

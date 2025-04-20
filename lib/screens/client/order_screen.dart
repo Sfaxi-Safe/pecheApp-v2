@@ -3,6 +3,7 @@ import 'package:peche_app/models/marketplace_produitvendus.dart';
 import 'package:peche_app/services/auth_service.dart';
 import 'package:peche_app/services/fish_service.dart';
 import 'package:peche_app/services/order_service.dart';
+import 'package:peche_app/services/payment_service.dart';
 import 'package:peche_app/utils/app_theme.dart';
 import 'package:provider/provider.dart';
 
@@ -17,11 +18,10 @@ class OrderScreen extends StatefulWidget {
 
 class _OrderScreenState extends State<OrderScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _quantityController = TextEditingController(text: '1.0');
+  final _quantityController = TextEditingController(text: '1');
   final _addressController = TextEditingController();
   final _notesController = TextEditingController();
   bool _isSubmitting = false;
-  final double _pricePerKg = 15.90; // Prix fixe pour l'exemple
 
   @override
   void dispose() {
@@ -31,11 +31,6 @@ class _OrderScreenState extends State<OrderScreen> {
     super.dispose();
   }
 
-  double get _totalPrice {
-    final quantity = double.tryParse(_quantityController.text) ?? 0.0;
-    return quantity * _pricePerKg;
-  }
-
   Future<void> _placeOrder() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -43,13 +38,13 @@ class _OrderScreenState extends State<OrderScreen> {
       });
 
       final fishService = Provider.of<FishService>(context, listen: false);
-      final orderService = Provider.of<OrderService>(context, listen: false);
+      final paymentService = Provider.of<PaymentService>(context, listen: false);
       final authService = Provider.of<AuthService>(context, listen: false);
 
       final fish = fishService.getFishById(widget.fishId);
       final user = authService.currentUser;
 
-      if (fish == null || user == null) {
+      if (fish == null || user == null || user.id == null) {
         setState(() {
           _isSubmitting = false;
         });
@@ -63,45 +58,55 @@ class _OrderScreenState extends State<OrderScreen> {
         return;
       }
 
-      final quantity = double.tryParse(_quantityController.text) ?? 0.0;
+      final quantity = int.tryParse(_quantityController.text) ?? 0;
 
       try {
-        // Créer un produit vendu pour le poisson
-        final produit = MarketplaceProduitVendus.create(
-          produitId: fish.id,
-          nom: fish.nom,
-          quantite: quantity.toInt(),
-          prix: _pricePerKg,
+        // Ajouter au panier
+        final success = await paymentService.addToCart(
+          userId: user.id!,
+          produitId: fish.id!,
+          quantite: quantity,
         );
-
-        // Créer la commande
-        final success = await orderService.createOrder(
-          userId: user.id ?? 0,
-          methodeDePaiement: 'Carte bancaire',
-          commentaire: _notesController.text.trim(),
-          totale: _totalPrice,
-          fournisseurId: fish.userId ?? 0,
-          produits: [produit],
-        );
-
-        setState(() {
-          _isSubmitting = false;
-        });
-
-        if (!mounted) return;
 
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Commande passée avec succès'),
-              backgroundColor: Colors.green,
-            ),
+          // Créer la commande à partir du panier
+          final orderSuccess = await paymentService.createOrderFromCart(
+            userId: user.id!,
+            methodeDePaiement: 'Carte bancaire',
+            commentaire: _notesController.text.trim(),
+            fournisseurId: fish.pecheurId ?? 0,
           );
-          Navigator.pop(context);
+
+          setState(() {
+            _isSubmitting = false;
+          });
+
+          if (!mounted) return;
+
+          if (orderSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Commande passée avec succès'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            Navigator.pop(context);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Erreur lors de la création de la commande'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         } else {
+          setState(() {
+            _isSubmitting = false;
+          });
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Erreur lors de la création de la commande'),
+              content: Text('Erreur lors de l\'ajout au panier'),
               backgroundColor: Colors.red,
             ),
           );
@@ -116,6 +121,13 @@ class _OrderScreenState extends State<OrderScreen> {
         );
       }
     }
+  }
+
+  double get _totalPrice {
+    final fishService = Provider.of<FishService>(context, listen: false);
+    final fish = fishService.getFishById(widget.fishId);
+    final quantity = int.tryParse(_quantityController.text) ?? 0;
+    return quantity * (fish?.prix ?? 0);
   }
 
   @override
@@ -159,12 +171,27 @@ class _OrderScreenState extends State<OrderScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.asset(
-                          'assets/images/fish_placeholder.jpg',
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
-                        ),
+                        child: fish.images.isNotEmpty
+                            ? Image.network(
+                                fish.images.first.url,
+                                width: 80,
+                                height: 80,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Image.asset(
+                                    'assets/images/fish_placeholder.jpg',
+                                    width: 80,
+                                    height: 80,
+                                    fit: BoxFit.cover,
+                                  );
+                                },
+                              )
+                            : Image.asset(
+                                'assets/images/fish_placeholder.jpg',
+                                width: 80,
+                                height: 80,
+                                fit: BoxFit.cover,
+                              ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -188,7 +215,7 @@ class _OrderScreenState extends State<OrderScreen> {
                               ),
                             ),
                             Text(
-                              'Prix: ${_pricePerKg.toStringAsFixed(2)} €/kg',
+                              'Prix: ${fish.prix.toStringAsFixed(2)} €/kg',
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
@@ -221,14 +248,12 @@ class _OrderScreenState extends State<OrderScreen> {
                   border: OutlineInputBorder(),
                   suffixText: 'kg',
                 ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                keyboardType: TextInputType.number,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Veuillez entrer une quantité';
                   }
-                  final quantity = double.tryParse(value);
+                  final quantity = int.tryParse(value);
                   if (quantity == null) {
                     return 'Veuillez entrer un nombre valide';
                   }
@@ -265,6 +290,8 @@ class _OrderScreenState extends State<OrderScreen> {
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Veuillez entrer  {
                   if (value == null || value.isEmpty) {
                     return 'Veuillez entrer une adresse de livraison';
                   }
@@ -345,7 +372,7 @@ class _OrderScreenState extends State<OrderScreen> {
                             ),
                           ),
                           Text(
-                            '${_pricePerKg.toStringAsFixed(2)} €/kg',
+                            '${fish.prix.toStringAsFixed(2)} €/kg',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -413,20 +440,19 @@ class _OrderScreenState extends State<OrderScreen> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child:
-                      _isSubmitting
-                          ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                          : const Text(
-                            'Confirmer la commande',
-                            style: TextStyle(fontSize: 16),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
                           ),
+                        )
+                      : const Text(
+                          'Confirmer la commande',
+                          style: TextStyle(fontSize: 16),
+                        ),
                 ),
               ),
             ],

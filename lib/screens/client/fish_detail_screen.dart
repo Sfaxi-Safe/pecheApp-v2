@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:peche_app/models/marketplace_avis.dart';
+import 'package:peche_app/models/marketplace_produit.dart';
 import 'package:peche_app/screens/client/order_screen.dart';
 import 'package:peche_app/screens/client/review_screen.dart';
 import 'package:peche_app/services/auth_service.dart';
@@ -33,11 +34,6 @@ class FishDetailScreen extends StatelessWidget {
       );
     }
 
-    final formattedDate =
-        fish.dateDePeche != null
-            ? fish.dateDePeche!.substring(0, 10)
-            : 'Date inconnue';
-
     return Scaffold(
       appBar: AppBar(
         title: Text(fish.nom),
@@ -52,10 +48,21 @@ class FishDetailScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               height: 250,
-              child: Image.asset(
-                'assets/images/fish_placeholder.jpg',
-                fit: BoxFit.cover,
-              ),
+              child: fish.images.isNotEmpty
+                  ? Image.network(
+                      fish.images.first.url,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Image.asset(
+                          'assets/images/fish_placeholder.jpg',
+                          fit: BoxFit.cover,
+                        );
+                      },
+                    )
+                  : Image.asset(
+                      'assets/images/fish_placeholder.jpg',
+                      fit: BoxFit.cover,
+                    ),
             ),
 
             // Informations principales
@@ -83,15 +90,15 @@ class FishDetailScreen extends StatelessWidget {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.green.shade100,
+                          color: fish.stock > 0 ? Colors.green.shade100 : Colors.red.shade100,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          'Disponible',
+                          fish.stock > 0 ? 'Disponible' : 'Épuisé',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Colors.green.shade800,
+                            color: fish.stock > 0 ? Colors.green.shade800 : Colors.red.shade800,
                           ),
                         ),
                       ),
@@ -145,7 +152,7 @@ class FishDetailScreen extends StatelessWidget {
                         children: [
                           _buildDetailRow(
                             'Prix',
-                            '${fish.prix} €/kg',
+                            '${fish.prix.toStringAsFixed(2)} €/kg',
                             Icons.euro,
                           ),
                           const Divider(height: 24),
@@ -154,18 +161,14 @@ class FishDetailScreen extends StatelessWidget {
                             '${fish.stock} kg',
                             Icons.inventory,
                           ),
-                          const Divider(height: 24),
-                          _buildDetailRow(
-                            'Lieu de pêche',
-                            fish.zoneDePeche ?? 'Non spécifié',
-                            Icons.location_on,
-                          ),
-                          const Divider(height: 24),
-                          _buildDetailRow(
-                            'Date de capture',
-                            formattedDate,
-                            Icons.calendar_today,
-                          ),
+                          if (fish.categorie != null) ...[
+                            const Divider(height: 24),
+                            _buildDetailRow(
+                              'Catégorie',
+                              fish.categorie!.nom,
+                              Icons.category,
+                            ),
+                          ],
                           const Divider(height: 24),
                           Row(
                             children: [
@@ -177,22 +180,22 @@ class FishDetailScreen extends StatelessWidget {
                               const SizedBox(width: 16),
                               Expanded(
                                 child: Text(
-                                  'Méthode de pêche',
+                                  'Description',
                                   style: TextStyle(
                                     fontSize: 16,
                                     color: Colors.grey.shade700,
                                   ),
                                 ),
                               ),
-                              Text(
-                                fish.typologie ?? 'Non spécifié',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.textColor,
-                                ),
-                              ),
                             ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            fish.description,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: AppTheme.textColor,
+                            ),
                           ),
                         ],
                       ),
@@ -229,7 +232,7 @@ class FishDetailScreen extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${(15.90).toStringAsFixed(2)} €/kg',
+                            '${fish.prix.toStringAsFixed(2)} €/kg',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -260,10 +263,9 @@ class FishDetailScreen extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder:
-                                    (context) => ReviewScreen(
-                                      fishId: fish.id.toString(),
-                                    ),
+                                builder: (context) => ReviewScreen(
+                                  fishId: fish.id.toString(),
+                                ),
                               ),
                             );
                           },
@@ -274,26 +276,25 @@ class FishDetailScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   reviews.isEmpty
                       ? const Card(
-                        elevation: 2,
-                        child: Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Center(
-                            child: Text(
-                              'Aucun avis pour le moment',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey,
+                          elevation: 2,
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(
+                              child: Text(
+                                'Aucun avis pour le moment',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      )
+                        )
                       : Column(
-                        children:
-                            reviews
-                                .map((review) => _buildReviewCard(review))
-                                .toList(),
-                      ),
+                          children: reviews
+                              .map((review) => _buildReviewCard(review))
+                              .toList(),
+                        ),
                   const SizedBox(height: 24),
 
                   // Boutons d'action
@@ -334,16 +335,15 @@ class FishDetailScreen extends StatelessWidget {
                       const SizedBox(width: 16),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () {
+                          onPressed: fish.stock > 0 ? () {
                             if (authService.isAuthenticated &&
                                 authService.isClient) {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder:
-                                      (context) => OrderScreen(
-                                        fishId: fish.id.toString(),
-                                      ),
+                                  builder: (context) => OrderScreen(
+                                    fishId: fish.id.toString(),
+                                  ),
                                 ),
                               );
                             } else {
@@ -356,13 +356,14 @@ class FishDetailScreen extends StatelessWidget {
                                 ),
                               );
                             }
-                          },
+                          } : null,
                           icon: const Icon(Icons.shopping_cart),
-                          label: const Text('Commander'),
+                          label: Text(fish.stock > 0 ? 'Commander' : 'Épuisé'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primaryColor,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
+                            disabledBackgroundColor: Colors.grey,
                           ),
                         ),
                       ),
@@ -412,15 +413,15 @@ class FishDetailScreen extends StatelessWidget {
           children: [
             Row(
               children: [
-                CircleAvatar(child: Text('U')),
+                const CircleAvatar(child: Text('U')),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Utilisateur',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.textColor,
@@ -431,7 +432,7 @@ class FishDetailScreen extends StatelessWidget {
                           ...List.generate(
                             5,
                             (index) => Icon(
-                              index < review.etoileNb
+                              index < review.note
                                   ? Icons.star
                                   : Icons.star_border,
                               color: Colors.amber,
@@ -440,8 +441,8 @@ class FishDetailScreen extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            review.etoileNb.toString(),
-                            style: TextStyle(
+                            review.note.toString(),
+                            style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                               color: AppTheme.textColor,

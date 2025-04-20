@@ -1,6 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:peche_app/models/marketplace_produit.dart';
+import 'package:peche_app/services/auth_service.dart';
+import 'package:peche_app/services/fish_service.dart';
 import 'package:peche_app/utils/app_theme.dart';
+import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class AnalysisResultScreen extends StatefulWidget {
@@ -24,6 +28,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
   final _weightController = TextEditingController();
   final _lengthController = TextEditingController();
   final _locationController = TextEditingController();
+  final _priceController = TextEditingController(text: '15.90');
+  final _stockController = TextEditingController(text: '1.0');
   
   String _selectedFishingMethod = 'Canne à pêche';
   final List<String> _fishingMethods = [
@@ -38,6 +44,9 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authService = Provider.of<AuthService>(context);
+    final fishService = Provider.of<FishService>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Résultat de l\'analyse'),
@@ -209,6 +218,40 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
                         ),
                         const SizedBox(height: 16),
                         
+                        // Champ de prix
+                        TextFormField(
+                          controller: _priceController,
+                          decoration: const InputDecoration(
+                            labelText: 'Prix (€/kg)',
+                            prefixIcon: Icon(Icons.euro),
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer le prix';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // Champ de stock
+                        TextFormField(
+                          controller: _stockController,
+                          decoration: const InputDecoration(
+                            labelText: 'Stock disponible (kg)',
+                            prefixIcon: Icon(Icons.inventory),
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer le stock disponible';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        
                         // Champ de localisation
                         TextFormField(
                           controller: _locationController,
@@ -230,7 +273,6 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
                           value: _selectedFishingMethod,
                           decoration: InputDecoration(
                             labelText: 'Méthode de pêche',
-                            // Remplacer Icon par FaIcon
                             prefixIcon: FaIcon(FontAwesomeIcons.fish),
                           ),
                           items: _fishingMethods.map((String method) {
@@ -259,7 +301,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _isSubmitting ? null : _submitForm,
+                  onPressed: _isSubmitting ? null : () => _submitForm(context, authService, fishService),
                   icon: _isSubmitting
                       ? const SizedBox(
                           width: 20,
@@ -320,37 +362,72 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
     );
   }
 
-  Future<void> _submitForm() async {
+  Future<void> _submitForm(
+    BuildContext context,
+    AuthService authService,
+    FishService fishService
+  ) async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isSubmitting = true;
       });
 
-      // Simuler un délai d'enregistrement
-      await Future.delayed(const Duration(seconds: 2));
+      try {
+        // Récupérer l'ID du pêcheur connecté
+        final userId = authService.currentUser?.id;
+        if (userId == null) {
+          throw Exception('Utilisateur non connecté');
+        }
 
-      // Dans une application réelle, vous enverriez ces données à votre backend
-      // pour les enregistrer dans une base de données
+        // Créer un nouveau produit
+        final newFish = MarketplaceProduit.create(
+          nom: widget.species,
+          description: 'Poisson frais pêché à ${_locationController.text}',
+          prix: double.tryParse(_priceController.text) ?? 15.90,
+          stock: double.tryParse(_stockController.text) ?? 1.0,
+          dateDePeche: DateTime.now().toIso8601String(),
+          zoneDePeche: _locationController.text,
+          typologie: _selectedFishingMethod,
+          userId: userId,
+        );
 
-      setState(() {
-        _isSubmitting = false;
-      });
+        // Enregistrer le poisson dans la base de données
+        final success = await fishService.addFish(newFish);
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      // Afficher un message de succès
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Capture enregistrée avec succès!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+        if (success) {
+          // Afficher un message de succès
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Capture enregistrée avec succès!'),
+              backgroundColor: Colors.green,
+            ),
+          );
 
-      // Retourner à l'écran principal
-      Navigator.popUntil(
-        context,
-        ModalRoute.withName('/'), // Retour à la racine
-      );
+          // Retourner à l'écran principal
+          Navigator.popUntil(
+            context,
+            ModalRoute.withName('/fisherman/dashboard'),
+          );
+        } else {
+          throw Exception('Erreur lors de l\'enregistrement du poisson');
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSubmitting = false;
+          });
+        }
+      }
     }
   }
 
@@ -359,7 +436,8 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
     _weightController.dispose();
     _lengthController.dispose();
     _locationController.dispose();
+    _priceController.dispose();
+    _stockController.dispose();
     super.dispose();
   }
 }
-

@@ -333,7 +333,7 @@ class _MapScreenState extends State<MapScreen> {
                     const SizedBox(height: 8),
                     
                     // Liste des poissons disponibles
-                    ..._selectedSalesPoint!['fish'].map<Widget>((fish) {
+                    ...(_selectedSalesPoint!['fish'] as List).map<Widget>((fish) {
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         elevation: 0,
@@ -343,14 +343,24 @@ class _MapScreenState extends State<MapScreen> {
                         ),
                         child: InkWell(
                           onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => FishDetailScreen(
-                                  fishId: fish['id'],
+                            // Vérifier si le poisson existe dans notre service
+                            final fishFromService = fishService.getFishById(fish['id']);
+                            if (fishFromService != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => FishDetailScreen(
+                                    fishId: fish['id'],
+                                  ),
                                 ),
-                              ),
-                            );
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Détails du poisson non disponibles'),
+                                ),
+                              );
+                            }
                           },
                           child: Padding(
                             padding: const EdgeInsets.all(12),
@@ -424,8 +434,9 @@ class _MapScreenState extends State<MapScreen> {
                             onPressed: () async {
                               // Ouvrir l'itinéraire dans Google Maps
                               final url = 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(_selectedSalesPoint!['address'])}';
-                              if (await canLaunch(url)) {
-                                await launch(url);
+                              final uri = Uri.parse(url);
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri);
                               } else {
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -475,4 +486,3 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 }
-

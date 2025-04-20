@@ -6,6 +6,7 @@ import '../../services/database_helper.dart';
 import '../../utils/image_cache_manager.dart';
 import '../../utils/responsive.dart';
 import '../../widgets/animated_list_item.dart';
+import 'fish_detail_screen.dart';
 
 class FishListScreen extends StatefulWidget {
   const FishListScreen({super.key});
@@ -48,9 +49,13 @@ class FishListScreenState extends State<FishListScreen> {
     final fishes = await dbHelper.getProduitsPaginated(page, pageSize);
 
     // Précharger les images pour une meilleure expérience utilisateur
-    // Utiliser une image par défaut car les URLs d'images ne sont pas disponibles
-    // dans le nouveau modèle
-    CustomCacheManager.preloadImages(['assets/images/fish_placeholder.jpg']);
+    for (var fish in fishes) {
+      if (fish.images.isNotEmpty) {
+        CustomCacheManager.preloadImages([fish.images.first.url]);
+      } else {
+        CustomCacheManager.preloadImages(['assets/images/fish_placeholder.jpg']);
+      }
+    }
 
     return fishes;
   }
@@ -145,24 +150,43 @@ class FishListScreenState extends State<FishListScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
-          // Naviguer vers l'écran de détails du poisson
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => FishDetailScreen(fishId: fish.id.toString()),
+            ),
+          );
         },
         borderRadius: BorderRadius.circular(12),
         child: Row(
           children: [
             // Image du poisson avec mise en cache
-            CachedImage(
-              imageUrl: 'assets/images/fish_placeholder.jpg',
-              width: context.responsiveWidth(120),
-              height: context.responsiveWidth(120),
+            ClipRRect(
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(12),
                 bottomLeft: Radius.circular(12),
               ),
-              placeholder: const Center(child: CircularProgressIndicator()),
-              errorWidget: const Center(
-                child: Icon(Icons.error, color: Colors.red),
-              ),
+              child: fish.images.isNotEmpty
+                  ? Image.network(
+                      fish.images.first.url,
+                      width: context.responsiveWidth(120),
+                      height: context.responsiveWidth(120),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Image.asset(
+                          'assets/images/fish_placeholder.jpg',
+                          width: context.responsiveWidth(120),
+                          height: context.responsiveWidth(120),
+                          fit: BoxFit.cover,
+                        );
+                      },
+                    )
+                  : Image.asset(
+                      'assets/images/fish_placeholder.jpg',
+                      width: context.responsiveWidth(120),
+                      height: context.responsiveWidth(120),
+                      fit: BoxFit.cover,
+                    ),
             ),
 
             // Informations du poisson
@@ -181,7 +205,7 @@ class FishListScreenState extends State<FishListScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Prix: ${fish.prix} €/kg',
+                      'Prix: ${fish.prix.toStringAsFixed(2)} €/kg',
                       style: TextStyle(
                         fontSize: context.responsiveFontSize(14),
                       ),
@@ -192,18 +216,13 @@ class FishListScreenState extends State<FishListScreen> {
                         fontSize: context.responsiveFontSize(14),
                       ),
                     ),
-                    Text(
-                      'Lieu: ${fish.zoneDePeche ?? "Non spécifié"}',
-                      style: TextStyle(
-                        fontSize: context.responsiveFontSize(14),
+                    if (fish.categorie != null)
+                      Text(
+                        'Catégorie: ${fish.categorie!.nom}',
+                        style: TextStyle(
+                          fontSize: context.responsiveFontSize(14),
+                        ),
                       ),
-                    ),
-                    Text(
-                      'Type: ${fish.typologie ?? "Non spécifié"}',
-                      style: TextStyle(
-                        fontSize: context.responsiveFontSize(14),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -211,6 +230,53 @@ class FishListScreenState extends State<FishListScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// Widget pour la mise en cache des images
+class CachedImage extends StatelessWidget {
+  final String imageUrl;
+  final double width;
+  final double height;
+  final BorderRadius borderRadius;
+  final Widget placeholder;
+  final Widget errorWidget;
+
+  const CachedImage({
+    super.key,
+    required this.imageUrl,
+    required this.width,
+    required this.height,
+    required this.borderRadius,
+    required this.placeholder,
+    required this.errorWidget,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: imageUrl.startsWith('assets/')
+          ? Image.asset(
+              imageUrl,
+              width: width,
+              height: height,
+              fit: BoxFit.cover,
+            )
+          : Image.network(
+              imageUrl,
+              width: width,
+              height: height,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return placeholder;
+              },
+              errorBuilder: (context, error, stackTrace) {
+                return errorWidget;
+              },
+            ),
     );
   }
 }

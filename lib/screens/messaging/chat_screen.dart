@@ -6,6 +6,8 @@ import 'dart:io';
 import '../../services/message_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/marketplace_message.dart';
+import '../../utils/app_theme.dart';
+import '../../utils/image_cache_manager.dart';
 
 class ChatScreen extends StatefulWidget {
   final String otherUserId;
@@ -18,7 +20,7 @@ class ChatScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _ChatScreenState createState() => _ChatScreenState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
@@ -79,12 +81,16 @@ class _ChatScreenState extends State<ChatScreen> {
         context,
         listen: false,
       );
+      final imageCacheManager = Provider.of<ImageCacheManager>(
+        context, 
+        listen: false
+      );
 
-      // TODO: Implémenter le téléchargement d'image et obtenir l'URL
+      // Gérer le téléchargement d'image
       String? imageUrl;
       if (_selectedImage != null) {
-        // Pour l'instant, nous utilisons un placeholder
-        imageUrl = 'https://via.placeholder.com/300';
+        // Utiliser le gestionnaire de cache d'images pour télécharger l'image
+        imageUrl = await imageCacheManager.uploadImage(_selectedImage!);
       }
 
       await messageService.sendMessage(
@@ -110,16 +116,20 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     } catch (e) {
       print('Erreur lors de l\'envoi du message: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erreur lors de l\'envoi du message'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'envoi du message: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isSending = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
     }
   }
 
@@ -137,22 +147,33 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       print('Erreur lors de la sélection de l\'image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sélection de l\'image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
-    final currentUserId = authService.currentUser?.id;
+    final currentUserId = authService.currentUser?.id.toString();
 
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.otherUserName),
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () {
-              // TODO: Afficher les informations de l'utilisateur
+              // Afficher les informations de l'utilisateur
+              _showUserInfo(context);
             },
           ),
         ],
@@ -282,10 +303,62 @@ class _ChatScreenState extends State<ChatScreen> {
                           )
                           : const Icon(Icons.send),
                   onPressed: _isSending ? null : _sendMessage,
-                  color: Theme.of(context).primaryColor,
+                  color: AppTheme.primaryColor,
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUserInfo(BuildContext context) {
+    // Implémenter l'affichage des informations de l'utilisateur
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(widget.otherUserName),
+        content: FutureBuilder(
+          future: Provider.of<AuthService>(context, listen: false)
+              .getUserById(widget.otherUserId),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            
+            if (snapshot.hasError) {
+              return Text('Erreur: ${snapshot.error}');
+            }
+            
+            final user = snapshot.data;
+            if (user == null) {
+              return const Text('Utilisateur non trouvé');
+            }
+            
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (user.photo != null)
+                  Center(
+                    child: CircleAvatar(
+                      radius: 40,
+                      backgroundImage: NetworkImage(user.photo!),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                Text('Email: ${user.email ?? "Non spécifié"}'),
+                Text('Téléphone: ${user.telephone ?? "Non spécifié"}'),
+                Text('Type: ${user.isPecheur ? "Pêcheur" : "Client"}'),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fermer'),
           ),
         ],
       ),
@@ -320,7 +393,7 @@ class _ChatScreenState extends State<ChatScreen> {
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
         decoration: BoxDecoration(
-          color: isMe ? Colors.blue[100] : Colors.grey[200],
+          color: isMe ? AppTheme.primaryColor.withOpacity(0.2) : Colors.grey[200],
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -336,6 +409,32 @@ class _ChatScreenState extends State<ChatScreen> {
                   message.imageUrl!,
                   fit: BoxFit.cover,
                   width: double.infinity,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      height: 150,
+                      width: double.infinity,
+                      color: Colors.grey[300],
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 150,
+                      width: double.infinity,
+                      color: Colors.grey[300],
+                      child: const Center(
+                        child: Icon(Icons.error, color: Colors.red),
+                      ),
+                    );
+                  },
                 ),
               ),
             Padding(
@@ -343,7 +442,8 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(message.content, style: const TextStyle(fontSize: 16)),
+                  if (message.content.isNotEmpty)
+                    Text(message.content, style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 4),
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -358,7 +458,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           message.isRead ? Icons.done_all : Icons.done,
                           size: 12,
                           color:
-                              message.isRead ? Colors.blue : Colors.grey[600],
+                              message.isRead ? AppTheme.primaryColor : Colors.grey[600],
                         ),
                       ],
                     ],
@@ -383,7 +483,7 @@ class _ChatScreenState extends State<ChatScreen> {
     } else if (dateToCheck == yesterday) {
       return 'Hier';
     } else {
-      return DateFormat.yMMMd().format(date);
+      return DateFormat.yMMMd('fr_FR').format(date);
     }
   }
 

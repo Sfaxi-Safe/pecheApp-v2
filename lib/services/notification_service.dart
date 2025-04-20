@@ -1,153 +1,245 @@
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz_data;
-import 'dart:io';
-import 'dart:math';
-class NotificationService {
-  static final NotificationService _instance = NotificationService._internal();
-  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-  bool _isInitialized = false;
+// Importation des packages Flutter nécessaires
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import '../models/marketplace_user.dart';
+import 'database_helper.dart';
 
-  // Singleton pattern
-  factory NotificationService() {
-    return _instance;
+/// Classe représentant une notification dans l'application
+/// Contient toutes les informations nécessaires pour afficher et gérer une notification
+class Notification {
+  final int id;                 // Identifiant unique de la notification
+  final String title;           // Titre de la notification
+  final String message;         // Message détaillé de la notification
+  final DateTime timestamp;     // Date et heure de la notification
+  final String type;            // Type de notification (ex: 'order', 'message', 'payment')
+  final bool isRead;            // Indique si la notification a été lue
+  final String? actionData;     // Données supplémentaires pour l'action (ex: ID de commande)
+
+  // Constructeur principal
+  Notification({
+    required this.id,
+    required this.title,
+    required this.message,
+    required this.timestamp,
+    required this.type,
+    required this.isRead,
+    this.actionData,
+  });
+
+  // Constructeur de factory pour créer une notification à partir d'une Map
+  // Utilisé pour convertir les données de la base de données en objet Notification
+  factory Notification.fromMap(Map<String, dynamic> map) {
+    return Notification(
+      id: map['id'],
+      title: map['title'],
+      message: map['message'],
+      timestamp: DateTime.parse(map['timestamp']),
+      type: map['type'],
+      isRead: map['is_read'] == 1,
+      actionData: map['action_data'],
+    );
   }
 
-  NotificationService._internal();
+  // Convertir l'objet Notification en Map pour le stockage dans la base de données
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'message': message,
+      'timestamp': timestamp.toIso8601String(),
+      'type': type,
+      'is_read': isRead ? 1 : 0,
+      'action_data': actionData,
+    };
+  }
+}
 
-  Future<void> init() async {
-    if (_isInitialized) return;
+/// Service de gestion des notifications
+/// Permet de charger, créer, marquer comme lu et supprimer des notifications
+class NotificationService with ChangeNotifier {
+  final List<Notification> _notifications = []; // Liste des notifications
+  bool _isLoading = false;                      // Indique si le service est en train de charger des données
+  String? _userId;                              // ID de l'utilisateur connecté
+  final DatabaseHelper _dbHelper = DatabaseHelper(); // Accès à la base de données
 
-    // Initialiser les fuseaux horaires
-    tz_data.initializeTimeZones();
+  // Getters pour accéder aux propriétés privées
+  List<Notification> get notifications => _notifications;
+  bool get isLoading => _isLoading;
+  int get unreadCount => _notifications.where((n) => !n.isRead).length;
 
-    // Initialiser les paramètres pour Android
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    // Initialiser les paramètres pour iOS
-    final DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-
-    // Initialiser les paramètres pour tous les plateformes
-    final InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsIOS,
-    );
-
-    // Initialiser le plugin
-    await _flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) async {
-        // Gérer les actions de notification
-        if (response.payload != null) {
-          print('Notification payload: ${response.payload}');
-          // Naviguer vers l'écran approprié en fonction du payload
-        }
-      },
-    );
-
-    _isInitialized = true;
+  // Initialiser le service avec l'ID de l'utilisateur
+  void init(String userId) {
+    _userId = userId;
+    loadNotifications();
   }
 
-  // Demander les permissions de notification (iOS uniquement)
-  Future<void> requestPermissions() async {
-    if (Platform.isIOS) {
-      await _flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin>()
-          ?.requestPermissions(
-            alert: true,
-            badge: true,
-            sound: true,
-          );
+  /// Charger les notifications de l'utilisateur depuis la base de données
+  Future<void> loadNotifications() async {
+    // Vérifier si l'utilisateur est connecté
+    if (_userId == null) return;
+
+    // Indiquer que le chargement est en cours
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // Simuler le chargement des notifications depuis la base de données
+      // Dans une implémentation réelle, vous récupéreriez les notifications depuis la base de données
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Exemple de notifications
+      _notifications.clear();
+      _notifications.addAll([
+        Notification(
+          id: 1,
+          title: 'Nouvelle commande',
+          message: 'Vous avez reçu une nouvelle commande #12345',
+          timestamp: DateTime.now().subtract(const Duration(hours: 2)),
+          type: 'order',
+          isRead: false,
+          actionData: '12345',
+        ),
+        Notification(
+          id: 2,
+          title: 'Paiement reçu',
+          message: 'Le paiement pour la commande #12345 a été reçu',
+          timestamp: DateTime.now().subtract(const Duration(days: 1)),
+          type: 'payment',
+          isRead: true,
+          actionData: '12345',
+        ),
+        Notification(
+          id: 3,
+          title: 'Nouveau message',
+          message: 'Vous avez reçu un nouveau message de Jean Dupont',
+          timestamp: DateTime.now().subtract(const Duration(days: 2)),
+          type: 'message',
+          isRead: true,
+          actionData: 'user_123',
+        ),
+      ]);
+    } catch (e) {
+      print('Erreur lors du chargement des notifications: $e');
+    } finally {
+      // Indiquer que le chargement est terminé
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
-  // Afficher une notification immédiate
-  Future<void> showNotification({
-    required String title,
-    required String body,
-    String? payload,
-  }) async {
-    await init();
+  /// Marquer une notification comme lue
+  Future<void> markAsRead(int notificationId) async {
+    // Trouver l'index de la notification dans la liste
+    final index = _notifications.indexWhere((n) => n.id == notificationId);
+    if (index != -1) {
+      // Récupérer la notification existante
+      final notification = _notifications[index];
+      
+      // Créer une nouvelle notification avec isRead = true
+      final updatedNotification = Notification(
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        timestamp: notification.timestamp,
+        type: notification.type,
+        isRead: true,
+        actionData: notification.actionData,
+      );
 
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'peche_app_channel',
-      'Pêche App Notifications',
-      channelDescription: 'Notifications pour l\'application Pêche App',
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: true,
-    );
+      // Mettre à jour la notification dans la liste
+      _notifications[index] = updatedNotification;
+      notifyListeners();
 
-    const DarwinNotificationDetails iOSPlatformChannelSpecifics =
-        DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-      iOS: iOSPlatformChannelSpecifics,
-    );
-
-    await _flutterLocalNotificationsPlugin.show(
-      Random().nextInt(1000), // ID unique pour chaque notification
-      title,
-      body,
-      platformChannelSpecifics,
-      payload: payload,
-    );
+      // Mettre à jour dans la base de données
+      // Dans une implémentation réelle, vous mettriez à jour la notification dans la base de données
+    }
   }
 
-  // Planifier une notification
-  Future<void> scheduleNotification({
-    required String title,
-    required String body,
-    required DateTime scheduledDate,
-    String? payload,
-  }) async {
-    await init();
+  /// Marquer toutes les notifications comme lues
+  Future<void> markAllAsRead() async {
+    // Parcourir toutes les notifications
+    for (int i = 0; i < _notifications.length; i++) {
+      final notification = _notifications[i];
+      // Ne mettre à jour que les notifications non lues
+      if (!notification.isRead) {
+        _notifications[i] = Notification(
+          id: notification.id,
+          title: notification.title,
+          message: notification.message,
+          timestamp: notification.timestamp,
+          type: notification.type,
+          isRead: true,
+          actionData: notification.actionData,
+        );
+      }
+    }
+    notifyListeners();
 
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'peche_app_channel',
-      'Pêche App Notifications',
-      channelDescription: 'Notifications pour l\'application Pêche App',
-      importance: Importance.max,
-      priority: Priority.high,
-    );
-
-    const DarwinNotificationDetails iOSPlatformChannelSpecifics =
-        DarwinNotificationDetails();
-
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-      iOS: iOSPlatformChannelSpecifics,
-    );
-
-    await _flutterLocalNotificationsPlugin.zonedSchedule(
-      Random().nextInt(1000), // ID unique pour chaque notification
-      title,
-      body,
-      tz.TZDateTime.from(scheduledDate, tz.local),
-      platformChannelSpecifics,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, // ✅ Ajout requis
-      payload: payload,
-      matchDateTimeComponents: DateTimeComponents.time, // ✅ Optionnel selon le besoin
-    );
-
+    // Mettre à jour dans la base de données
+    // Dans une implémentation réelle, vous mettriez à jour toutes les notifications dans la base de données
   }
 
-  // Annuler toutes les notifications
-  Future<void> cancelAllNotifications() async {
-    await _flutterLocalNotificationsPlugin.cancelAll();
+  /// Supprimer une notification
+  Future<void> deleteNotification(int notificationId) async {
+    // Supprimer la notification de la liste
+    _notifications.removeWhere((n) => n.id == notificationId);
+    notifyListeners();
+
+    // Supprimer de la base de données
+    // Dans une implémentation réelle, vous supprimeriez la notification de la base de données
+  }
+
+  /// Ajouter une nouvelle notification
+  Future<void> addNotification({
+    required String title,
+    required String message,
+    required String type,
+    String? actionData,
+  }) async {
+    // Créer une nouvelle notification
+    final newNotification = Notification(
+      id: _notifications.isEmpty ? 1 : _notifications.last.id + 1,
+      title: title,
+      message: message,
+      timestamp: DateTime.now(),
+      type: type,
+      isRead: false,
+      actionData: actionData,
+    );
+
+    // Ajouter la notification au début de la liste
+    _notifications.insert(0, newNotification);
+    notifyListeners();
+
+    // Dans une implémentation réelle, vous ajouteriez la notification à la base de données
+  }
+
+  /// Gérer l'action lorsqu'une notification est tapée
+  void handleNotificationTap(BuildContext context, Notification notification) {
+    // Naviguer vers l'écran approprié en fonction du type de notification
+    switch (notification.type) {
+      case 'order':
+        if (notification.actionData != null) {
+          // Naviguer vers les détails de la commande
+          // Navigator.pushNamed(context, '/order-details', arguments: {'orderId': notification.actionData});
+        }
+        break;
+      case 'message':
+        if (notification.actionData != null) {
+          // Naviguer vers la conversation
+          // Navigator.pushNamed(context, '/chat', arguments: {'userId': notification.actionData});
+        }
+        break;
+      case 'payment':
+        // Naviguer vers l'écran des paiements
+        // Navigator.pushNamed(context, '/payments');
+        break;
+      default:
+        // Par défaut, ne rien faire
+        break;
+    }
+
+    // Marquer la notification comme lue
+    markAsRead(notification.id);
   }
 }

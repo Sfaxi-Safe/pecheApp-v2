@@ -2,7 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:peche_app/screens/fisherman/analysis_result_screen.dart';
+import 'package:peche_app/services/auth_service.dart';
 import 'package:peche_app/utils/app_theme.dart';
+import 'package:provider/provider.dart';
 
 class ScanFishScreen extends StatefulWidget {
   const ScanFishScreen({super.key});
@@ -17,16 +19,26 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
   final ImagePicker _picker = ImagePicker();
 
   Future<void> _getImage(ImageSource source) async {
-    final XFile? pickedFile = await _picker.pickImage(
-      source: source,
-      maxWidth: 1800,
-      maxHeight: 1800,
-    );
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        maxWidth: 1800,
+        maxHeight: 1800,
+      );
 
-    if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-      });
+      if (pickedFile != null) {
+        setState(() {
+          _imageFile = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la capture d\'image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -37,32 +49,64 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
       _isAnalyzing = true;
     });
 
-    // Simuler un délai d'analyse
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // Simuler un délai d'analyse
+      await Future.delayed(const Duration(seconds: 2));
 
-    // Dans une application réelle, vous enverriez l'image à un service d'IA
-    // et recevriez les résultats de l'analyse
+      // Dans une application réelle, vous enverriez l'image à un service d'IA
+      // et recevriez les résultats de l'analyse
 
-    setState(() {
-      _isAnalyzing = false;
-    });
+      if (!mounted) return;
 
-    if (!mounted) return;
-
-    // Naviguer vers l'écran des résultats
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AnalysisResultScreen(
-          imageFile: _imageFile!,
-          species: 'Bar commun', // Résultat simulé
+      // Naviguer vers l'écran des résultats
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AnalysisResultScreen(
+            imageFile: _imageFile!,
+            species: 'Bar commun', // Résultat simulé
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de l\'analyse: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authService = Provider.of<AuthService>(context);
+    
+    // Vérifier si l'utilisateur est connecté et est un pêcheur
+    if (!authService.isAuthenticated || !authService.isFisherman) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Scanner un poisson'),
+          backgroundColor: AppTheme.primaryColor,
+          foregroundColor: Colors.white,
+        ),
+        body: const Center(
+          child: Text(
+            'Vous devez être connecté en tant que pêcheur pour accéder à cette fonctionnalité',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Scanner un poisson'),
@@ -240,4 +284,3 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
     );
   }
 }
-

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/marketplace_panier.dart';
 import '../models/marketplace_aommande.dart';
+import '../models/marketplace_produitvendus.dart';
 
 import 'database_helper.dart';
 import 'notification_service.dart';
@@ -36,166 +37,221 @@ class CreditCard {
 class PaymentService with ChangeNotifier {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final NotificationService _notificationService = NotificationService();
-  List<MarketplacePanier> _payments = [];
+  List<MarketplacePanier> _cartItems = [];
   bool _isLoading = false;
 
   // Getters
-  List<MarketplacePanier> get payments => _payments;
+  List<MarketplacePanier> get cartItems => _cartItems;
   bool get isLoading => _isLoading;
 
   // Initialiser le service
-  Future<void> init(String userId) async {
-    await loadPayments(userId);
+  Future<void> init(int userId) async {
+    await loadCartItems(userId);
   }
 
-  // Charger les paiements depuis la base de données
-  Future<void> loadPayments(String userId) async {
+  // Charger les articles du panier depuis la base de données
+  Future<void> loadCartItems(int userId) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final userIdInt = int.tryParse(userId);
-      if (userIdInt != null) {
-        _payments = await _dbHelper.getPaniersByUser(userIdInt);
-      }
+      _cartItems = await _dbHelper.getPaniersByUser(userId);
     } catch (e) {
-      print('Erreur lors du chargement des paiements: $e');
+      print('Erreur lors du chargement du panier: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Créer un nouveau paiement
-  Future<bool> createPayment({
-    required dynamic orderId,
-    required String userId,
-    required double amount,
-    required PaymentMethod method,
-    String? transactionId,
-    String? notes,
+  // Ajouter un article au panier
+  Future<bool> addToCart({
+    required int userId,
+    required int produitId,
+    required int quantite,
   }) async {
     try {
-      final userIdInt = int.tryParse(userId);
-      if (userIdInt == null) return false;
-
-      // Créer un nouveau panier (utilisé comme paiement)
-      final newPayment = MarketplacePanier.create(
-        produitId: 0, // Pas de produit spécifique pour un paiement
-        userId: userIdInt,
-        quantite: 1, // Quantité par défaut
+      // Vérifier si l'article est déjà dans le panier
+      final existingItem = _cartItems.firstWhere(
+        (item) => item.produitId == produitId && item.userId == userId,
+        orElse: () => MarketplacePanier(
+          produitId: -1,
+          userId: -1,
+          quantite: 0,
+          dateAjout: DateTime.now(),
+        ),
       );
 
-      // Insérer le panier dans la base de données
-      final paymentId = await _dbHelper.insertPanier(newPayment);
-      if (paymentId > 0) {
-        // Créer un nouveau panier avec l'ID généré
-        final savedPayment = newPayment.copyWith(id: paymentId);
-        _payments.add(savedPayment);
+      if (existingItem.produitId != -1) {
+        // Mettre à jour la quantité
+        final updatedItem = existingItem.updateQuantite(
+          existingItem.quantite + quantite,
+        );
+        await _dbHelper.updatePanier(updatedItem);
+        
+        // Mettre à jour la liste locale
+        final index = _cartItems.indexWhere((item) => item.id == existingItem.id);
+        if (index != -1) {
+          _cartItems[index] = updatedItem;
+        }
+      } else {
+        // Créer un nouvel article
+        final newItem = MarketplacePanier.create(
+          userId: userId,
+          produitId: produitId,
+          quantite: quantite,
+        );
+        
+        final id = await _dbHelper.insertPanier(newItem);
+        if (id > 0) {
+          _cartItems.add(newItem.copyWith(id: id));
+        }
       }
-
-      // Mettre à jour le statut de la commande
-      // Note: Dans une implémentation réelle, nous mettrions à jour le statut de la commande
-      // Pour l'instant, nous supposons que la commande est confirmée
-
-      // Envoyer une notification de confirmation de paiement
-      await _notificationService.showNotification(
-        title: 'Paiement confirmé',
-        body:
-            'Votre paiement de ${amount.toStringAsFixed(2)} € a été confirmé.',
-        payload: 'payment:${newPayment.id}',
-      );
-
+      
       notifyListeners();
       return true;
     } catch (e) {
-      print('Erreur lors de la création du paiement: $e');
+      print('Erreur lors de l\'ajout au panier: $e');
       return false;
     }
   }
 
-  // Mettre à jour le statut d'un paiement
-  Future<bool> updatePaymentStatus(
-    String paymentIdStr,
-    PaymentStatus newStatus,
-  ) async {
+  // Mettre à jour la quantité d'un article du panier
+  Future<bool> updateCartItemQuantity(int itemId, int newQuantity) async {
     try {
-      final paymentId = int.tryParse(paymentIdStr);
-      if (paymentId == null) return false;
-
-      // Récupérer le panier (paiement)
-      final payment = await _dbHelper.getPanierById(paymentId);
-      if (payment == null) return false;
-
-      // Mettre à jour le panier
-      // Note: Dans le nouveau modèle, nous n'avons pas de statut de paiement
-      // Nous pourrions ajouter un champ dans la base de données pour cela
-
-      // Mettre à jour la liste locale
-      final index = _payments.indexWhere((p) => p.id == paymentId);
-      if (index != -1) {
-        _payments[index] = payment;
-        notifyListeners();
-      }
-
+      final index = _cartItems.indexWhere((item) => item.id == itemId);
+      if (index == -1) return false;
+      
+      final updatedItem = _cartItems[index].updateQuantite(newQuantity);
+      await _dbHelper.updatePanier(updatedItem);
+      
+      _cartItems[index] = updatedItem;
+      notifyListeners();
       return true;
     } catch (e) {
-      print('Erreur lors de la mise à jour du statut du paiement: $e');
+      print('Erreur lors de la mise à jour de la quantité: $e');
       return false;
     }
   }
 
-  // Obtenir un paiement par son ID
-  MarketplacePanier? getPaymentById(String idStr) {
+  // Supprimer un article du panier
+  Future<bool> removeFromCart(int itemId) async {
     try {
-      final id = int.tryParse(idStr);
-      if (id == null) return null;
-
-      return _payments.firstWhere((payment) => payment.id == id);
+      await _dbHelper.deletePanier(itemId);
+      _cartItems.removeWhere((item) => item.id == itemId);
+      notifyListeners();
+      return true;
     } catch (e) {
-      return null;
+      print('Erreur lors de la suppression de l\'article du panier: $e');
+      return false;
     }
   }
 
-  // Obtenir les paiements pour une commande
-  Future<List<MarketplacePanier>> getPaymentsForOrder(int orderId) async {
+  // Vider le panier
+  Future<bool> clearCart(int userId) async {
     try {
-      // Dans le nouveau modèle, nous n'avons pas de relation directe entre panier et commande
-      // Nous pourrions ajouter un champ dans la base de données pour cela
-      return [];
+      for (var item in _cartItems.where((item) => item.userId == userId)) {
+        if (item.id != null) {
+          await _dbHelper.deletePanier(item.id!);
+        }
+      }
+      
+      _cartItems.removeWhere((item) => item.userId == userId);
+      notifyListeners();
+      return true;
     } catch (e) {
-      print(
-        'Erreur lors de la récupération des paiements pour la commande: $e',
+      print('Erreur lors du vidage du panier: $e');
+      return false;
+    }
+  }
+
+  // Calculer le total du panier
+  Future<double> calculateCartTotal(int userId) async {
+    try {
+      double total = 0.0;
+      
+      for (var item in _cartItems.where((item) => item.userId == userId)) {
+        if (item.produitId != null) {
+          final produit = await _dbHelper.getProduitById(item.produitId);
+          if (produit != null) {
+            total += produit.prix * item.quantite;
+          }
+        }
+      }
+      
+      return total;
+    } catch (e) {
+      print('Erreur lors du calcul du total du panier: $e');
+      return 0.0;
+    }
+  }
+
+  // Créer une commande à partir du panier
+  Future<bool> createOrderFromCart({
+    required int userId,
+    required String methodeDePaiement,
+    String? commentaire,
+    required int fournisseurId,
+  }) async {
+    try {
+      // Calculer le total
+      final total = await calculateCartTotal(userId);
+      
+      // Créer la commande
+      final commande = MarketplaceAommande.create(
+        userId: userId,
+        methodeDePaiement: methodeDePaiement,
+        commentaire: commentaire,
+        totale: total,
+        statutCommande: 'En Attente',
+        fournisseurId: fournisseurId,
       );
-      return [];
-    }
-  }
-
-  // Vérifier si une commande a été payée
-  Future<bool> isOrderPaid(int orderId) async {
-    try {
-      // Dans le nouveau modèle, nous vérifions le statut de la commande directement
-      final order = await _dbHelper.getOrderById(orderId);
-      if (order == null) return false;
-
-      // Convertir l'ordre en MarketplaceAommande pour accéder à statutCommande
-      final commande = order as MarketplaceAommande;
-
-      // Si le statut est confirmed, in_progress, delivered, alors la commande est payée
-      return commande.statutCommande == 'confirmed' ||
-          commande.statutCommande == 'in_progress' ||
-          commande.statutCommande == 'delivered';
+      
+      // Créer les produits vendus
+      List<MarketplaceProduitVendus> produitsVendus = [];
+      
+      for (var item in _cartItems.where((item) => item.userId == userId)) {
+        if (item.produitId != null) {
+          final produit = await _dbHelper.getProduitById(item.produitId);
+          if (produit != null) {
+            produitsVendus.add(
+              MarketplaceProduitVendus.create(
+                produitId: item.produitId,
+                quantite: item.quantite,
+                prix: produit.prix,
+              ),
+            );
+          }
+        }
+      }
+      
+      // Insérer la commande et les produits vendus
+      final commandeId = await _dbHelper.insertCommande(commande, produitsVendus);
+      
+      if (commandeId > 0) {
+        // Vider le panier
+        await clearCart(userId);
+        
+        // Envoyer une notification
+        await _notificationService.showNotification(
+          title: 'Commande confirmée',
+          body: 'Votre commande de ${total.toStringAsFixed(2)} € a été confirmée.',
+          payload: 'order:$commandeId',
+        );
+        
+        return true;
+      }
+      
+      return false;
     } catch (e) {
-      print('Erreur lors de la vérification du paiement de la commande: $e');
+      print('Erreur lors de la création de la commande: $e');
       return false;
     }
   }
 
-  // Simuler un paiement par carte de crédit
+  // Traiter un paiement par carte de crédit
   Future<bool> processCardPayment({
-    required dynamic orderId,
-    required String userId,
-    required double amount,
+    required int userId,
     required CreditCard creditCard,
     String? notes,
   }) async {
@@ -203,7 +259,7 @@ class PaymentService with ChangeNotifier {
       // Simuler un délai de traitement
       await Future.delayed(const Duration(seconds: 2));
 
-      // Simuler une validation de carte (dans une vraie application, cela serait fait par un service de paiement)
+      // Simuler une validation de carte
       if (creditCard.number.length < 16 ||
           creditCard.cvv.length < 3 ||
           creditCard.expiryDate.isEmpty ||
@@ -211,15 +267,8 @@ class PaymentService with ChangeNotifier {
         return false;
       }
 
-      // Créer le paiement
-      return await createPayment(
-        orderId: orderId,
-        userId: userId,
-        amount: amount,
-        method: PaymentMethod.creditCard,
-        transactionId: 'CARD_${DateTime.now().millisecondsSinceEpoch}',
-        notes: notes,
-      );
+      // Le paiement est considéré comme réussi
+      return true;
     } catch (e) {
       print('Erreur lors du traitement du paiement par carte: $e');
       return false;
@@ -227,21 +276,10 @@ class PaymentService with ChangeNotifier {
   }
 
   // Simuler un paiement en espèces
-  Future<bool> processCashPayment({
-    required dynamic orderId,
-    required String userId,
-    required double amount,
-    String? notes,
-  }) async {
+  Future<bool> processCashPayment() async {
     try {
-      // Créer le paiement
-      return await createPayment(
-        orderId: orderId,
-        userId: userId,
-        amount: amount,
-        method: PaymentMethod.cash,
-        notes: notes ?? 'Paiement en espèces à la livraison',
-      );
+      // Le paiement en espèces est toujours considéré comme réussi
+      return true;
     } catch (e) {
       print('Erreur lors du traitement du paiement en espèces: $e');
       return false;

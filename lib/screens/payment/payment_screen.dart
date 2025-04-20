@@ -8,6 +8,7 @@ import '../../services/payment_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/order_service.dart';
 import '../../services/database_helper.dart';
+import '../../utils/app_theme.dart';
 
 class PaymentScreen extends StatefulWidget {
   final MarketplaceAommande order;
@@ -62,7 +63,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Erreur lors du chargement des détails du produit';
+          _errorMessage = 'Erreur lors du chargement des détails du produit: $e';
         });
       }
     }
@@ -137,7 +138,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Une erreur est survenue. Veuillez réessayer.';
+        _errorMessage = 'Une erreur est survenue: $e';
       });
     } finally {
       if (mounted) {
@@ -187,7 +188,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final totalPrice = widget.order.totale;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Paiement')),
+      appBar: AppBar(
+        title: const Text('Paiement'),
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -214,25 +219,51 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         contentPadding: EdgeInsets.zero,
                         leading: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.asset(
-                            'assets/images/fish_placeholder.jpg',
-                            width: 60,
-                            height: 60,
-                            fit: BoxFit.cover,
-                          ),
+                          child: _produit!.images.isNotEmpty
+                              ? Image.network(
+                                  _produit!.images[0],
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      width: 60,
+                                      height: 60,
+                                      color: Colors.grey.shade300,
+                                      child: const Icon(Icons.image_not_supported),
+                                    );
+                                  },
+                                )
+                              : Image.asset(
+                                  'assets/images/fish_placeholder.jpg',
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                ),
                         ),
                         title: Text(_produit!.nom),
                         subtitle: Text(
                           'Quantité: ${_produitsVendus.isNotEmpty ? _produitsVendus[0].quantite : 1}',
                         ),
                         trailing: Text(
-                          formatter.format(totalPrice),
+                          formatter.format(_produitsVendus.isNotEmpty ? _produitsVendus[0].totale : 0),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
                         ),
                       ),
+                      if (_produitsVendus.length > 1)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            '+ ${_produitsVendus.length - 1} autres produits',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
                     ] else ...[
                       const ListTile(
                         contentPadding: EdgeInsets.zero,
@@ -256,7 +287,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
-                            color: Colors.blue,
+                            color: AppTheme.primaryColor,
                           ),
                         ),
                       ],
@@ -447,6 +478,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
               onPressed: _isProcessing ? null : _processPayment,
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
               ),
               child:
                   _isProcessing

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/marketplace_aommande.dart';
 import '../models/marketplace_produitvendus.dart';
+import '../models/marketplace_produit.dart';
 import 'database_helper.dart';
 import 'notification_service.dart';
 
@@ -15,8 +16,8 @@ class OrderService with ChangeNotifier {
   bool get isLoading => _isLoading;
 
   // Initialiser le service
-  Future<void> init(String userId, String userType) async {
-    await loadOrders(int.tryParse(userId) ?? 0, userType);
+  Future<void> init(int userId, String userType) async {
+    await loadOrders(userId, userType);
     await _notificationService.init();
   }
 
@@ -30,6 +31,8 @@ class OrderService with ChangeNotifier {
         _orders = await _dbHelper.getOrdersByClient(userId);
       } else if (userType == 'fisherman') {
         _orders = await _dbHelper.getOrdersByFisherman(userId);
+      } else {
+        _orders = await _dbHelper.getAllOrders();
       }
     } catch (e) {
       print('Erreur lors du chargement des commandes: $e');
@@ -55,16 +58,30 @@ class OrderService with ChangeNotifier {
         methodeDePaiement: methodeDePaiement,
         commentaire: commentaire,
         totale: totale,
-        statutCommande: 'pending',
+        statutCommande: 'En Attente',
         fournisseurId: fournisseurId,
       );
 
-      await _dbHelper.insertCommande(newOrder, produits);
-      _orders.add(newOrder);
-      notifyListeners();
+      final orderId = await _dbHelper.insertCommande(newOrder, produits);
+      
+      // Mettre à jour les stocks des produits
+      for (var produit in produits) {
+        if (produit.produitId != null) {
+          final fish = await _dbHelper.getProduitById(produit.produitId);
+          if (fish != null) {
+            final updatedFish = fish.copyWith(
+              stock: fish.stock - produit.quantite,
+            );
+            await _dbHelper.updateProduit(updatedFish);
+          }
+        }
+      }
+      
+      // Recharger les commandes
+      await loadOrders(userId, 'client');
 
       // Envoyer une notification au pêcheur
-      _sendNewOrderNotification(fournisseurId, newOrder.id ?? 0);
+      _sendNewOrderNotification(fournisseurId, orderId);
 
       return true;
     } catch (e) {
@@ -105,29 +122,106 @@ class OrderService with ChangeNotifier {
   }
 
   // Obtenir une commande par son ID
-  MarketplaceAommande? getOrderById(dynamic id) {
+  Future<MarketplaceAommande?> getOrderById(dynamic id) async {
     try {
-      return _orders.firstWhere((order) => order.id == id);
+      return await _dbHelper.getOrderById(id);
     } catch (e) {
+      print('Erreur lors de la récupération de la commande: $e');
       return null;
     }
   }
 
-  // Obtenir les commandes d'un client
-  List<MarketplaceAommande> getOrdersByClient(int userId) {
-    return _orders.where((order) => order.userId == userId).toList();
+  // Obtenir les produits vendus d'une commande
+  Future<List<MarketplaceProduitVendus>> getOrderItems(dynamic orderId) async {
+    try {
+      return await _dbHelper.getProduitVendusByCommandeId(orderId);
+    } catch (e) {
+      print('Erreur lors de la récupération des produits vendus: $e');
+      return [];
+    }
   }
 
-  // Obtenir les commandes d'un pêcheur
-  List<MarketplaceAommande> getOrdersByFisherman(int fournisseurId) {
-    return _orders
-        .where((order) => order.fournisseurId == fournisseurId)
-        .toList();
+  // Obtenir les détails complets d'une commande
+  Future<Map<String, dynamic>> getOrderDetails(dynamic orderId) async {
+    try {
+      final order = await _dbHelper.getOrderById(orderId);
+      if (order == null) {
+        return {'error': 'Commande non trouvée'};
+      }
+      
+      final items = await _dbHelper.getProduitVendusByCommandeId(orderId);
+      
+      // Récupérer les détails des produits
+      List<Map<String, dynamic>> itemsWithDetails = [];
+      for (var item in items) {
+        if (item.produitId != null) {
+          final produit = await _dbHelper.getProduitById(item.produitId);
+          if (produit != null) {
+            itemsWithDetails.add({
+              'item': item,
+              'produit': produit,
+            });
+          } else {
+            itemsWithDetails.add({
+              'item': item,
+              'produit': null,
+            });
+          }
+        } else {
+          itemsWithDetails.add({
+            'item': item,
+            'produit': null,
+          });
+        }
+      }
+      
+      // Récupérer les informations du client
+      final client = order.userId != null 
+          ? await _dbHelper.getUserById(order.userId!) 
+          : null;
+      
+      // Récupérer les informations du fournisseur
+      final fournisseur = order.fournisseurId != null 
+          ? await _dbHelper.getUserById(order.fournisseurId!) 
+          : null;
+      
+      return {
+        'order': order,
+        'items': itemsWithDetails,
+        'client': client,
+        'fournisseur': fournisseur,
+      };
+    } catch (e) {
+      print('Erreur lors de la récupération des détails de la commande: $e');
+      return {'error': 'Erreur lors de la récupération des détails'};
+    }
   }
 
   // Annuler une commande
   Future<bool> cancelOrder(dynamic orderId) async {
-    return await updateOrderStatus(orderId, 'cancelled');
+    try {
+      // Récupérer les produits vendus
+      final items = await _dbHelper.getProduitVendusByCommandeId(orderId);
+      
+      // Remettre les produits en stock
+      for (var item in items) {
+        if (item.produitId != null) {
+          final produit = await _dbHelper.getProduitById(item.produitId);
+          if (produit != null) {
+            final updatedProduit = produit.copyWith(
+              stock: produit.stock + item.quantite,
+            );
+            await _dbHelper.updateProduit(updatedProduit);
+          }
+        }
+      }
+      
+      // Mettre à jour le statut de la commande
+      return await updateOrderStatus(orderId, 'Annulée');
+    } catch (e) {
+      print('Erreur lors de l\'annulation de la commande: $e');
+      return false;
+    }
   }
 
   // Envoyer une notification pour une nouvelle commande
@@ -137,7 +231,7 @@ class OrderService with ChangeNotifier {
   ) async {
     try {
       // Récupérer les informations du pêcheur
-      final fisherman = await _dbHelper.getFishermanById(fournisseurId);
+      final fisherman = await _dbHelper.getFishermanByUserId(fournisseurId);
       if (fisherman == null) return;
 
       // Récupérer les informations de la commande
@@ -147,7 +241,7 @@ class OrderService with ChangeNotifier {
       // Envoyer la notification
       await _notificationService.showNotification(
         title: 'Nouvelle commande !',
-        body: 'Vous avez reçu une nouvelle commande de ${order.totale} €.',
+        body: 'Vous avez reçu une nouvelle commande de ${order.totale.toStringAsFixed(2)} €.',
         payload: 'order:$orderId',
       );
     } catch (e) {
@@ -173,16 +267,16 @@ class OrderService with ChangeNotifier {
       // Déterminer le message en fonction du statut
       String statusMessage;
       switch (status) {
-        case 'confirmed':
+        case 'Confirmée':
           statusMessage = 'Votre commande a été confirmée.';
           break;
-        case 'in_progress':
+        case 'En Cours':
           statusMessage = 'Votre commande est en cours de préparation.';
           break;
-        case 'delivered':
+        case 'Livrée':
           statusMessage = 'Votre commande a été livrée.';
           break;
-        case 'cancelled':
+        case 'Annulée':
           statusMessage = 'Votre commande a été annulée.';
           break;
         default:

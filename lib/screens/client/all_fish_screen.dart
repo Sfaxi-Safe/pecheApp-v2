@@ -27,27 +27,26 @@ class AllFishScreen extends StatelessWidget {
             colors: [Colors.blue.shade50, Colors.blue.shade100],
           ),
         ),
-        child:
-            fishes.isEmpty
-                ? const Center(
-                  child: Text(
-                    'Aucun poisson disponible pour le moment',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                )
-                : GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.75,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: fishes.length,
-                  itemBuilder: (context, index) {
-                    return _buildFishCard(context, fishes[index], fishService);
-                  },
+        child: fishes.isEmpty
+            ? const Center(
+                child: Text(
+                  'Aucun poisson disponible pour le moment',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
                 ),
+              )
+            : GridView.builder(
+                padding: const EdgeInsets.all(16),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.75,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: fishes.length,
+                itemBuilder: (context, index) {
+                  return _buildFishCard(context, fishes[index], fishService);
+                },
+              ),
       ),
     );
   }
@@ -58,10 +57,6 @@ class AllFishScreen extends StatelessWidget {
     FishService fishService,
   ) {
     final averageRating = fishService.getAverageRating(fish.id.toString());
-    final formattedDate =
-        fish.dateDePeche != null
-            ? fish.dateDePeche!.substring(0, 10)
-            : 'Date inconnue';
 
     return GestureDetector(
       onTap: () {
@@ -83,12 +78,27 @@ class AllFishScreen extends StatelessWidget {
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(12),
               ),
-              child: Image.asset(
-                'assets/images/fish_placeholder.jpg',
-                height: 120,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
+              child: fish.images.isNotEmpty
+                  ? Image.network(
+                      fish.images.first.url,
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Image.asset(
+                          'assets/images/fish_placeholder.jpg',
+                          height: 120,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        );
+                      },
+                    )
+                  : Image.asset(
+                      'assets/images/fish_placeholder.jpg',
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
             ),
             Padding(
               padding: const EdgeInsets.all(12),
@@ -107,7 +117,7 @@ class AllFishScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${fish.prix} €/kg',
+                    '${fish.prix.toStringAsFixed(2)} €/kg',
                     style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
                   ),
                   const SizedBox(height: 4),
@@ -129,7 +139,7 @@ class AllFishScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Pêché le: $formattedDate',
+                    'Stock: ${fish.stock} kg',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

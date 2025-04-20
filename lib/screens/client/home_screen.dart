@@ -71,31 +71,29 @@ class _HomeScreenState extends State<HomeScreen>
     final user = authService.currentUser;
 
     // Filtrer les poissons en fonction de la recherche
-    List<MarketplaceProduit> filteredFishes =
-        _searchQuery.isEmpty
-            ? fishService.fishes
-            : fishService.fishes.where((fish) {
-              return fish.nom.toLowerCase().contains(
-                _searchQuery.toLowerCase(),
-              );
-            }).toList();
+    List<MarketplaceProduit> filteredFishes = _searchQuery.isEmpty
+        ? fishService.fishes
+        : fishService.fishes.where((fish) {
+            return fish.nom.toLowerCase().contains(
+                  _searchQuery.toLowerCase(),
+                );
+          }).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title:
-            _isSearching
-                ? TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    hintText: 'Rechercher un poisson...',
-                    border: InputBorder.none,
-                    hintStyle: TextStyle(color: Colors.white70),
-                  ),
-                  style: const TextStyle(color: Colors.white),
-                  autofocus: true,
-                  onChanged: _updateSearchQuery,
-                )
-                : const Text('Pêche App'),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: 'Rechercher un poisson...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: Colors.white70),
+                ),
+                style: const TextStyle(color: Colors.white),
+                autofocus: true,
+                onChanged: _updateSearchQuery,
+              )
+            : const Text('Pêche App'),
         actions: [
           if (_isSearching)
             IconButton(icon: const Icon(Icons.close), onPressed: _stopSearch)
@@ -112,17 +110,16 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           const ThemeSwitch(),
         ],
-        bottom:
-            _isSearching
-                ? null
-                : TabBar(
-                  controller: _tabController,
-                  tabs: const [
-                    Tab(text: 'Tous'),
-                    Tab(text: 'Populaires'),
-                    Tab(text: 'Récents'),
-                  ],
-                ),
+        bottom: _isSearching
+            ? null
+            : TabBar(
+                controller: _tabController,
+                tabs: const [
+                  Tab(text: 'Tous'),
+                  Tab(text: 'Populaires'),
+                  Tab(text: 'Récents'),
+                ],
+              ),
       ),
       body: TabBarView(
         controller: _tabController,
@@ -144,14 +141,7 @@ class _HomeScreenState extends State<HomeScreen>
           // Onglet "Récents"
           _buildFishGrid(
             context,
-            filteredFishes.where((fish) {
-              final now = DateTime.now();
-              final dateDePeche =
-                  DateTime.tryParse(fish.dateDePeche ?? '') ?? now;
-              final difference = now.difference(dateDePeche);
-              return difference.inDays <=
-                  7; // Poissons capturés dans les 7 derniers jours
-            }).toList(),
+            filteredFishes,
           ),
         ],
       ),
@@ -165,7 +155,12 @@ class _HomeScreenState extends State<HomeScreen>
               ),
               accountEmail: Text(user?.email ?? ''),
               currentAccountPicture: CircleAvatar(
-                child: const Icon(Icons.person, size: 40),
+                backgroundImage: user?.photo != null
+                    ? NetworkImage(user!.photo!)
+                    : null,
+                child: user?.photo == null
+                    ? const Icon(Icons.person, size: 40)
+                    : null,
               ),
               decoration: BoxDecoration(color: Theme.of(context).primaryColor),
             ),
@@ -272,22 +267,21 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             child: AspectRatio(
               aspectRatio: 1.2,
-              child: Image.network(
-                'https://via.placeholder.com/150', // Remplacer par l'URL de l'image du produit
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      value:
-                          loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
+              child: produit.images.isNotEmpty
+                  ? Image.network(
+                      produit.images.first.url,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Image.asset(
+                          'assets/images/fish_placeholder.jpg',
+                          fit: BoxFit.cover,
+                        );
+                      },
+                    )
+                  : Image.asset(
+                      'assets/images/fish_placeholder.jpg',
+                      fit: BoxFit.cover,
                     ),
-                  );
-                },
-              ),
             ),
           ),
 
@@ -328,7 +322,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${produit.prix} € - ${produit.stock} en stock',
+                  '${produit.prix.toStringAsFixed(2)} € - ${produit.stock} kg en stock',
                   style: TextStyle(
                     fontSize: context.responsiveFontSize(12),
                     color: Colors.grey[600],
@@ -347,9 +341,8 @@ class _HomeScreenState extends State<HomeScreen>
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder:
-                        (context) =>
-                            FishDetailScreen(fishId: produit.id.toString()),
+                    builder: (context) =>
+                        FishDetailScreen(fishId: produit.id.toString()),
                   ),
                 );
               },

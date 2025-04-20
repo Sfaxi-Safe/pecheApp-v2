@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:peche_app/models/marketplace_produit.dart';
+import 'package:peche_app/models/marketplace_user.dart';
 import 'package:peche_app/screens/fisherman/scan_fish_screen.dart';
 import 'package:peche_app/screens/fisherman/history_screen.dart';
 import 'package:peche_app/services/auth_service.dart';
+import 'package:peche_app/services/fish_service.dart';
 import 'package:peche_app/services/statistics_service.dart';
 import 'package:peche_app/utils/app_theme.dart';
 import 'package:provider/provider.dart';
@@ -13,20 +16,17 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
     final statisticsService = Provider.of<StatisticsService>(context);
+    final fishService = Provider.of<FishService>(context);
 
     // Obtenir les statistiques pour le pêcheur connecté
-    final fishermanId =
-        authService.currentUser?.id != null
-            ? authService.currentUser!.id.toString()
-            : '1'; // Utiliser '1' par défaut pour la démo
-    final capturesThisMonth = statisticsService.getCapturesThisMonth(
-      fishermanId,
-    );
-    final differentSpeciesCount = statisticsService.getDifferentSpeciesCount(
-      fishermanId,
-    );
+    final MarketplaceUser? currentUser = authService.currentUser;
+    final fishermanId = currentUser?.id?.toString() ?? '0';
+    
+    // Récupérer les statistiques
+    final capturesThisMonth = statisticsService.getCapturesThisMonth(fishermanId);
+    final differentSpeciesCount = statisticsService.getDifferentSpeciesCount(fishermanId);
     final totalWeight = statisticsService.getTotalWeight(fishermanId);
-    final lastCapture = statisticsService.getLastCapture(fishermanId);
+    final MarketplaceProduit? lastCapture = fishService.getLastCaptureByFisherman(fishermanId);
 
     return Scaffold(
       appBar: AppBar(
@@ -36,8 +36,10 @@ class DashboardScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              authService.logout();
+            onPressed: () async {
+              await authService.logout();
+              if (!context.mounted) return;
+              Navigator.pushReplacementNamed(context, '/login');
             },
           ),
         ],
@@ -58,7 +60,7 @@ class DashboardScreen extends StatelessWidget {
               children: [
                 // En-tête avec salutation
                 Text(
-                  'Bonjour, ${authService.currentUser != null ? "${authService.currentUser!.prenom} ${authService.currentUser!.nom}" : 'Pêcheur'}!',
+                  'Bonjour, ${currentUser != null ? "${currentUser.prenom} ${currentUser.nom}" : 'Pêcheur'}!',
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -123,7 +125,7 @@ class DashboardScreen extends StatelessWidget {
                         Icons.shopping_cart,
                         Colors.orange.shade700,
                         () {
-                          Navigator.pushNamed(context, '/orders');
+                          Navigator.pushNamed(context, '/fisherman/orders');
                         },
                       ),
                     ),
@@ -135,7 +137,7 @@ class DashboardScreen extends StatelessWidget {
                         Icons.bar_chart,
                         Colors.purple.shade700,
                         () {
-                          Navigator.pushNamed(context, '/statistics');
+                          Navigator.pushNamed(context, '/fisherman/statistics');
                         },
                       ),
                     ),

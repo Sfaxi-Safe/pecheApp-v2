@@ -36,7 +36,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
       final authService = Provider.of<AuthService>(context, listen: false);
       final user = authService.currentUser;
 
-      if (user == null) {
+      if (user == null || user.id == null) {
         setState(() {
           _isSubmitting = false;
         });
@@ -50,29 +50,37 @@ class _ReviewScreenState extends State<ReviewScreen> {
         return;
       }
 
-      final review = MarketplaceAvis(
+      final review = MarketplaceAvis.create(
         produitId: int.tryParse(widget.fishId),
-        userId: int.tryParse(user.id.toString()),
-        etoileNb: _rating.toInt(),
+        userId: user.id,
+        note: _rating.toInt(),
         commentaire: _commentController.text.trim(),
-        createdAt: DateTime.now(),
       );
 
-      await fishService.addReview(review);
+      final success = await fishService.addReview(review);
 
       setState(() {
         _isSubmitting = false;
       });
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Avis ajouté avec succès'),
-          backgroundColor: Colors.green,
-        ),
-      );
 
-      Navigator.pop(context);
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Avis ajouté avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de l\'ajout de l\'avis'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -117,12 +125,27 @@ class _ReviewScreenState extends State<ReviewScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.asset(
-                          'assets/images/fish_placeholder.jpg',
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
-                        ),
+                        child: fish.images.isNotEmpty
+                            ? Image.network(
+                                fish.images.first.url,
+                                width: 80,
+                                height: 80,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Image.asset(
+                                    'assets/images/fish_placeholder.jpg',
+                                    width: 80,
+                                    height: 80,
+                                    fit: BoxFit.cover,
+                                  );
+                                },
+                              )
+                            : Image.asset(
+                                'assets/images/fish_placeholder.jpg',
+                                width: 80,
+                                height: 80,
+                                fit: BoxFit.cover,
+                              ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -139,7 +162,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Prix: ${fish.prix} €/kg',
+                              'Prix: ${fish.prix.toStringAsFixed(2)} €/kg',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey.shade700,
@@ -181,8 +204,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         index < _rating.floor()
                             ? Icons.star
                             : index < _rating
-                            ? Icons.star_half
-                            : Icons.star_border,
+                                ? Icons.star_half
+                                : Icons.star_border,
                         color: Colors.amber,
                         size: 36,
                       ),
@@ -247,20 +270,19 @@ class _ReviewScreenState extends State<ReviewScreen> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child:
-                      _isSubmitting
-                          ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                          : const Text(
-                            'Soumettre l\'avis',
-                            style: TextStyle(fontSize: 16),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
                           ),
+                        )
+                      : const Text(
+                          'Soumettre l\'avis',
+                          style: TextStyle(fontSize: 16),
+                        ),
                 ),
               ),
             ],

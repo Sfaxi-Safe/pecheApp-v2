@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../services/statistics_service.dart';
 import '../../utils/app_theme.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 /// Écran d'affichage des statistiques
 class StatisticsScreen extends StatefulWidget {
@@ -44,6 +45,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       initialDate: isStartDate ? (_startDate ?? DateTime.now()) : (_endDate ?? DateTime.now()),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
+      locale: const Locale('fr', 'FR'),
     );
     
     if (picked != null) {
@@ -59,6 +61,26 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   
   // Générer un rapport de ventes
   Future<void> _generateSalesReport() async {
+    if (_startDate == null || _endDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez sélectionner une période'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    if (_endDate!.isBefore(_startDate!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('La date de fin doit être après la date de début'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
     setState(() {
       _isGeneratingReport = true;
     });
@@ -74,16 +96,20 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
         _salesReport = report;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors de la génération du rapport: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la génération du rapport: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isGeneratingReport = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isGeneratingReport = false;
+        });
+      }
     }
   }
   
@@ -92,6 +118,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
     return Scaffold(
       appBar: AppBar(
         title: const Text('Statistiques'),
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -99,6 +127,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
             Tab(text: 'Ventes'),
             Tab(text: 'Produits'),
           ],
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
         ),
       ),
       body: TabBarView(
@@ -180,6 +211,25 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
               
               const SizedBox(height: 24),
               
+              // Graphique des revenus par mois
+              if (statisticsService.revenueByMonth.isNotEmpty) ...[
+                const Text(
+                  'Revenus par mois',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                SizedBox(
+                  height: 200,
+                  child: _buildRevenueChart(statisticsService.revenueByMonth),
+                ),
+                
+                const SizedBox(height: 24),
+              ],
+              
               // Commandes par statut
               const Text(
                 'Commandes par statut',
@@ -259,7 +309,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
               
               const SizedBox(height: 24),
               
-              // Revenus par mois
+              // Revenus par mois (tableau)
               const Text(
                 'Revenus par mois',
                 style: TextStyle(
@@ -384,12 +434,17 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _isGeneratingReport ? null : _generateSalesReport,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                      ),
                       child: _isGeneratingReport
                           ? const SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
+                                color: Colors.white,
                               ),
                             )
                           : const Text('Générer le rapport'),
@@ -479,6 +534,26 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
               
               const SizedBox(height: 24),
               
+              // Graphique de répartition des produits
+              if (sortedProducts.isNotEmpty) ...[
+                const Text(
+                  'Répartition des ventes',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                SizedBox(
+                  height: 200,
+                  child: _buildProductsChart(sortedProducts, statisticsService),
+                ),
+                
+                const SizedBox(height: 24),
+              ],
+              
+              // Tableau de répartition des ventes
               const Text(
                 'Répartition des ventes',
                 style: TextStyle(
@@ -542,7 +617,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
                                     : 0,
                                 backgroundColor: Colors.grey.shade200,
                                 valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.blue.shade700,
+                                  AppTheme.primaryColor,
                                 ),
                               ),
                             ],
@@ -618,7 +693,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                const Icon(Icons.date_range, color: Colors.blue),
+                const Icon(Icons.date_range, color: AppTheme.primaryColor),
                 const SizedBox(width: 8),
                 Text(
                   'Période: ${period['start']} - ${period['end']}',
@@ -822,6 +897,122 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
             ),
           ),
         ],
+      ),
+    );
+  }
+  
+  // Construire un graphique de revenus
+  Widget _buildRevenueChart(Map<String, double> revenueByMonth) {
+    // Convertir les données pour le graphique
+    final entries = revenueByMonth.entries.toList();
+    entries.sort((a, b) {
+      final dateA = DateFormat('MM-yyyy').parse(a.key);
+      final dateB = DateFormat('MM-yyyy').parse(b.key);
+      return dateA.compareTo(dateB);
+    });
+    
+    final spots = <FlSpot>[];
+    for (int i = 0; i < entries.length; i++) {
+      spots.add(FlSpot(i.toDouble(), entries[i].value.toDouble()));
+    }
+    
+    return LineChart(
+      LineChartData(
+        gridData: FlGridData(show: true),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, meta) {
+                if (value.toInt() >= 0 && value.toInt() < entries.length) {
+                  final date = DateFormat('MM-yyyy').parse(entries[value.toInt()].key);
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      DateFormat('MMM', 'fr_FR').format(date),
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                  );
+                }
+                return const Text('');
+              },
+              reservedSize: 30,
+            ),
+          ),
+          rightTitles: AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+        ),
+        borderData: FlBorderData(show: true),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            color: AppTheme.primaryColor,
+            barWidth: 3,
+            isStrokeCapRound: true,
+            dotData: FlDotData(show: true),
+            belowBarData: BarAreaData(
+              show: true,
+              color: AppTheme.primaryColor.withOpacity(0.2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Construire un graphique de produits
+  Widget _buildProductsChart(
+    List<MapEntry<String, int>> products,
+    StatisticsService statisticsService,
+  ) {
+    // Limiter à 5 produits maximum
+    final topProducts = products.take(5).toList();
+    
+    return PieChart(
+      PieChartData(
+        sections: topProducts.map((product) {
+          final name = product.key;
+          final revenue = statisticsService.revenueByProduct[name] ?? 0.0;
+          final percentage = statisticsService.totalRevenue > 0
+              ? revenue / statisticsService.totalRevenue
+              : 0.0;
+          
+          // Générer une couleur basée sur l'index
+          final index = topProducts.indexOf(product);
+          final colors = [
+            AppTheme.primaryColor,
+            Colors.green,
+            Colors.orange,
+            Colors.purple,
+            Colors.red,
+          ];
+          final color = index < colors.length ? colors[index] : Colors.grey;
+          
+          return PieChartSectionData(
+            color: color,
+            value: percentage,
+            title: '${(percentage * 100).toStringAsFixed(1)}%',
+            radius: 80,
+            titleStyle: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          );
+        }).toList(),
+        sectionsSpace: 2,
+        centerSpaceRadius: 40,
       ),
     );
   }

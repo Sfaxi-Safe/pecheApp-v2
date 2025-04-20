@@ -15,11 +15,11 @@ enum OrderStatus { pending, confirmed, inProgress, delivered, cancelled }
 String statusToString(OrderStatus status) {
   switch (status) {
     case OrderStatus.pending:
-      return 'En attente';
+      return 'En Attente';
     case OrderStatus.confirmed:
       return 'Confirmée';
     case OrderStatus.inProgress:
-      return 'En cours';
+      return 'En Cours';
     case OrderStatus.delivered:
       return 'Livrée';
     case OrderStatus.cancelled:
@@ -28,21 +28,16 @@ String statusToString(OrderStatus status) {
 }
 
 OrderStatus stringToStatus(String status) {
-  switch (status.toLowerCase()) {
-    case 'pending':
-    case 'en attente':
+  switch (status) {
+    case 'En Attente':
       return OrderStatus.pending;
-    case 'confirmed':
-    case 'confirmée':
+    case 'Confirmée':
       return OrderStatus.confirmed;
-    case 'in_progress':
-    case 'en cours':
+    case 'En Cours':
       return OrderStatus.inProgress;
-    case 'delivered':
-    case 'livrée':
+    case 'Livrée':
       return OrderStatus.delivered;
-    case 'cancelled':
-    case 'annulée':
+    case 'Annulée':
       return OrderStatus.cancelled;
     default:
       return OrderStatus.pending;
@@ -59,7 +54,7 @@ class OrdersScreen extends StatefulWidget {
 
 class _OrdersScreenState extends State<OrdersScreen> {
   OrderStatus? _selectedStatus;
-  final String _searchQuery = '';
+  String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -68,16 +63,32 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
     // Charger les commandes au démarrage
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeOrderService();
+    });
+  }
+
+  Future<void> _initializeOrderService() async {
+    try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final orderService = Provider.of<OrderService>(context, listen: false);
 
       if (authService.currentUser != null) {
-        orderService.init(
+        await orderService.init(
           authService.currentUser!.id.toString(),
           authService.isFisherman ? 'fisherman' : 'client',
         );
       }
-    });
+    } catch (e) {
+      print('Erreur lors de l\'initialisation du service de commandes: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -91,6 +102,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Commandes'),
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -99,6 +112,19 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 context: context,
                 delegate: OrderSearchDelegate(
                   Provider.of<OrderService>(context, listen: false),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              final orderService = Provider.of<OrderService>(context, listen: false);
+              orderService.refreshOrders();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Commandes actualisées'),
+                  backgroundColor: Colors.green,
                 ),
               );
             },
@@ -131,7 +157,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           _buildStatusFilterChip(null, 'Tous'),
                           _buildStatusFilterChip(
                             OrderStatus.pending,
-                            'En attente',
+                            'En Attente',
                           ),
                           _buildStatusFilterChip(
                             OrderStatus.confirmed,
@@ -139,7 +165,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           ),
                           _buildStatusFilterChip(
                             OrderStatus.inProgress,
-                            'En cours',
+                            'En Cours',
                           ),
                           _buildStatusFilterChip(
                             OrderStatus.delivered,
@@ -221,12 +247,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   );
                 }
 
-                return ListView.builder(
-                  itemCount: filteredOrders.length,
-                  itemBuilder: (context, index) {
-                    final order = filteredOrders[index];
-                    return _buildOrderCard(order);
-                  },
+                return RefreshIndicator(
+                  onRefresh: () => orderService.refreshOrders(),
+                  child: ListView.builder(
+                    itemCount: filteredOrders.length,
+                    itemBuilder: (context, index) {
+                      final order = filteredOrders[index];
+                      return _buildOrderCard(order);
+                    },
+                  ),
                 );
               },
             ),
@@ -378,9 +407,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 ],
               ),
 
-              // Produits
-              // Note: Dans cette version, nous n'affichons pas les produits dans la carte
-
               // Commentaire
               if (order.commentaire != null &&
                   order.commentaire!.isNotEmpty) ...[
@@ -447,7 +473,11 @@ class OrderDetailScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text('Commande #${order.reference}')),
+      appBar: AppBar(
+        title: Text('Commande #${order.reference}'),
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -831,7 +861,7 @@ class OrderDetailScreen extends StatelessWidget {
       if (context.mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Statut mis à jour avec succès'),
               backgroundColor: Colors.green,
             ),
@@ -839,7 +869,7 @@ class OrderDetailScreen extends StatelessWidget {
           Navigator.pop(context);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Erreur lors de la mise à jour du statut'),
               backgroundColor: Colors.red,
             ),

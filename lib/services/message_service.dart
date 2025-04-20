@@ -1,38 +1,39 @@
 import 'package:flutter/foundation.dart';
 import '../models/marketplace_message.dart';
 import '../models/marketplace_user.dart';
+import '../models/marketplace_salon.dart';
 
 import 'database_helper.dart';
 
 class MessageService with ChangeNotifier {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   List<MarketplaceMessage> _messages = [];
-  List<Map<String, dynamic>> _conversations = [];
+  List<MarketplaceSalon> _salons = [];
   int? _currentUserId;
   bool _isLoading = false;
 
   // Getters
   List<MarketplaceMessage> get messages => _messages;
-  List<Map<String, dynamic>> get conversations => _conversations;
+  List<MarketplaceSalon> get salons => _salons;
   bool get isLoading => _isLoading;
 
   // Initialiser le service
-  Future<void> init(String userId) async {
-    _currentUserId = int.tryParse(userId);
-    await loadConversations();
+  Future<void> init(int userId) async {
+    _currentUserId = userId;
+    await loadSalons();
   }
 
-  // Charger les conversations de l'utilisateur
-  Future<void> loadConversations() async {
+  // Charger les salons
+  Future<void> loadSalons() async {
     if (_currentUserId == null) return;
 
     _isLoading = true;
     notifyListeners();
 
     try {
-      _conversations = await _dbHelper.getConversationsForUser(_currentUserId!);
+      _salons = await _dbHelper.getAllSalons();
     } catch (e) {
-      print('Erreur lors du chargement des conversations: $e');
+      print('Erreur lors du chargement des salons: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -40,11 +41,8 @@ class MessageService with ChangeNotifier {
   }
 
   // Charger les messages entre deux utilisateurs
-  Future<void> loadMessages(String otherUserIdStr) async {
+  Future<void> loadMessages(int destinataireId) async {
     if (_currentUserId == null) return;
-
-    final otherUserId = int.tryParse(otherUserIdStr);
-    if (otherUserId == null) return;
 
     _isLoading = true;
     notifyListeners();
@@ -52,27 +50,20 @@ class MessageService with ChangeNotifier {
     try {
       _messages = await _dbHelper.getMessagesBetweenUsers(
         _currentUserId!,
-        otherUserId,
+        destinataireId,
       );
 
       // Marquer les messages comme lus
       for (var message in _messages) {
-        if (message.receiverId == _currentUserId && !message.isRead) {
+        if (message.destinataireId == _currentUserId && !message.estLu) {
           if (message.id != null) {
             await _dbHelper.markMessageAsRead(message.id!);
           }
         }
       }
 
-      // Mettre à jour la conversation
-      final conversationId = await _dbHelper.getOrCreateSalon(
-        _currentUserId!,
-        otherUserId,
-      );
-      await _dbHelper.markConversationAsRead(conversationId);
-
-      // Recharger les conversations pour mettre à jour l'UI
-      await loadConversations();
+      // Marquer tous les messages comme lus
+      await _dbHelper.markAllMessagesAsRead(_currentUserId!, destinataireId);
     } catch (e) {
       print('Erreur lors du chargement des messages: $e');
     } finally {
@@ -83,44 +74,24 @@ class MessageService with ChangeNotifier {
 
   // Envoyer un message
   Future<bool> sendMessage({
-    required String receiverId,
-    required String content,
-    String? imageUrl,
+    required int destinataireId,
+    required String contenu,
   }) async {
     if (_currentUserId == null) return false;
-
-    final receiverIdInt = int.tryParse(receiverId);
-    if (receiverIdInt == null) return false;
 
     try {
       // Créer un nouveau message
       final message = MarketplaceMessage.create(
-        senderId: _currentUserId,
-        receiverId: receiverIdInt,
-        content: content,
-        imageUrl: imageUrl,
+        contenu: contenu,
+        expediteurId: _currentUserId,
+        destinataireId: destinataireId,
       );
 
       // Insérer le message dans la base de données
-      await _dbHelper.insertMessage(message);
-
-      // Mettre à jour ou créer la conversation
-      final conversationId = await _dbHelper.getOrCreateSalon(
-        _currentUserId!,
-        receiverIdInt,
-      );
-      await _dbHelper.updateConversationLastMessage(
-        conversationId,
-        content,
-        message.timestamp,
-        true,
-      );
-
+      final messageId = await _dbHelper.insertMessage(message);
+      
       // Ajouter le message à la liste locale
-      _messages.add(message);
-
-      // Recharger les conversations pour mettre à jour l'UI
-      await loadConversations();
+      _messages.add(message.copyWith(id: messageId));
 
       notifyListeners();
       return true;
@@ -131,10 +102,7 @@ class MessageService with ChangeNotifier {
   }
 
   // Supprimer un message
-  Future<bool> deleteMessage(String messageIdStr) async {
-    final messageId = int.tryParse(messageIdStr);
-    if (messageId == null) return false;
-
+  Future<bool> deleteMessage(int messageId) async {
     try {
       await _dbHelper.deleteMessage(messageId);
       _messages.removeWhere((message) => message.id == messageId);
@@ -146,17 +114,49 @@ class MessageService with ChangeNotifier {
     }
   }
 
-  // Supprimer une conversation
-  Future<bool> deleteConversation(String conversationIdStr) async {
-    final conversationId = int.tryParse(conversationIdStr);
-    if (conversationId == null) return false;
-
+  // Créer un salon
+  Future<bool> createSalon({
+    required String titre,
+    required String description,
+    required DateTime date,
+    required DateTime tempsDebut,
+    required DateTime tempsFin,
+    required String lieu,
+    required int maxInvitation,
+    required String affiche,
+  }) async {
     try {
-      await _dbHelper.deleteConversation(conversationId);
-      await loadConversations();
+      final salon = MarketplaceSalon.create(
+        titre: titre,
+        description: description,
+        date: date,
+        tempsDebut: tempsDebut,
+        tempsFin: tempsFin,
+        lieu: lieu,
+        maxInvitation: maxInvitation,
+        affiche: affiche,
+      );
+      
+      final salonId = await _dbHelper.insertSalon(salon);
+      _salons.add(salon.copyWith(id: salonId));
+      
+      notifyListeners();
       return true;
     } catch (e) {
-      print('Erreur lors de la suppression de la conversation: $e');
+      print('Erreur lors de la création du salon: $e');
+      return false;
+    }
+  }
+
+  // Supprimer un salon
+  Future<bool> deleteSalon(int salonId) async {
+    try {
+      await _dbHelper.deleteSalon(salonId);
+      _salons.removeWhere((salon) => salon.id == salonId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      print('Erreur lors de la suppression du salon: $e');
       return false;
     }
   }
@@ -167,12 +167,14 @@ class MessageService with ChangeNotifier {
 
     try {
       int count = 0;
-      for (var conversation in _conversations) {
-        if (conversation['hasUnreadMessages'] == 1 &&
-            conversation['otherUserId'] != _currentUserId) {
+      final allMessages = await _dbHelper.getAllMessages();
+      
+      for (var message in allMessages) {
+        if (message.destinataireId == _currentUserId && !message.estLu) {
           count++;
         }
       }
+      
       return count;
     } catch (e) {
       print('Erreur lors du comptage des messages non lus: $e');
