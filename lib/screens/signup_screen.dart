@@ -13,18 +13,18 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _nomController = TextEditingController();
   final _prenomController = TextEditingController();
   final _telephoneController = TextEditingController();
-  
+
   String _selectedRole = 'ROLE_CLIENT';
   bool _isLoading = false;
   String? _errorMessage;
-  
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -35,19 +35,21 @@ class _SignupScreenState extends State<SignupScreen> {
     _telephoneController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _signup() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
-    
+
     try {
       // Check if email already exists
-      final emailExists = await DatabaseHelper.instance.emailExists(_emailController.text.trim());
-      
+      final emailExists = await DatabaseHelper.instance.emailExists(
+        _emailController.text.trim(),
+      );
+
       if (emailExists) {
         setState(() {
           _errorMessage = 'Cet email est déjà utilisé';
@@ -55,18 +57,18 @@ class _SignupScreenState extends State<SignupScreen> {
         });
         return;
       }
-      
+
       // Create user based on selected role
       final email = _emailController.text.trim();
       final password = _passwordController.text;
       final nom = _nomController.text.trim();
       final prenom = _prenomController.text.trim();
       int? telephone;
-      
+
       if (_telephoneController.text.isNotEmpty) {
         telephone = int.tryParse(_telephoneController.text);
       }
-      
+
       if (_selectedRole == 'ROLE_CLIENT') {
         await DatabaseHelper.instance.insertUser({
           'email': email,
@@ -89,21 +91,41 @@ class _SignupScreenState extends State<SignupScreen> {
           'telephone': telephone,
           'is_valid': 1,
         });
+      } else if (_selectedRole == 'ROLE_VETERINAIRE') {
+        await DatabaseHelper.instance.insertVitirinaire({
+          'email': email,
+          'roles': jsonEncode(["ROLE_VETERINAIRE"]),
+          'password': password,
+          'nom': nom,
+          'prenom': prenom,
+          'telephone': telephone,
+          'is_valid': 1,
+        });
+      } else if (_selectedRole == 'ROLE_MARYEUR') {
+        await DatabaseHelper.instance.insertMaryeur({
+          'email': email,
+          'roles': jsonEncode(["ROLE_MARYEUR"]),
+          'password': password,
+          'nom': nom,
+          'prenom': prenom,
+          'telephone': telephone,
+          'is_valid': 1,
+        });
       }
-      
+
       // Navigate to login screen
       if (!mounted) return;
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Compte créé avec succès. Veuillez vous connecter.'),
           backgroundColor: Colors.green,
         ),
       );
-      
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
+
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
     } catch (e) {
       setState(() {
         _errorMessage = 'Une erreur est survenue: ${e.toString()}';
@@ -111,13 +133,11 @@ class _SignupScreenState extends State<SignupScreen> {
       });
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Créer un compte'),
-      ),
+      appBar: AppBar(title: const Text('Créer un compte')),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -137,7 +157,9 @@ class _SignupScreenState extends State<SignupScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'Fish Marketplace',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      style: Theme.of(
+                        context,
+                      ).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: Theme.of(context).primaryColor,
                       ),
@@ -146,13 +168,14 @@ class _SignupScreenState extends State<SignupScreen> {
                     Text(
                       'Créez votre compte',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                        color: Theme.of(context).colorScheme.onSurface
+                            .withAlpha(179), // 0.7 opacity = 179 alpha
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 32),
-                
+
                 // Signup form
                 Form(
                   key: _formKey,
@@ -175,6 +198,14 @@ class _SignupScreenState extends State<SignupScreen> {
                             value: 'ROLE_PECHEUR',
                             child: Text('Pêcheur'),
                           ),
+                          DropdownMenuItem(
+                            value: 'ROLE_VETERINAIRE',
+                            child: Text('Vétérinaire'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'ROLE_MARYEUR',
+                            child: Text('Maryeur'),
+                          ),
                         ],
                         onChanged: (value) {
                           setState(() {
@@ -183,7 +214,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Email
                       TextFormField(
                         controller: _emailController,
@@ -195,7 +226,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         validator: Validators.validateEmail,
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Password
                       TextFormField(
                         controller: _passwordController,
@@ -208,7 +239,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         validator: Validators.validatePassword,
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Confirm Password
                       TextFormField(
                         controller: _confirmPasswordController,
@@ -217,13 +248,14 @@ class _SignupScreenState extends State<SignupScreen> {
                           labelText: 'Confirmer le mot de passe',
                           prefixIcon: Icon(Icons.lock_outline),
                         ),
-                        validator: (value) => Validators.validateConfirmPassword(
-                          value, 
-                          _passwordController.text,
-                        ),
+                        validator:
+                            (value) => Validators.validateConfirmPassword(
+                              value,
+                              _passwordController.text,
+                            ),
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Nom
                       TextFormField(
                         controller: _nomController,
@@ -234,7 +266,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         validator: Validators.validateName,
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Prénom
                       TextFormField(
                         controller: _prenomController,
@@ -245,7 +277,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         validator: Validators.validateName,
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Téléphone
                       TextFormField(
                         controller: _telephoneController,
@@ -256,37 +288,40 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         validator: Validators.validatePhone,
                       ),
-                      
+
                       if (_errorMessage != null) ...[
                         const SizedBox(height: 16),
                         Text(
                           _errorMessage!,
-                          style: TextStyle(color: Theme.of(context).colorScheme.error),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ],
                       const SizedBox(height: 24),
-                      
+
                       // Submit button
                       ElevatedButton(
                         onPressed: _isLoading ? null : _signup,
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('Créer un compte'),
+                        child:
+                            _isLoading
+                                ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                                : const Text('Créer un compte'),
                       ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Login link
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -295,7 +330,9 @@ class _SignupScreenState extends State<SignupScreen> {
                           TextButton(
                             onPressed: () {
                               Navigator.of(context).pushReplacement(
-                                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                                MaterialPageRoute(
+                                  builder: (_) => const LoginScreen(),
+                                ),
                               );
                             },
                             child: const Text('Se connecter'),
