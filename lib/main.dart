@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:fish_marketplace/screens/login_screen.dart';
-import 'package:fish_marketplace/utils/app_theme.dart';
-import 'package:fish_marketplace/services/database_helper.dart';
-import 'package:fish_marketplace/services/auth_service.dart';
-import 'package:fish_marketplace/screens/pecheur/dashboard_screen.dart';
-import 'package:fish_marketplace/screens/vitirinaire/dashboard_screen.dart';
-import 'package:fish_marketplace/screens/maryeur/dashboard_screen.dart';
-import 'package:fish_marketplace/screens/client/dashboard_screen.dart';
+import 'screens/login_screen.dart';
+import 'utils/app_theme.dart';
+import 'services/database_helper.dart';
+import 'services/auth_service.dart';
+import 'screens/pecheur/dashboard_screen.dart';
+import 'screens/vitirinaire/dashboard_screen.dart';
+import 'screens/maryeur/dashboard_screen.dart';
+import 'screens/client/dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

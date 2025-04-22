@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:fish_marketplace/services/database_helper.dart';
-import 'package:fish_marketplace/services/auth_service.dart';
+import '../../services/database_helper.dart';
+import '../../services/auth_service.dart';
 import 'package:intl/intl.dart';
 
 class MyPurchasesScreen extends StatefulWidget {
@@ -37,8 +37,8 @@ class _MyPurchasesScreenState extends State<MyPurchasesScreen> {
       // Get lots that have been purchased by the current user
       _myPurchases = await DatabaseHelper.instance.queryWhere(
         'marketplace_lots',
-        'user_id = ? AND vendre = 1',
-        [user.id],
+        'user_id = ? AND vendre = ?',
+        [user.id, 1], // 1 means sold
       );
 
       setState(() {
@@ -162,6 +162,18 @@ class _MyPurchasesScreenState extends State<MyPurchasesScreen> {
                         width: 120,
                         height: 120,
                         fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 120,
+                            height: 120,
+                            color: Colors.grey[300],
+                            child: Icon(
+                              Icons.image_not_supported,
+                              size: 40,
+                              color: Colors.grey[500],
+                            ),
+                          );
+                        },
                       )
                     : Container(
                         width: 120,
@@ -269,6 +281,18 @@ class _MyPurchasesScreenState extends State<MyPurchasesScreen> {
                     width: double.infinity,
                     height: 200,
                     fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: double.infinity,
+                        height: 200,
+                        color: Colors.grey[300],
+                        child: Icon(
+                          Icons.image_not_supported,
+                          size: 50,
+                          color: Colors.grey[500],
+                        ),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -336,36 +360,15 @@ class _MyPurchasesScreenState extends State<MyPurchasesScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          
-
-
-```dart file="lib/main.dart"
-import 'package:flutter/material.dart';
-import 'package:fish_marketplace/screens/login_screen.dart';
-import 'package:fish_marketplace/utils/app_theme.dart';
-import 'package:fish_marketplace/services/database_helper.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize the database
-  await DatabaseHelper.instance.database;
-  
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Fish Marketplace',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      debugShowCheckedModeBanner: false,
-      home: const LoginScreen(),
+          Text(
+            '$label: ',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          Expanded(
+            child: Text(value),
+          ),
+        ],
+      ),
     );
   }
 }

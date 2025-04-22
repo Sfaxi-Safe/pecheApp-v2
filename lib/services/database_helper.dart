@@ -2,13 +2,13 @@ import 'dart:io';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:fish_marketplace/models/espece.dart';
-import 'package:fish_marketplace/models/lot.dart';
-import 'package:fish_marketplace/models/maryeur.dart';
-import 'package:fish_marketplace/models/pecheur.dart';
-import 'package:fish_marketplace/models/prise.dart';
-import 'package:fish_marketplace/models/user.dart';
-import 'package:fish_marketplace/models/vitirinaire.dart';
+import 'package:peche_app/models/espece.dart';
+import 'package:peche_app/models/lot.dart';
+import 'package:peche_app/models/maryeur.dart';
+import 'package:peche_app/models/pecheur.dart';
+import 'package:peche_app/models/prise.dart';
+import 'package:peche_app/models/user.dart';
+import 'package:peche_app/models/vitirinaire.dart';
 import 'dart:convert';
 
 class DatabaseHelper {

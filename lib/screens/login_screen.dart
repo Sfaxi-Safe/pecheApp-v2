@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:fish_marketplace/services/auth_service.dart';
-import 'package:fish_marketplace/screens/pecheur/dashboard_screen.dart';
-import 'package:fish_marketplace/screens/vitirinaire/dashboard_screen.dart';
-import 'package:fish_marketplace/screens/maryeur/dashboard_screen.dart';
-import 'package:fish_marketplace/screens/client/dashboard_screen.dart';
-import 'package:fish_marketplace/screens/signup_screen.dart';
-import 'package:fish_marketplace/utils/validators.dart';
+import 'package:peche_app/services/auth_service.dart';
+import 'package:peche_app/screens/pecheur/dashboard_screen.dart';
+import 'package:peche_app/screens/vitirinaire/dashboard_screen.dart';
+import 'package:peche_app/screens/maryeur/dashboard_screen.dart';
+import 'package:peche_app/screens/client/dashboard_screen.dart';
+import 'package:peche_app/screens/signup_screen.dart';
+import 'package:peche_app/utils/validators.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);

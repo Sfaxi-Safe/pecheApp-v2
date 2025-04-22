@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:fish_marketplace/services/auth_service.dart';
-import 'package:fish_marketplace/screens/login_screen.dart';
-import 'package:fish_marketplace/screens/pecheur/scan_fish_screen.dart';
-import 'package:fish_marketplace/screens/pecheur/history_screen.dart';
-import 'package:fish_marketplace/services/database_helper.dart';
+import 'package:peche_app/services/auth_service.dart';
+import 'package:peche_app/screens/login_screen.dart';
+import 'package:peche_app/screens/pecheur/scan_fish_screen.dart';
+import 'package:peche_app/screens/pecheur/history_screen.dart';
+import 'package:peche_app/services/database_helper.dart';
 
 class PecheurDashboardScreen extends StatefulWidget {
   const PecheurDashboardScreen({Key? key}) : super(key: key);

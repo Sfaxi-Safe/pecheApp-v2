@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:fish_marketplace/services/auth_service.dart';
-import 'package:fish_marketplace/screens/login_screen.dart';
-import 'package:fish_marketplace/services/database_helper.dart';
-import 'package:fish_marketplace/screens/maryeur/pending_lots_screen.dart';
-import 'package:fish_marketplace/screens/maryeur/active_auctions_screen.dart';
+import '../../services/auth_service.dart';
+import '../../screens/login_screen.dart';
+import '../../services/database_helper.dart';
+import 'pending_lots_screen.dart';
+import 'active_auctions_screen.dart';
 
 class MaryeurDashboardScreen extends StatefulWidget {
   const MaryeurDashboardScreen({Key? key}) : super(key: key);

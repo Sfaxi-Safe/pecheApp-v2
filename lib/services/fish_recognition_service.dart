@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'package:fish_marketplace/models/espece.dart';
-import 'package:fish_marketplace/services/database_helper.dart';
+import 'package:peche_app/models/espece.dart';
+import 'package:peche_app/services/database_helper.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 

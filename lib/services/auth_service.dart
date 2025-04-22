@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'package:fish_marketplace/models/user.dart';
-import 'package:fish_marketplace/models/pecheur.dart';
-import 'package:fish_marketplace/models/vitirinaire.dart';
-import 'package:fish_marketplace/models/maryeur.dart';
-import 'package:fish_marketplace/services/database_helper.dart';
+import 'package:peche_app/models/user.dart';
+import 'package:peche_app/models/pecheur.dart';
+import 'package:peche_app/models/vitirinaire.dart';
+import 'package:peche_app/models/maryeur.dart';
+import 'package:peche_app/services/database_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {

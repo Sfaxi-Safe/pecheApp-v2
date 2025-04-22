@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:fish_marketplace/services/database_helper.dart';
-import 'package:fish_marketplace/services/auth_service.dart';
-import 'package:fish_marketplace/screens/client/auction_detail_screen.dart';
+import '../../services/database_helper.dart';
+import '../../services/auth_service.dart';
+import 'auction_detail_screen.dart';
 import 'package:intl/intl.dart';
 
 class AvailableAuctionsScreen extends StatefulWidget {
@@ -34,8 +34,8 @@ class _AvailableAuctionsScreenState extends State<AvailableAuctionsScreen> {
       // Get lots that have initial price set and are not sold yet
       _availableAuctions = await DatabaseHelper.instance.queryWhere(
         'marketplace_lots',
-        'prixinitial IS NOT NULL AND vendre = 0',
-        [],
+        'prixinitial IS NOT NULL AND vendre = ?',
+        [0], // 0 means not sold yet
       );
 
       // Apply sorting
@@ -144,178 +144,52 @@ class _AvailableAuctionsScreenState extends State<AvailableAuctionsScreen> {
                           _errorMessage!,
                           style: TextStyle(color: Theme.of(context).colorScheme.error),
                           textAlign: TextAlign.center,
-
-
-```dart file="lib/screens/client/search_screen.dart"
-import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:fish_marketplace/services/database_helper.dart';
-import 'package:fish_marketplace/screens/client/auction_detail_screen.dart';
-
-class SearchScreen extends StatefulWidget {
-  const SearchScreen({Key? key}) : super(key: key);
-
-  @override
-  _SearchScreenState createState() => _SearchScreenState();
-}
-
-class _SearchScreenState extends State<SearchScreen> {
-  final _searchController = TextEditingController();
-  List<Map<String, dynamic>> _searchResults = [];
-  bool _isSearching = false;
-  String? _errorMessage;
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _performSearch(String query) async {
-    if (query.isEmpty) {
-      setState(() {
-        _searchResults = [];
-        _isSearching = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _isSearching = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Search for lots by espece name
-      final results = await DatabaseHelper.instance.queryWhere(
-        'marketplace_lots',
-        'espece LIKE ? AND prixinitial IS NOT NULL AND vendre = 0',
-        ['%$query%'],
-      );
-
-      setState(() {
-        _searchResults = results;
-        _isSearching = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Erreur lors de la recherche: ${e.toString()}';
-        _isSearching = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recherche'),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Search bar
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Rechercher par espèce, poids, prix...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            _performSearch('');
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                onChanged: _performSearch,
-              ),
-            ),
-            
-            // Results
-            Expanded(
-              child: _isSearching
-                  ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage != null
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.error_outline,
-                                size: 48,
-                                color: Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: _loadAvailableAuctions,
+                          child: const Text('Réessayer'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _availableAuctions.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.gavel_outlined,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Aucune enchère disponible',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
                               ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _errorMessage!,
-                                style: TextStyle(color: Theme.of(context).colorScheme.error),
-                                textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Revenez plus tard pour voir les nouvelles enchères',
+                              style: TextStyle(
+                                color: Colors.grey[500],
                               ),
-                            ],
-                          ),
-                        )
-                      : _searchController.text.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.search,
-                                    size: 64,
-                                    color: Colors.grey[400],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Commencez à taper pour rechercher',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : _searchResults.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.search_off,
-                                        size: 64,
-                                        color: Colors.grey[400],
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'Aucun résultat trouvé pour "${_searchController.text}"',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          color: Colors.grey[600],
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : ListView.builder(
-                                  padding: const EdgeInsets.all(16),
-                                  itemCount: _searchResults.length,
-                                  itemBuilder: (context, index) {
-                                    final auction = _searchResults[index];
-                                    return _buildAuctionCard(context, auction);
-                                  },
-                                ),
-            ),
-          ],
-        ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _availableAuctions.length,
+                        itemBuilder: (context, index) {
+                          final auction = _availableAuctions[index];
+                          return _buildAuctionCard(context, auction);
+                        },
+                      ),
       ),
     );
   }
@@ -354,6 +228,18 @@ class _SearchScreenState extends State<SearchScreen> {
                           width: 120,
                           height: 120,
                           fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 120,
+                              height: 120,
+                              color: Colors.grey[300],
+                              child: Icon(
+                                Icons.image_not_supported,
+                                size: 40,
+                                color: Colors.grey[500],
+                              ),
+                            );
+                          },
                         )
                       : Container(
                           width: 120,

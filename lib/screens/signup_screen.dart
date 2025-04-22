@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:fish_marketplace/services/auth_service.dart';
-import 'package:fish_marketplace/services/database_helper.dart';
-import 'package:fish_marketplace/screens/login_screen.dart';
-import 'package:fish_marketplace/utils/validators.dart';
+import 'package:peche_app/services/auth_service.dart';
+import 'package:peche_app/services/database_helper.dart';
+import 'package:peche_app/screens/login_screen.dart';
+import 'package:peche_app/utils/validators.dart';
 import 'dart:convert';
 
 class SignupScreen extends StatefulWidget {

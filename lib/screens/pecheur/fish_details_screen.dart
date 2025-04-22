@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:fish_marketplace/models/espece.dart';
-import 'package:fish_marketplace/models/lot.dart';
-import 'package:fish_marketplace/models/prise.dart';
-import 'package:fish_marketplace/services/database_helper.dart';
-import 'package:fish_marketplace/services/auth_service.dart';
+import 'package:peche_app/models/espece.dart';
+import 'package:peche_app/models/lot.dart';
+import 'package:peche_app/models/prise.dart';
+import 'package:peche_app/services/database_helper.dart';
+import 'package:peche_app/services/auth_service.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 
