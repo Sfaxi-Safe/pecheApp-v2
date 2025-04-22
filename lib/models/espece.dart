@@ -24,4 +24,9 @@ class Espece {
       'image_url': imageUrl,
     };
   }
+  
+  @override
+  String toString() {
+    return 'Espece{id: $id, nom: $nom, imageUrl: $imageUrl}';
+  }
 }

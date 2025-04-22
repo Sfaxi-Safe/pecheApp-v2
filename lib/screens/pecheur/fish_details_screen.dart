@@ -8,6 +8,7 @@ import 'package:peche_app/services/auth_service.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 
+
 class FishDetailsScreen extends StatefulWidget {
   final File imageFile;
   final Espece espece;

@@ -16,10 +16,22 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
   File? _imageFile;
   bool _isAnalyzing = false;
   String? _errorMessage;
+  final FishRecognitionService _recognitionService = FishRecognitionService();
+
+  @override
+  void dispose() {
+    _recognitionService.dispose();
+    super.dispose();
+  }
 
   Future<void> _getImage(ImageSource source) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: source);
+    final pickedFile = await picker.pickImage(
+      source: source,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 90,
+    );
 
     if (pickedFile != null) {
       setState(() {
@@ -43,7 +55,7 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
     });
 
     try {
-      final espece = await FishRecognitionService().recognizeFish(_imageFile!);
+      final espece = await _recognitionService.recognizeFish(_imageFile!);
       
       if (!mounted) return;
       
