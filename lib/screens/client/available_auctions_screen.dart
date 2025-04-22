@@ -1,9 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../services/database_helper.dart';
-import '../../services/auth_service.dart';
 import 'auction_detail_screen.dart';
-import 'package:intl/intl.dart';
 
 class AvailableAuctionsScreen extends StatefulWidget {
   const AvailableAuctionsScreen({Key? key}) : super(key: key);

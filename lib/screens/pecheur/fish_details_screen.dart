@@ -1,8 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:peche_app/models/espece.dart';
-import 'package:peche_app/models/lot.dart';
-import 'package:peche_app/models/prise.dart';
 import 'package:peche_app/services/database_helper.dart';
 import 'package:peche_app/services/auth_service.dart';
 import 'package:intl/intl.dart';

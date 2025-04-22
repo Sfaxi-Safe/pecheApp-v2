@@ -1,15 +1,5 @@
-import 'dart:io';
 import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:peche_app/models/espece.dart';
-import 'package:peche_app/models/lot.dart';
-import 'package:peche_app/models/maryeur.dart';
-import 'package:peche_app/models/pecheur.dart';
-import 'package:peche_app/models/prise.dart';
-import 'package:peche_app/models/user.dart';
-import 'package:peche_app/models/vitirinaire.dart';
-import 'dart:convert';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -27,11 +17,7 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _createDB,
-    );
+    return await openDatabase(path, version: 1, onCreate: _createDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -365,11 +351,7 @@ class DatabaseHelper {
     List<dynamic> whereArgs,
   ) async {
     final db = await instance.database;
-    return await db.query(
-      table,
-      where: where,
-      whereArgs: whereArgs,
-    );
+    return await db.query(table, where: where, whereArgs: whereArgs);
   }
 
   // Insert methods
@@ -681,14 +663,19 @@ class DatabaseHelper {
   // Custom queries
   Future<List<Map<String, dynamic>>> queryLotsByPecheurId(int pecheurId) async {
     final db = await instance.database;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT l.* FROM marketplace_lots l
       JOIN marketplace_prise p ON l.prise_id = p.id
       WHERE p.pecheur_id = ?
-    ''', [pecheurId]);
+    ''',
+      [pecheurId],
+    );
   }
 
-  Future<List<Map<String, dynamic>>> queryLotsByVitirinaireId(int vitirinaireId) async {
+  Future<List<Map<String, dynamic>>> queryLotsByVitirinaireId(
+    int vitirinaireId,
+  ) async {
     final db = await instance.database;
     return await db.query(
       'marketplace_lots',
@@ -699,11 +686,14 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> queryLotsByMaryeurId(int maryeurId) async {
     final db = await instance.database;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT l.* FROM marketplace_lots l
       JOIN marketplace_prise p ON l.prise_id = p.id
       WHERE p.maryeur_id = ?
-    ''', [maryeurId]);
+    ''',
+      [maryeurId],
+    );
   }
 
   Future<List<Map<String, dynamic>>> queryPendingLotsForVitirinaire() async {
@@ -715,13 +705,18 @@ class DatabaseHelper {
     );
   }
 
-  Future<List<Map<String, dynamic>>> queryApprovedLotsForMaryeur(int maryeurId) async {
+  Future<List<Map<String, dynamic>>> queryApprovedLotsForMaryeur(
+    int maryeurId,
+  ) async {
     final db = await instance.database;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT l.* FROM marketplace_lots l
       JOIN marketplace_prise p ON l.prise_id = p.id
       WHERE p.maryeur_id = ? AND l.status = ? AND l.prixinitial IS NULL
-    ''', [maryeurId, 1]); // 1 means approved by vitirinaire
+    ''',
+      [maryeurId, 1],
+    ); // 1 means approved by vitirinaire
   }
 
   Future<List<Map<String, dynamic>>> queryAvailableAuctions() async {
@@ -745,37 +740,68 @@ class DatabaseHelper {
   // Get lots by user role
   Future<List<Map<String, dynamic>>> getLotsByPecheurId(int pecheurId) async {
     final db = await instance.database;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT l.* FROM marketplace_lots l
       JOIN marketplace_prise p ON l.prise_id = p.id
       WHERE p.pecheur_id = ?
-    ''', [pecheurId]);
+    ''',
+      [pecheurId],
+    );
   }
 
   Future<List<Map<String, dynamic>>> getLotsByMaryeurId(int maryeurId) async {
     final db = await instance.database;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT l.* FROM marketplace_lots l
       JOIN marketplace_prise p ON l.prise_id = p.id
       WHERE p.maryeur_id = ?
-    ''', [maryeurId]);
+    ''',
+      [maryeurId],
+    );
   }
 
   // Check if email exists in any table
   Future<bool> emailExists(String email) async {
     final user = await getUserByEmail(email);
     if (user != null) return true;
-    
+
     final pecheur = await getPecheurByEmail(email);
     if (pecheur != null) return true;
-    
+
     final vitirinaire = await getVitirinaireByEmail(email);
     if (vitirinaire != null) return true;
-    
+
     final maryeur = await getMaryeurByEmail(email);
     if (maryeur != null) return true;
-    
+
     return false;
+  }
+
+  // Generic methods for direct database operations
+  Future<int> insert(String table, Map<String, dynamic> row) async {
+    final db = await instance.database;
+    return await db.insert(table, row);
+  }
+
+  Future<int> update(
+    String table,
+    Map<String, dynamic> row,
+    String where,
+    List<dynamic> whereArgs,
+  ) async {
+    final db = await instance.database;
+    return await db.update(table, row, where: where, whereArgs: whereArgs);
+  }
+
+  Future<int> delete(
+    String table,
+    String where,
+    List<dynamic> whereArgs,
+  ) async {
+    final db = await instance.database;
+    return await db.delete(table, where: where, whereArgs: whereArgs);
   }
 
   // Close database

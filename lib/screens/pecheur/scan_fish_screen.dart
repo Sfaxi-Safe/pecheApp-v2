@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:peche_app/services/fish_recognition_service.dart';
-import 'package:peche_app/models/espece.dart';
 import 'package:peche_app/screens/pecheur/fish_details_screen.dart';
 
 class ScanFishScreen extends StatefulWidget {

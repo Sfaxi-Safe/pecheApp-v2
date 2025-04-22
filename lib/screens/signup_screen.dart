@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:peche_app/services/auth_service.dart';
 import 'package:peche_app/services/database_helper.dart';
 import 'package:peche_app/screens/login_screen.dart';
 import 'package:peche_app/utils/validators.dart';

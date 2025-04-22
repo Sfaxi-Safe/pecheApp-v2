@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:fish_marketplace/services/database_helper.dart';
-import 'package:fish_marketplace/services/auth_service.dart';
+import 'package:peche_app/services/database_helper.dart';
+import 'package:peche_app/services/auth_service.dart';
 import 'package:intl/intl.dart';
 
 class PendingLotsScreen extends StatefulWidget {
