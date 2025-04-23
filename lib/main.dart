@@ -1,54 +1,41 @@
 import 'package:flutter/material.dart';
-import 'screens/login_screen.dart';
 import 'utils/app_theme.dart';
 import 'services/database_helper.dart';
-import 'services/auth_service.dart';
-import 'screens/pecheur/dashboard_screen.dart';
-import 'screens/vitirinaire/dashboard_screen.dart';
-import 'screens/maryeur/dashboard_screen.dart';
-import 'screens/client/dashboard_screen.dart';
+import 'screens/video_splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize the database
   await DatabaseHelper.instance.database;
-  
+
   runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
-  _MyAppState createState() => _MyAppState();
+  State<MyApp> createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
   bool _isLoading = true;
-  Widget _initialScreen = const LoginScreen();
+  final Widget _initialScreen =
+      const VideoSplashScreen(); // Utiliser l'écran de démarrage vidéo
 
   @override
   void initState() {
     super.initState();
-    _checkCurrentUser();
+    // Nous n'avons plus besoin de vérifier l'utilisateur ici car l'écran de démarrage vidéo
+    // redirigera vers l'écran de connexion
+    _loadApp();
   }
 
-  Future<void> _checkCurrentUser() async {
-    final user = await AuthService().getCurrentUser();
-    
-    if (user != null) {
-      if (user.isPecheur()) {
-        _initialScreen = const PecheurDashboardScreen();
-      } else if (user.isVeterinaire()) {
-        _initialScreen = const VitirinaireScreen();
-      } else if (user.isMaryeur()) {
-        _initialScreen = const MaryeurDashboardScreen();
-      } else if (user.isClient()) {
-        _initialScreen = const ClientDashboardScreen();
-      }
-    }
-    
+  Future<void> _loadApp() async {
+    // Simuler un temps de chargement pour l'initialisation de l'application
+    await Future.delayed(const Duration(milliseconds: 500));
+
     setState(() {
       _isLoading = false;
     });
@@ -62,13 +49,10 @@ class _MyAppState extends State<MyApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
-      home: _isLoading
-          ? const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
-            )
-          : _initialScreen,
+      home:
+          _isLoading
+              ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+              : _initialScreen,
     );
   }
 }

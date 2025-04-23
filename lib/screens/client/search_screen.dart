@@ -59,9 +59,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recherche'),
-      ),
+      appBar: AppBar(title: const Text('Recherche')),
       body: SafeArea(
         child: Column(
           children: [
@@ -73,15 +71,16 @@ class _SearchScreenState extends State<SearchScreen> {
                 decoration: InputDecoration(
                   hintText: 'Rechercher par espèce, poids, prix...',
                   prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            _performSearch('');
-                          },
-                        )
-                      : null,
+                  suffixIcon:
+                      _searchController.text.isNotEmpty
+                          ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              _performSearch('');
+                            },
+                          )
+                          : null,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -89,81 +88,84 @@ class _SearchScreenState extends State<SearchScreen> {
                 onChanged: _performSearch,
               ),
             ),
-            
+
             // Results
             Expanded(
-              child: _isSearching
-                  ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage != null
+              child:
+                  _isSearching
+                      ? const Center(child: CircularProgressIndicator())
+                      : _errorMessage != null
                       ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.error_outline,
-                                size: 48,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: 48,
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _errorMessage!,
+                              style: TextStyle(
                                 color: Theme.of(context).colorScheme.error,
                               ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _errorMessage!,
-                                style: TextStyle(color: Theme.of(context).colorScheme.error),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        )
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
                       : _searchController.text.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.search,
-                                    size: 64,
-                                    color: Colors.grey[400],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Commencez à taper pour rechercher',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
+                      ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.search,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Commencez à taper pour rechercher',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
                               ),
-                            )
-                          : _searchResults.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.search_off,
-                                        size: 64,
-                                        color: Colors.grey[400],
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'Aucun résultat trouvé pour "${_searchController.text}"',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          color: Colors.grey[600],
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : ListView.builder(
-                                  padding: const EdgeInsets.all(16),
-                                  itemCount: _searchResults.length,
-                                  itemBuilder: (context, index) {
-                                    final auction = _searchResults[index];
-                                    return _buildAuctionCard(context, auction);
-                                  },
-                                ),
+                            ),
+                          ],
+                        ),
+                      )
+                      : _searchResults.isEmpty
+                      ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.search_off,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Aucun résultat trouvé pour "${_searchController.text}"',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                      : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _searchResults.length,
+                        itemBuilder: (context, index) {
+                          final auction = _searchResults[index];
+                          return _buildAuctionCard(context, auction);
+                        },
+                      ),
             ),
           ],
         ),
@@ -199,37 +201,38 @@ class _SearchScreenState extends State<SearchScreen> {
                     topLeft: Radius.circular(12),
                     bottomLeft: Radius.circular(12),
                   ),
-                  child: photoPath != null && File(photoPath).existsSync()
-                      ? Image.file(
-                          File(photoPath),
-                          width: 120,
-                          height: 120,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: 120,
-                              height: 120,
-                              color: Colors.grey[300],
-                              child: Icon(
-                                Icons.image_not_supported,
-                                size: 40,
-                                color: Colors.grey[500],
-                              ),
-                            );
-                          },
-                        )
-                      : Container(
-                          width: 120,
-                          height: 120,
-                          color: Colors.grey[300],
-                          child: Icon(
-                            Icons.image_not_supported,
-                            size: 40,
-                            color: Colors.grey[500],
+                  child:
+                      photoPath != null && File(photoPath).existsSync()
+                          ? Image.file(
+                            File(photoPath),
+                            width: 120,
+                            height: 120,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 120,
+                                height: 120,
+                                color: Colors.grey[300],
+                                child: Icon(
+                                  Icons.image_not_supported,
+                                  size: 40,
+                                  color: Colors.grey[500],
+                                ),
+                              );
+                            },
+                          )
+                          : Container(
+                            width: 120,
+                            height: 120,
+                            color: Colors.grey[300],
+                            child: Icon(
+                              Icons.image_not_supported,
+                              size: 40,
+                              color: Colors.grey[500],
+                            ),
                           ),
-                        ),
                 ),
-                
+
                 // Info
                 Expanded(
                   child: Padding(
@@ -249,10 +252,14 @@ class _SearchScreenState extends State<SearchScreen> {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(Icons.euro, size: 16, color: Colors.green),
+                            const Icon(
+                              Icons.price_change,
+                              size: 16,
+                              color: Colors.green,
+                            ),
                             const SizedBox(width: 4),
                             Text(
-                              'Prix actuel: $currentPrice €',
+                              'Prix actuel: $currentPrice TND',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.green,
@@ -263,9 +270,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         const SizedBox(height: 4),
                         Text(
                           'Quantité: ${auction['quantite'] ?? 'N/A'} | Poids: ${auction['poid'] ?? 'N/A'} kg',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                          ),
+                          style: TextStyle(color: Colors.grey[600]),
                         ),
                       ],
                     ),

@@ -319,6 +319,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // Méthode pour obtenir les initiales de l'utilisateur
+  String _getInitials() {
+    if (_userData == null) return '?';
+
+    final prenom = _userData!['prenom'] as String?;
+    final nom = _userData!['nom'] as String?;
+
+    String initials = '';
+
+    if (prenom != null && prenom.isNotEmpty) {
+      initials += prenom[0];
+    }
+
+    if (nom != null && nom.isNotEmpty) {
+      initials += nom[0];
+    }
+
+    return initials.isEmpty ? '?' : initials;
+  }
+
   Future<void> _logout() async {
     await AuthService().logout();
     if (!mounted) return;
@@ -407,8 +427,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                     _photoPath!,
                                                   ).existsSync()
                                               ? Text(
-                                                _userData!['prenom'][0] +
-                                                    _userData!['nom'][0],
+                                                _getInitials(),
                                                 style: const TextStyle(
                                                   fontSize: 36,
                                                   fontWeight: FontWeight.bold,

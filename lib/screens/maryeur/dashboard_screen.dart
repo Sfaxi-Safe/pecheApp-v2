@@ -34,13 +34,15 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
       // Load statistics
       if (user.id != null) {
         final lots = await DatabaseHelper.instance.getLotsByMaryeurId(user.id!);
-        
+
         setState(() {
           _pendingLots = lots.where((lot) => lot['prixinitial'] == null).length;
-          _activeAuctions = lots.where((lot) => 
-            lot['prixinitial'] != null && 
-            lot['vendre'] == 0
-          ).length;
+          _activeAuctions =
+              lots
+                  .where(
+                    (lot) => lot['prixinitial'] != null && lot['vendre'] == 0,
+                  )
+                  .length;
           _completedAuctions = lots.where((lot) => lot['vendre'] == 1).length;
         });
       }
@@ -50,9 +52,9 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
   Future<void> _logout() async {
     await AuthService().logout();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   @override
@@ -83,9 +85,8 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
                     children: [
                       Text(
                         'Bienvenue, $_userName',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -97,7 +98,7 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Main actions
               Row(
                 children: [
@@ -110,7 +111,9 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
                       count: _pendingLots,
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const PendingLotsMaryeurScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const PendingLotsMaryeurScreen(),
+                          ),
                         );
                       },
                     ),
@@ -125,7 +128,9 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
                       count: _activeAuctions,
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const ActiveAuctionsScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const ActiveAuctionsScreen(),
+                          ),
                         );
                       },
                     ),
@@ -133,13 +138,13 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-              
+
               // Statistics
               Text(
                 'Statistiques',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               Row(
@@ -176,13 +181,13 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-              
+
               // Recent activity
               Text(
                 'Activité récente',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               _buildRecentActivityList(),
@@ -249,15 +254,12 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
               const SizedBox(height: 16),
               Text(
                 title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              Text(
-                description,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+              Text(description, style: Theme.of(context).textTheme.bodyMedium),
             ],
           ),
         ),
@@ -277,11 +279,7 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Icon(
-              icon,
-              size: 32,
-              color: color,
-            ),
+            Icon(icon, size: 32, color: color),
             const SizedBox(height: 8),
             Text(
               value,
@@ -315,7 +313,7 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
             {
               'title': 'Thon rouge',
               'status': 'Vendu',
-              'price': '120€',
+              'price': '120 TND',
               'date': '23/04/2023',
               'icon': Icons.check_circle,
               'color': Colors.green,
@@ -323,7 +321,7 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
             {
               'title': 'Dorade',
               'status': 'En enchère',
-              'price': '45€',
+              'price': '45 TND',
               'date': '22/04/2023',
               'icon': Icons.gavel,
               'color': Colors.blue,
@@ -331,7 +329,7 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
             {
               'title': 'Sardine',
               'status': 'Prix défini',
-              'price': '30€',
+              'price': '30 TND',
               'date': '21/04/2023',
               'icon': Icons.price_check,
               'color': Colors.orange,
@@ -354,9 +352,7 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
               children: [
                 Text(
                   activity['price'] as String,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 Text(
                   activity['status'] as String,

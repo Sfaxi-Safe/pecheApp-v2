@@ -37,13 +37,13 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
         'prixinitial IS NOT NULL AND vendre = 0',
         [],
       );
-      
+
       final myPurchases = await DatabaseHelper.instance.queryWhere(
         'marketplace_lots',
         'user_id = ? AND vendre = 1',
         [user.id],
       );
-      
+
       setState(() {
         _availableAuctions = availableAuctions.length;
         _myPurchases = myPurchases.length;
@@ -54,9 +54,9 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
   Future<void> _logout() async {
     await AuthService().logout();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   @override
@@ -87,9 +87,8 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
                     children: [
                       Text(
                         'Bienvenue, $_userName',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -101,7 +100,7 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Search bar
               Card(
                 child: Padding(
@@ -111,19 +110,23 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
                     children: [
                       Text(
                         'Rechercher un poisson',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 16),
                       InkWell(
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const SearchScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const SearchScreen(),
+                            ),
                           );
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.grey[200],
                             borderRadius: BorderRadius.circular(8),
@@ -131,16 +134,11 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
                           ),
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.search,
-                                color: Colors.grey[600],
-                              ),
+                              Icon(Icons.search, color: Colors.grey[600]),
                               const SizedBox(width: 12),
                               Text(
                                 'Rechercher par espèce, poids, prix...',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                ),
+                                style: TextStyle(color: Colors.grey[600]),
                               ),
                             ],
                           ),
@@ -151,13 +149,13 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Main actions
               Text(
                 'Actions',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               Row(
@@ -170,7 +168,9 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
                       description: 'Parcourir et participer aux enchères',
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const AvailableAuctionsScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const AvailableAuctionsScreen(),
+                          ),
                         );
                       },
                     ),
@@ -184,7 +184,9 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
                       description: 'Voir l\'historique de vos achats',
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const MyPurchasesScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const MyPurchasesScreen(),
+                          ),
                         );
                       },
                     ),
@@ -192,24 +194,24 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-              
+
               // Featured auctions
               Text(
                 'Enchères en vedette',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               _buildFeaturedAuctions(),
               const SizedBox(height: 24),
-              
+
               // Statistics
               Text(
                 'Statistiques',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               Row(
@@ -274,15 +276,12 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
               const SizedBox(height: 16),
               Text(
                 title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              Text(
-                description,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+              Text(description, style: Theme.of(context).textTheme.bodyMedium),
             ],
           ),
         ),
@@ -302,11 +301,7 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Icon(
-              icon,
-              size: 32,
-              color: color,
-            ),
+            Icon(icon, size: 32, color: color),
             const SizedBox(height: 8),
             Text(
               value,
@@ -332,19 +327,19 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
     final featuredAuctions = [
       {
         'title': 'Thon rouge',
-        'price': '120€',
+        'price': '120 TND',
         'image': 'assets/images/thon.jpg',
         'time_left': '2h 30m',
       },
       {
         'title': 'Dorade',
-        'price': '45€',
+        'price': '45 TND',
         'image': 'assets/images/dorade.jpg',
         'time_left': '1h 15m',
       },
       {
         'title': 'Sardine',
-        'price': '30€',
+        'price': '30 TND',
         'image': 'assets/images/sardine.jpg',
         'time_left': '45m',
       },
@@ -377,7 +372,7 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
                       ),
                     ),
                   ),
-                  
+
                   // Info
                   Padding(
                     padding: const EdgeInsets.all(12.0),
