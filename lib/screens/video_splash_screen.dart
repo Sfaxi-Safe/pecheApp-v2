@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
-import 'package:peche_app/screens/login_screen.dart';
+import 'package:seatrace/screens/login_screen.dart';
 
 class VideoSplashScreen extends StatefulWidget {
   const VideoSplashScreen({super.key});
@@ -24,7 +24,7 @@ class _VideoSplashScreenState extends State<VideoSplashScreen> {
         });
         _controller.play();
         _controller.setLooping(true);
-        
+
         // Afficher le bouton après 2 secondes
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
@@ -58,75 +58,70 @@ class _VideoSplashScreenState extends State<VideoSplashScreen> {
           _isVideoInitialized
               ? VideoPlayer(_controller)
               : const Center(child: CircularProgressIndicator()),
-          
+
           // Contenu superposé
           Container(
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.4),
-            ),
+            decoration: BoxDecoration(color: Colors.black.withOpacity(0.4)),
           ),
-          
+
           // Texte et bouton
           SafeArea(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Spacer(flex: 2),
-                
+
                 // Titre principal
                 const Text(
-                  'réservez votre',
+                  'De la mer à l\'assiette,',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 32,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
                   ),
                   textAlign: TextAlign.center,
                 ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 // Sous-titre
                 const Text(
-                  'table en tout',
+                  'la transparence est',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 32,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
                   ),
                   textAlign: TextAlign.center,
                 ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 // Troisième ligne
                 const Text(
-                  'simplicité',
+                  'le meilleur enchérisseur',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 32,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
                   ),
                   textAlign: TextAlign.center,
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Description
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 32),
                   child: Text(
-                    'Découvrez les meilleurs restaurants et réservez en quelques clics',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
+                    'Le goût authentique de la Mer Sans intermédiaire',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
                     textAlign: TextAlign.center,
                   ),
                 ),
-                
+
                 const Spacer(),
-                
+
                 // Bouton pour commencer
                 if (_showStartButton)
                   Padding(
@@ -150,22 +145,19 @@ class _VideoSplashScreenState extends State<VideoSplashScreen> {
                       ),
                     ),
                   ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Texte en bas
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   child: Text(
                     'Profitez d\'une réservation rapide et garantie',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
                     textAlign: TextAlign.center,
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
               ],
             ),

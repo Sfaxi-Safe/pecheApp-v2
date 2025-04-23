@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:peche_app/services/auth_service.dart';
-import 'package:peche_app/screens/pecheur/dashboard_screen.dart';
-import 'package:peche_app/screens/vitirinaire/dashboard_screen.dart';
-import 'package:peche_app/screens/maryeur/dashboard_screen.dart';
-import 'package:peche_app/screens/client/dashboard_screen.dart';
-import 'package:peche_app/screens/signup_screen.dart';
-import 'package:peche_app/utils/validators.dart';
+import 'package:seatrace/services/auth_service.dart';
+import 'package:seatrace/screens/pecheur/dashboard_screen.dart';
+import 'package:seatrace/screens/vitirinaire/dashboard_screen.dart';
+import 'package:seatrace/screens/maryeur/dashboard_screen.dart';
+import 'package:seatrace/screens/client/dashboard_screen.dart';
+import 'package:seatrace/screens/signup_screen.dart';
+import 'package:seatrace/utils/validators.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // Navigate to the appropriate dashboard based on user role
       if (!mounted) return;
-      
+
       if (user.isPecheur()) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const PecheurDashboardScreen()),
@@ -105,23 +105,27 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Fish Marketplace',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      'SeaTrace',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: Theme.of(context).primaryColor,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Plateforme de vente de poisson',
+                      'Application de traçabilité et de vente de produits de la mer',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 48),
-                
+
                 // Login form
                 Form(
                   key: _formKey,
@@ -146,7 +150,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                              _obscurePassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
                             ),
                             onPressed: () {
                               setState(() {
@@ -161,7 +167,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 16),
                         Text(
                           _errorMessage!,
-                          style: TextStyle(color: Theme.of(context).colorScheme.error),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -171,20 +179,21 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('Se connecter'),
+                        child:
+                            _isLoading
+                                ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                                : const Text('Se connecter'),
                       ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Sign up link
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -193,7 +202,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextButton(
                             onPressed: () {
                               Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => const SignupScreen()),
+                                MaterialPageRoute(
+                                  builder: (_) => const SignupScreen(),
+                                ),
                               );
                             },
                             child: const Text('Créer un compte'),
@@ -203,9 +214,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Demo accounts
                 Card(
                   child: Padding(
@@ -218,13 +229,29 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 8),
-                        _buildDemoAccount('Pêcheur', 'pecheur@example.com', 'password123'),
+                        _buildDemoAccount(
+                          'Pêcheur',
+                          'pecheur@example.com',
+                          'password123',
+                        ),
                         const Divider(),
-                        _buildDemoAccount('Vétérinaire', 'vet@example.com', 'password123'),
+                        _buildDemoAccount(
+                          'Vétérinaire',
+                          'vet@example.com',
+                          'password123',
+                        ),
                         const Divider(),
-                        _buildDemoAccount('Maryeur', 'maryeur@example.com', 'password123'),
+                        _buildDemoAccount(
+                          'Maryeur',
+                          'maryeur@example.com',
+                          'password123',
+                        ),
                         const Divider(),
-                        _buildDemoAccount('Client', 'client@example.com', 'password123'),
+                        _buildDemoAccount(
+                          'Client',
+                          'client@example.com',
+                          'password123',
+                        ),
                       ],
                     ),
                   ),
@@ -247,10 +274,7 @@ class _LoginScreenState extends State<LoginScreen> {
         padding: const EdgeInsets.symmetric(vertical: 8.0),
         child: Row(
           children: [
-            Text(
-              role,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+            Text(role, style: const TextStyle(fontWeight: FontWeight.bold)),
             const Spacer(),
             Text(email, style: const TextStyle(color: Colors.blue)),
           ],

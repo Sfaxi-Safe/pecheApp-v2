@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:peche_app/services/auth_service.dart';
-import 'package:peche_app/screens/login_screen.dart';
-import 'package:peche_app/services/database_helper.dart';
-import 'package:peche_app/screens/client/available_auctions_screen.dart';
-import 'package:peche_app/screens/client/search_screen.dart';
-import 'package:peche_app/screens/client/my_purchases_screen.dart';
+import 'package:seatrace/services/auth_service.dart';
+import 'package:seatrace/screens/login_screen.dart';
+import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/screens/client/available_auctions_screen.dart';
+import 'package:seatrace/screens/client/search_screen.dart';
+import 'package:seatrace/screens/client/my_purchases_screen.dart';
 
 class ClientDashboardScreen extends StatefulWidget {
   const ClientDashboardScreen({Key? key}) : super(key: key);

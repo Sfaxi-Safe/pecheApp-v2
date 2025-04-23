@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:peche_app/models/espece.dart';
-import 'package:peche_app/services/database_helper.dart';
-import 'package:peche_app/services/auth_service.dart';
+import 'package:seatrace/models/espece.dart';
+import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/services/auth_service.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 

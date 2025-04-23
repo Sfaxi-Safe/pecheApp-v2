@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:peche_app/services/auth_service.dart';
-import 'package:peche_app/screens/login_screen.dart';
-import 'package:peche_app/services/database_helper.dart';
-import 'package:peche_app/screens/vitirinaire/pending_lots_screen.dart';
+import 'package:seatrace/services/auth_service.dart';
+import 'package:seatrace/screens/login_screen.dart';
+import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/screens/vitirinaire/pending_lots_screen.dart';
 
 class VitirinaireScreen extends StatefulWidget {
   const VitirinaireScreen({Key? key}) : super(key: key);

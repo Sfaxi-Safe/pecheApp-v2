@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:peche_app/services/auth_service.dart';
-import 'package:peche_app/services/database_helper.dart';
-import 'package:peche_app/utils/validators.dart';
-import 'package:peche_app/screens/login_screen.dart';
+import 'package:seatrace/services/auth_service.dart';
+import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/utils/validators.dart';
+import 'package:seatrace/screens/login_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:peche_app/services/database_helper.dart';
-import 'package:peche_app/services/auth_service.dart';
-import 'package:peche_app/screens/login_screen.dart';
-import 'package:peche_app/utils/validators.dart';
-import 'package:peche_app/widgets/password_strength_indicator.dart';
+import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/services/auth_service.dart';
+import 'package:seatrace/screens/login_screen.dart';
+import 'package:seatrace/utils/validators.dart';
+import 'package:seatrace/widgets/password_strength_indicator.dart';
 import 'dart:convert';
 
 class SignupScreen extends StatefulWidget {
@@ -23,7 +23,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _nomController = TextEditingController();
   final _prenomController = TextEditingController();
   final _telephoneController = TextEditingController();
-  
+
   // Champs spécifiques pour les différents types d'utilisateurs
   final _cinController = TextEditingController();
   final _matriculeController = TextEditingController();
@@ -36,7 +36,7 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _errorMessage;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  
+
   // Pour l'indicateur de force du mot de passe
   double _passwordStrength = 0.0;
 
@@ -59,26 +59,26 @@ class _SignupScreenState extends State<SignupScreen> {
 
   void _updatePasswordStrength(String password) {
     double strength = 0;
-    
+
     if (password.isEmpty) {
       strength = 0;
     } else {
       // Length contribution
       if (password.length >= 8) strength += 0.2;
-      
+
       // Uppercase contribution
       if (password.contains(RegExp(r'[A-Z]'))) strength += 0.2;
-      
+
       // Lowercase contribution
       if (password.contains(RegExp(r'[a-z]'))) strength += 0.2;
-      
+
       // Digit contribution
       if (password.contains(RegExp(r'[0-9]'))) strength += 0.2;
-      
+
       // Special character contribution
       if (password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) strength += 0.2;
     }
-    
+
     setState(() {
       _passwordStrength = strength;
     });
@@ -184,15 +184,17 @@ class _SignupScreenState extends State<SignupScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Compte créé avec succès. Veuillez vérifier votre email pour activer votre compte.'),
+          content: Text(
+            'Compte créé avec succès. Veuillez vérifier votre email pour activer votre compte.',
+          ),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 5),
         ),
       );
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
     } catch (e) {
       setState(() {
         _errorMessage = 'Une erreur est survenue: ${e.toString()}';
@@ -240,8 +242,10 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Fish Marketplace',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      'SeaTrace',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: Theme.of(context).primaryColor,
                       ),
@@ -250,7 +254,9 @@ class _SignupScreenState extends State<SignupScreen> {
                     Text(
                       'Créez votre compte',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -295,7 +301,10 @@ class _SignupScreenState extends State<SignupScreen> {
                             value: 'ROLE_VETERINAIRE',
                             child: Row(
                               children: [
-                                Icon(Icons.medical_services, color: Colors.green),
+                                Icon(
+                                  Icons.medical_services,
+                                  color: Colors.green,
+                                ),
                                 SizedBox(width: 10),
                                 Text('Vétérinaire'),
                               ],
@@ -342,7 +351,9 @@ class _SignupScreenState extends State<SignupScreen> {
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                              _obscurePassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
                             ),
                             onPressed: () {
                               setState(() {
@@ -357,7 +368,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         },
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Password strength indicator
                       PasswordStrengthIndicator(strength: _passwordStrength),
                       const SizedBox(height: 16),
@@ -371,19 +382,23 @@ class _SignupScreenState extends State<SignupScreen> {
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                              _obscureConfirmPassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
                             ),
                             onPressed: () {
                               setState(() {
-                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                                _obscureConfirmPassword =
+                                    !_obscureConfirmPassword;
                               });
                             },
                           ),
                         ),
-                        validator: (value) => Validators.validateConfirmPassword(
-                          value,
-                          _passwordController.text,
-                        ),
+                        validator:
+                            (value) => Validators.validateConfirmPassword(
+                              value,
+                              _passwordController.text,
+                            ),
                       ),
                       const SizedBox(height: 16),
 
@@ -419,18 +434,17 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         validator: Validators.validatePhone,
                       ),
-                      
+
                       // Champs spécifiques selon le rôle
                       if (_selectedRole != 'ROLE_CLIENT') ...[
                         const SizedBox(height: 24),
                         Text(
                           'Informations spécifiques',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // CIN
                         TextFormField(
                           controller: _cinController,
@@ -441,7 +455,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           validator: Validators.validateCIN,
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Matricule
                         TextFormField(
                           controller: _matriculeController,
@@ -452,7 +466,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           validator: Validators.validateMatricule,
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Port
                         TextFormField(
                           controller: _portController,
@@ -463,11 +477,11 @@ class _SignupScreenState extends State<SignupScreen> {
                           validator: Validators.validatePort,
                         ),
                       ],
-                      
+
                       // Champs spécifiques pour les pêcheurs
                       if (_selectedRole == 'ROLE_PECHEUR') ...[
                         const SizedBox(height: 16),
-                        
+
                         // Bateau
                         TextFormField(
                           controller: _bateauController,
@@ -478,7 +492,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           validator: Validators.validateBateau,
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Capacité
                         TextFormField(
                           controller: _capaciteController,
@@ -487,10 +501,11 @@ class _SignupScreenState extends State<SignupScreen> {
                             prefixIcon: Icon(Icons.scale_outlined),
                           ),
                           keyboardType: TextInputType.number,
-                          validator: (value) => Validators.validateNumeric(
-                            value,
-                            fieldName: 'Capacité',
-                          ),
+                          validator:
+                              (value) => Validators.validateNumeric(
+                                value,
+                                fieldName: 'Capacité',
+                              ),
                         ),
                       ],
 
@@ -512,16 +527,17 @@ class _SignupScreenState extends State<SignupScreen> {
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('Créer un compte'),
+                        child:
+                            _isLoading
+                                ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                                : const Text('Créer un compte'),
                       ),
 
                       const SizedBox(height: 16),
@@ -543,7 +559,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                         ],
                       ),
-                      
+
                       // Mot de passe oublié
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -635,7 +651,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       await Future.delayed(const Duration(seconds: 2));
 
       setState(() {
-        _message = 'Un email de réinitialisation a été envoyé à ${_emailController.text}';
+        _message =
+            'Un email de réinitialisation a été envoyé à ${_emailController.text}';
         _isLoading = false;
         _isSuccess = true;
       });
@@ -651,9 +668,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mot de passe oublié'),
-      ),
+      appBar: AppBar(title: const Text('Mot de passe oublié')),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -701,9 +716,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         Text(
                           _message!,
                           style: TextStyle(
-                            color: _isSuccess
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.error,
+                            color:
+                                _isSuccess
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.error,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -714,16 +730,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
+                        child:
+                            _isLoading
+                                ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                                : const Text(
+                                  'Envoyer le lien de réinitialisation',
                                 ),
-                              )
-                            : const Text('Envoyer le lien de réinitialisation'),
                       ),
                       const SizedBox(height: 16),
                       TextButton(

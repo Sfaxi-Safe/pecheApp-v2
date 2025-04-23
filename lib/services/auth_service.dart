@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'package:peche_app/models/user.dart';
-import 'package:peche_app/models/pecheur.dart';
-import 'package:peche_app/models/vitirinaire.dart';
-import 'package:peche_app/models/maryeur.dart';
-import 'package:peche_app/services/database_helper.dart';
+import 'package:seatrace/models/user.dart';
+import 'package:seatrace/models/pecheur.dart';
+import 'package:seatrace/models/vitirinaire.dart';
+import 'package:seatrace/models/maryeur.dart';
+import 'package:seatrace/services/database_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
