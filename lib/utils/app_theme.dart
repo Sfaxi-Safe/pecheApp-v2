@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Colors
-  static const Color primaryColor = Color(0xFF0277BD); // Blue
-  static const Color secondaryColor = Color(0xFF00838F); // Teal
-  static const Color accentColor = Color(0xFF4FC3F7); // Light Blue
-  static const Color backgroundColor = Color(0xFFE1F5FE); // Very Light Blue
-  static const Color errorColor = Color(0xFFD32F2F); // Red
-  static const Color successColor = Color(0xFF388E3C); // Green
-  static const Color warningColor = Color(0xFFFFA000); // Amber
-  static const Color textColor = Color(0xFF263238); // Dark Blue Grey
-  static const Color textLightColor = Color(0xFF607D8B); // Blue Grey
+  // Palette de couleurs principale
+  static const Color primaryColor = Color(0xFF0277BD); // Bleu océan
+  static const Color secondaryColor = Color(0xFF00838F); // Bleu-vert
+  static const Color accentColor = Color(0xFF4FC3F7); // Bleu clair
+  static const Color backgroundColor = Color(0xFFE1F5FE); // Bleu très clair
+  static const Color errorColor = Color(0xFFD32F2F); // Rouge
+  static const Color successColor = Color(0xFF388E3C); // Vert
+  static const Color warningColor = Color(0xFFFFA000); // Ambre
+  static const Color textColor = Color(0xFF263238); // Bleu-gris foncé
+  static const Color textLightColor = Color(0xFF607D8B); // Bleu-gris
 
-  // Light Theme
+  // Thème clair
   static final ThemeData lightTheme = ThemeData(
     primaryColor: primaryColor,
     colorScheme: ColorScheme.light(
@@ -102,7 +102,7 @@ class AppTheme {
     ),
   );
 
-  // Dark Theme
+  // Thème sombre
   static final ThemeData darkTheme = ThemeData(
     primaryColor: primaryColor,
     colorScheme: ColorScheme.dark(

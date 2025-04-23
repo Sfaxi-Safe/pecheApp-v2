@@ -56,21 +56,24 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
     }
   }
 
-  Future<void> _setPrices(int lotId, String initialPrice, String minPrice) async {
+  // Mise à jour pour définir uniquement le prix minimal
+  Future<void> _setMinPrice(int lotId, String minPrice) async {
     try {
       final user = await AuthService().getCurrentUser();
       if (user == null || !user.isMaryeur() || user.id == null) {
         throw Exception('Utilisateur non autorisé');
       }
 
+      // Correction de l'appel à update - maintenant on définit seulement le prix minimal
       await DatabaseHelper.instance.update(
         'marketplace_lots',
         {
-          'prixinitial': initialPrice,
           'prixminimal': minPrice,
+          'prixinitial': minPrice, // Le prix initial est égal au prix minimal au début
           'typeenchere': 'standard',
-          'current': initialPrice,
+          'current': minPrice, // Le prix courant commence au prix minimal
           'online': '1',
+          'devise': 'TND', // Utilisation du Dinar Tunisien
         },
         'id = ?',
         [lotId],
@@ -82,7 +85,7 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Prix définis avec succès'),
+          content: Text('Prix minimal défini avec succès'),
           backgroundColor: Colors.green,
         ),
       );
@@ -98,43 +101,25 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
   }
 
   void _showSetPriceDialog(BuildContext context, Map<String, dynamic> lot) {
-    final initialPriceController = TextEditingController();
     final minPriceController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Définir les prix - ${lot['espece'] ?? 'Inconnu'}'),
+        title: Text('Définir le prix minimal - ${lot['espece'] ?? 'Inconnu'}'),
         content: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextFormField(
-                controller: initialPriceController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Prix initial (€)',
-                  prefixIcon: Icon(Icons.euro),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer un prix initial';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Veuillez entrer un nombre valide';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
                 controller: minPriceController,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'Prix minimal (€)',
-                  prefixIcon: Icon(Icons.euro),
+                  labelText: 'Prix minimal (TND)',
+                  prefixIcon: Icon(Icons.price_change),
+                  helperText: 'Le prix de départ de l\'enchère',
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -143,9 +128,8 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
                   if (double.tryParse(value) == null) {
                     return 'Veuillez entrer un nombre valide';
                   }
-                  if (initialPriceController.text.isNotEmpty &&
-                      double.parse(value) > double.parse(initialPriceController.text)) {
-                    return 'Le prix minimal doit être inférieur au prix initial';
+                  if (double.parse(value) <= 0) {
+                    return 'Le prix doit être supérieur à 0';
                   }
                   return null;
                 },
@@ -162,9 +146,8 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
             onPressed: () {
               if (formKey.currentState!.validate()) {
                 Navigator.of(context).pop();
-                _setPrices(
+                _setMinPrice(
                   lot['id'],
-                  initialPriceController.text,
                   minPriceController.text,
                 );
               }
@@ -438,7 +421,7 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
                   _showSetPriceDialog(context, lot);
                 },
                 icon: const Icon(Icons.price_change),
-                label: const Text('Définir les prix'),
+                label: const Text('Définir le prix minimal'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).primaryColor,
                 ),

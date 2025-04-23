@@ -16,6 +16,10 @@ class AuctionDetailScreen extends StatefulWidget {
 
 class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
   Map<String, dynamic>? _auction;
+  Map<String, dynamic>? _pecheur;    // Ajout de cette variable
+  Map<String, dynamic>? _veterinaire; // Ajout de cette variable
+  Map<String, dynamic>? _maryeur;     // Ajout de cette variable
+  Map<String, dynamic>? _prise;       // Ajout de cette variable
   bool _isLoading = true;
   String? _errorMessage;
   final _bidController = TextEditingController();
@@ -40,20 +44,79 @@ class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
     });
 
     try {
+      // Charger les détails de l'enchère
       final results = await DatabaseHelper.instance.queryWhere(
         'marketplace_lots',
         'id = ?',
         [widget.auctionId],
       );
 
-      if (results.isNotEmpty) {
-        setState(() {
-          _auction = results.first;
-          _isLoading = false;
-        });
-      } else {
+      if (results.isEmpty) {
         throw Exception('Enchère non trouvée');
       }
+
+      final auction = results.first;
+      
+      // Charger les détails de la prise
+      Map<String, dynamic>? prise;
+      if (auction['prise_id'] != null) {
+        final priseResults = await DatabaseHelper.instance.queryWhere(
+          'marketplace_prise',
+          'id = ?',
+          [auction['prise_id']],
+        );
+        if (priseResults.isNotEmpty) {
+          prise = priseResults.first;
+        }
+      }
+      
+      // Charger les détails du pêcheur
+      Map<String, dynamic>? pecheur;
+      if (prise != null && prise['pecheur_id'] != null) {
+        final pecheurResults = await DatabaseHelper.instance.queryWhere(
+          'marketplace_pecheur',
+          'id = ?',
+          [prise['pecheur_id']],
+        );
+        if (pecheurResults.isNotEmpty) {
+          pecheur = pecheurResults.first;
+        }
+      }
+      
+      // Charger les détails du vétérinaire
+      Map<String, dynamic>? veterinaire;
+      if (auction['vitirinaire_id'] != null) {
+        final veterinaireResults = await DatabaseHelper.instance.queryWhere(
+          'marketplace_vitirinaire',
+          'id = ?',
+          [auction['vitirinaire_id']],
+        );
+        if (veterinaireResults.isNotEmpty) {
+          veterinaire = veterinaireResults.first;
+        }
+      }
+      
+      // Charger les détails du maryeur
+      Map<String, dynamic>? maryeur;
+      if (prise != null && prise['maryeur_id'] != null) {
+        final maryeurResults = await DatabaseHelper.instance.queryWhere(
+          'marketplace_maryeur',
+          'id = ?',
+          [prise['maryeur_id']],
+        );
+        if (maryeurResults.isNotEmpty) {
+          maryeur = maryeurResults.first;
+        }
+      }
+
+      setState(() {
+        _auction = auction;
+        _prise = prise;
+        _pecheur = pecheur;
+        _veterinaire = veterinaire;
+        _maryeur = maryeur;
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() {
         _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
@@ -221,10 +284,12 @@ class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          const Icon(Icons.euro, size: 20, color: Colors.green),
+                          // Remplacer l'icône Euro par une icône plus générique
+                          const Icon(Icons.price_change, size: 20, color: Colors.green),
                           const SizedBox(width: 4),
                           Text(
-                            'Prix actuel: ${_auction!['current'] ?? _auction!['prixinitial'] ?? 'N/A'} €',
+                            // Afficher le prix en TND
+                            'Prix actuel: ${_auction!['current'] ?? _auction!['prixinitial'] ?? 'N/A'} ${_auction!['devise'] ?? 'TND'}',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.green,
@@ -264,13 +329,10 @@ class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
                                 'Poids',
                                 '${_auction!['poid'] ?? 'N/A'} kg',
                               ),
-                              _buildDetailItem(
-                                'Prix initial',
-                                '${_auction!['prixinitial'] ?? 'N/A'} €',
-                              ),
+                              // Remplacer "Prix initial" par "Prix minimal" et afficher en TND
                               _buildDetailItem(
                                 'Prix minimal',
-                                '${_auction!['prixminimal'] ?? 'N/A'} €',
+                                '${_auction!['prixminimal'] ?? 'N/A'} ${_auction!['devise'] ?? 'TND'}',
                               ),
                               _buildDetailItem(
                                 'Type d\'enchère',
@@ -283,13 +345,146 @@ class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
                                     DateTime.parse(_auction!['datesoumettre']),
                                   ),
                                 ),
+                              if (_auction!['temperature'] != null)
+                                _buildDetailItem(
+                                  'Température', 
+                                  '${_auction!['temperature']} °C'
+                                ),
                             ],
                           ),
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      
+                      // Ajouter les informations sur le pêcheur
+                      if (_pecheur != null)
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Informations sur le pêcheur',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 16),
+                                _buildDetailItem(
+                                  'Nom', 
+                                  '${_pecheur!['prenom'] ?? ''} ${_pecheur!['nom'] ?? ''}'
+                                ),
+                                if (_pecheur!['bateau'] != null)
+                                  _buildDetailItem('Bateau', _pecheur!['bateau']),
+                                if (_pecheur!['port'] != null)
+                                  _buildDetailItem('Port', _pecheur!['port']),
+                                if (_pecheur!['matricule'] != null)
+                                  _buildDetailItem('Matricule', _pecheur!['matricule']),
+                              ],
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      
+                      // Ajouter les informations sur la prise
+                      if (_prise != null)
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Informations sur la prise',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 16),
+                                if (_prise!['nom'] != null)
+                                  _buildDetailItem('Nom de la prise', _prise!['nom']),
+                                if (_prise!['debut'] != null && _prise!['fin'] != null)
+                                  _buildDetailItem(
+                                    'Période de pêche', 
+                                    '${DateFormat('dd/MM/yyyy').format(DateTime.parse(_prise!['debut']))} - ${DateFormat('dd/MM/yyyy').format(DateTime.parse(_prise!['fin']))}'
+                                  ),
+                                if (_prise!['engin'] != null)
+                                  _buildDetailItem('Méthode de pêche', _prise!['engin']),
+                                if (_prise!['zone'] != null)
+                                  _buildDetailItem('Zone de pêche', _prise!['zone']),
+                                if (_prise!['latitude'] != null && _prise!['langitude'] != null)
+                                  _buildDetailItem(
+                                    'Coordonnées', 
+                                    '${_prise!['latitude']}, ${_prise!['langitude']}'
+                                  ),
+                                if (_prise!['datedebarquement'] != null)
+                                  _buildDetailItem(
+                                    'Date de débarquement', 
+                                    DateFormat('dd/MM/yyyy').format(DateTime.parse(_prise!['datedebarquement']))
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      
+                      // Ajouter les informations sur le vétérinaire
+                      if (_veterinaire != null)
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Vétérinaire ayant validé le lot',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 16),
+                                _buildDetailItem(
+                                  'Nom', 
+                                  '${_veterinaire!['prenom'] ?? ''} ${_veterinaire!['nom'] ?? ''}'
+                                ),
+                                if (_veterinaire!['matricule'] != null)
+                                  _buildDetailItem('Matricule', _veterinaire!['matricule']),
+                                if (_auction!['datetest'] != null)
+                                  _buildDetailItem(
+                                    'Date de validation', 
+                                    DateFormat('dd/MM/yyyy').format(DateTime.parse(_auction!['datetest']))
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      
+                      // Ajouter les informations sur le maryeur
+                      if (_maryeur != null)
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Maryeur responsable de l\'enchère',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 16),
+                                _buildDetailItem(
+                                  'Nom', 
+                                  '${_maryeur!['prenom'] ?? ''} ${_maryeur!['nom'] ?? ''}'
+                                ),
+                                if (_maryeur!['matricule'] != null)
+                                  _buildDetailItem('Matricule', _maryeur!['matricule']),
+                              ],
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 24),
 
-                      // Place bid
+                      // Place bid - Mettre à jour pour afficher TND
                       Card(
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
@@ -306,10 +501,12 @@ class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
                                 controller: _bidController,
                                 keyboardType: TextInputType.number,
                                 decoration: InputDecoration(
-                                  labelText: 'Votre enchère (€)',
+                                  // Mettre à jour pour afficher TND
+                                  labelText: 'Votre enchère (TND)',
                                   hintText:
-                                      'Entrez un montant supérieur à ${_auction!['current'] ?? _auction!['prixinitial'] ?? '0'} €',
-                                  prefixIcon: const Icon(Icons.euro),
+                                      'Entrez un montant supérieur à ${_auction!['current'] ?? _auction!['prixinitial'] ?? '0'} ${_auction!['devise'] ?? 'TND'}',
+                                  // Remplacer l'icône Euro
+                                  prefixIcon: const Icon(Icons.price_change),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),

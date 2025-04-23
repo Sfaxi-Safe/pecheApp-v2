@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../services/database_helper.dart';
+import '../../services/auth_service.dart';
 import 'auction_detail_screen.dart';
+import 'package:intl/intl.dart';
 
 class AvailableAuctionsScreen extends StatefulWidget {
   const AvailableAuctionsScreen({Key? key}) : super(key: key);
@@ -195,6 +197,7 @@ class _AvailableAuctionsScreenState extends State<AvailableAuctionsScreen> {
   Widget _buildAuctionCard(BuildContext context, Map<String, dynamic> auction) {
     final espece = auction['espece'] ?? 'Inconnu';
     final currentPrice = auction['current'] ?? auction['prixinitial'] ?? 'N/A';
+    final devise = auction['devise'] ?? 'TND'; // Utiliser TND par défaut
     final photoPath = auction['photo'];
 
     return Card(
@@ -270,10 +273,10 @@ class _AvailableAuctionsScreenState extends State<AvailableAuctionsScreen> {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(Icons.euro, size: 16, color: Colors.green),
+                            const Icon(Icons.price_change, size: 16, color: Colors.green),
                             const SizedBox(width: 4),
                             Text(
-                              'Prix actuel: $currentPrice €',
+                              'Prix actuel: $currentPrice $devise',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.green,
