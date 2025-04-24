@@ -152,7 +152,7 @@ class _VideoSplashScreenState extends State<VideoSplashScreen> {
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   child: Text(
-                    'Profitez d\'une réservation rapide et garantie',
+                    'Suivez le parcours de vos produits marins de la pêche à l\'assiette',
                     style: TextStyle(color: Colors.white70, fontSize: 14),
                     textAlign: TextAlign.center,
                   ),
