@@ -1,5 +1,5 @@
 class User {
-  final int? id;
+  final String? id; // Changé de int? à String? pour Firebase
   final String email;
   final String roles;
   final String password;
@@ -50,8 +50,9 @@ class User {
       nom: map['nom'],
       prenom: map['prenom'],
       telephone: map['telephone'],
-      isVerified: map['is_verified'] == 1,
-      isBlocked: map['is_blocked'] == 1,
+      // Gérer les booléens de Firebase
+      isVerified: map['isVerified'] == true,
+      isBlocked: map['isBlocked'] == true,
       civilite: map['civilite'],
       service: map['service'],
       fonction: map['fonction'],
@@ -60,7 +61,7 @@ class User {
       facebook: map['facebook'],
       tweeter: map['tweeter'],
       photo: map['photo'],
-      isValid: map['is_valid'] == 1,
+      isValid: map['isValid'] == true,
       adresse: map['adresse'],
     );
   }
@@ -74,8 +75,9 @@ class User {
       'nom': nom,
       'prenom': prenom,
       'telephone': telephone,
-      'is_verified': isVerified ? 1 : 0,
-      'is_blocked': isBlocked ? 1 : 0,
+      // Utiliser les noms de champs Firebase
+      'isVerified': isVerified,
+      'isBlocked': isBlocked,
       'civilite': civilite,
       'service': service,
       'fonction': fonction,
@@ -84,7 +86,7 @@ class User {
       'facebook': facebook,
       'tweeter': tweeter,
       'photo': photo,
-      'is_valid': isValid == true ? 1 : 0,
+      'isValid': isValid,
       'adresse': adresse,
     };
   }

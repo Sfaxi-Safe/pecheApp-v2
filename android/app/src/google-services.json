@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "787115555042",
+    "project_id": "seatrace-e3af5",
+    "storage_bucket": "seatrace-e3af5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:787115555042:android:b3db2865260f0f9586c6bb",
+        "android_client_info": {
+          "package_name": "com.example.peche_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJWCDnMH2Qu-TULKNXX3s8DAN3cqqEw4c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

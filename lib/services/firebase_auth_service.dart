@@ -5,30 +5,25 @@ import 'package:seatrace/models/user.dart';
 import 'package:seatrace/models/pecheur.dart';
 import 'package:seatrace/models/vitirinaire.dart';
 import 'package:seatrace/models/maryeur.dart';
-import 'package:seatrace/services/firestore_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class AuthService {
-  static final AuthService _instance = AuthService._internal();
-  factory AuthService() => _instance;
-  AuthService._internal();
+class FirebaseAuthService {
+  static final FirebaseAuthService _instance = FirebaseAuthService._internal();
+  factory FirebaseAuthService() => _instance;
+  FirebaseAuthService._internal();
 
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirestoreService _firestoreService = FirestoreService();
-
+  
   // Clé pour stocker l'utilisateur dans les préférences partagées
   static const String _userKey = 'current_user';
-
-  // Clé pour stocker le token de vérification d'email
-  static const String _verificationTokenKey = 'email_verification_token';
 
   // Obtenir l'utilisateur actuellement connecté
   Future<User?> getCurrentUser() async {
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString(_userKey);
     if (userJson == null) return null;
-
+    
     try {
       final userMap = json.decode(userJson);
       return User.fromMap(userMap);
@@ -40,12 +35,12 @@ class AuthService {
   // Sauvegarder l'utilisateur courant
   Future<void> saveCurrentUser(User user) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_userKey, json.encode(user.toMap()));
+    final userJson = json.encode(user.toMap());
+    await prefs.setString(_userKey, userJson);
   }
 
-  // Déconnexion
-  Future<void> logout() async {
-    await _auth.signOut();
+  // Supprimer l'utilisateur courant
+  Future<void> removeCurrentUser() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userKey);
   }
@@ -58,37 +53,32 @@ class AuthService {
         email: email,
         password: password,
       );
-
+      
       if (userCredential.user == null) return null;
-
+      
       // Récupérer les données utilisateur depuis Firestore
       final uid = userCredential.user!.uid;
-
+      
       // Vérifier dans la collection users (clients)
       final userDoc = await _firestore.collection('users').doc(uid).get();
       if (userDoc.exists) {
         final userData = userDoc.data()!;
-
+        
         // Vérifier si l'utilisateur est vérifié
         if (userData['isVerified'] != true) {
-          throw Exception(
-            'Veuillez vérifier votre email avant de vous connecter',
-          );
+          throw Exception('Veuillez vérifier votre email avant de vous connecter');
         }
-
+        
         // Vérifier si l'utilisateur est bloqué
         if (userData['isBlocked'] == true) {
-          throw Exception(
-            'Votre compte a été bloqué. Veuillez contacter l\'administrateur',
-          );
+          throw Exception('Votre compte a été bloqué. Veuillez contacter l\'administrateur');
         }
-
+        
         final user = User(
           id: uid,
           email: email,
           roles: userData['roles'],
-          password:
-              password, // Note: normalement on ne stocke pas le mot de passe
+          password: password, // Note: normalement on ne stocke pas le mot de passe
           nom: userData['nom'],
           prenom: userData['prenom'],
           telephone: userData['telephone'],
@@ -96,23 +86,21 @@ class AuthService {
           isBlocked: userData['isBlocked'] ?? false,
           isValid: userData['isValid'] ?? false,
         );
-
+        
         await saveCurrentUser(user);
         return user;
       }
-
+      
       // Vérifier dans la collection pecheurs
       final pecheurDoc = await _firestore.collection('pecheurs').doc(uid).get();
       if (pecheurDoc.exists) {
         final pecheurData = pecheurDoc.data()!;
-
+        
         // Vérifier si le pêcheur est validé
         if (pecheurData['isValid'] != true) {
-          throw Exception(
-            'Votre compte est en attente de validation par l\'administrateur',
-          );
+          throw Exception('Votre compte est en attente de validation par l\'administrateur');
         }
-
+        
         final user = User(
           id: uid,
           email: email,
@@ -125,24 +113,21 @@ class AuthService {
           isBlocked: false,
           isValid: pecheurData['isValid'] ?? false,
         );
-
+        
         await saveCurrentUser(user);
         return user;
       }
-
+      
       // Vérifier dans la collection vitirinaires
-      final vitirinaireDoc =
-          await _firestore.collection('vitirinaires').doc(uid).get();
+      final vitirinaireDoc = await _firestore.collection('vitirinaires').doc(uid).get();
       if (vitirinaireDoc.exists) {
         final vitirinaireData = vitirinaireDoc.data()!;
-
+        
         // Vérifier si le vétérinaire est validé
         if (vitirinaireData['isValid'] != true) {
-          throw Exception(
-            'Votre compte est en attente de validation par l\'administrateur',
-          );
+          throw Exception('Votre compte est en attente de validation par l\'administrateur');
         }
-
+        
         final user = User(
           id: uid,
           email: email,
@@ -155,23 +140,21 @@ class AuthService {
           isBlocked: false,
           isValid: vitirinaireData['isValid'] ?? false,
         );
-
+        
         await saveCurrentUser(user);
         return user;
       }
-
+      
       // Vérifier dans la collection maryeurs
       final maryeurDoc = await _firestore.collection('maryeurs').doc(uid).get();
       if (maryeurDoc.exists) {
         final maryeurData = maryeurDoc.data()!;
-
+        
         // Vérifier si le maryeur est validé
         if (maryeurData['isValid'] != true) {
-          throw Exception(
-            'Votre compte est en attente de validation par l\'administrateur',
-          );
+          throw Exception('Votre compte est en attente de validation par l\'administrateur');
         }
-
+        
         final user = User(
           id: uid,
           email: email,
@@ -184,37 +167,33 @@ class AuthService {
           isBlocked: false,
           isValid: maryeurData['isValid'] ?? false,
         );
-
+        
         await saveCurrentUser(user);
         return user;
       }
-
+      
       // Si l'utilisateur n'est trouvé dans aucune collection
       await _auth.signOut();
       return null;
     } catch (e) {
       print('Erreur de connexion: ${e.toString()}');
-      rethrow; // Propager l'exception pour que l'UI puisse l'afficher
+      return null;
     }
   }
-
+  
   // Inscription
-  Future<User?> register(
-    Map<String, dynamic> userData,
-    String password,
-    String role,
-  ) async {
+  Future<User?> register(Map<String, dynamic> userData, String password, String role) async {
     try {
       // Créer l'utilisateur dans Firebase Auth
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: userData['email'],
         password: password,
       );
-
+      
       if (userCredential.user == null) return null;
-
+      
       final uid = userCredential.user!.uid;
-
+      
       // Ajouter les données utilisateur à la collection appropriée
       if (role == 'ROLE_CLIENT') {
         await _firestore.collection('users').doc(uid).set({
@@ -247,7 +226,7 @@ class AuthService {
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
-
+      
       // Créer l'objet User
       final user = User(
         id: uid,
@@ -257,35 +236,42 @@ class AuthService {
         nom: userData['nom'],
         prenom: userData['prenom'],
         telephone: userData['telephone'],
-        isVerified:
-            role ==
-            'ROLE_CLIENT', // Seuls les clients sont vérifiés automatiquement
+        isVerified: role == 'ROLE_CLIENT', // Seuls les clients sont vérifiés automatiquement
         isBlocked: false,
-        isValid:
-            role ==
-            'ROLE_CLIENT', // Seuls les clients sont validés automatiquement
+        isValid: role == 'ROLE_CLIENT', // Seuls les clients sont validés automatiquement
       );
-
+      
       await saveCurrentUser(user);
       return user;
     } catch (e) {
       print('Erreur d\'inscription: ${e.toString()}');
-      rethrow; // Propager l'exception pour que l'UI puisse l'afficher
+      return null;
     }
   }
-
+  
+  // Déconnexion
+  Future<void> logout() async {
+    await _auth.signOut();
+    await removeCurrentUser();
+  }
+  
+  // Vérifier si l'utilisateur est connecté
+  Future<bool> isLoggedIn() async {
+    final user = await getCurrentUser();
+    return user != null;
+  }
+  
   // Rafraîchir les données de l'utilisateur courant
   Future<User?> refreshCurrentUser() async {
     final currentUser = await getCurrentUser();
     if (currentUser == null) return null;
-
+    
     try {
       // Récupérer les données à jour depuis Firestore
       User? updatedUser;
-
+      
       if (currentUser.isPecheur()) {
-        final pecheurDoc =
-            await _firestore.collection('pecheurs').doc(currentUser.id).get();
+        final pecheurDoc = await _firestore.collection('pecheurs').doc(currentUser.id).get();
         if (pecheurDoc.exists) {
           final pecheurData = pecheurDoc.data()!;
           updatedUser = User(
@@ -302,11 +288,7 @@ class AuthService {
           );
         }
       } else if (currentUser.isVeterinaire()) {
-        final vitirinaireDoc =
-            await _firestore
-                .collection('vitirinaires')
-                .doc(currentUser.id)
-                .get();
+        final vitirinaireDoc = await _firestore.collection('vitirinaires').doc(currentUser.id).get();
         if (vitirinaireDoc.exists) {
           final vitirinaireData = vitirinaireDoc.data()!;
           updatedUser = User(
@@ -323,8 +305,7 @@ class AuthService {
           );
         }
       } else if (currentUser.isMaryeur()) {
-        final maryeurDoc =
-            await _firestore.collection('maryeurs').doc(currentUser.id).get();
+        final maryeurDoc = await _firestore.collection('maryeurs').doc(currentUser.id).get();
         if (maryeurDoc.exists) {
           final maryeurData = maryeurDoc.data()!;
           updatedUser = User(
@@ -341,8 +322,7 @@ class AuthService {
           );
         }
       } else if (currentUser.isClient()) {
-        final userDoc =
-            await _firestore.collection('users').doc(currentUser.id).get();
+        final userDoc = await _firestore.collection('users').doc(currentUser.id).get();
         if (userDoc.exists) {
           final userData = userDoc.data()!;
           updatedUser = User(
@@ -359,83 +339,16 @@ class AuthService {
           );
         }
       }
-
+      
       if (updatedUser != null) {
         await saveCurrentUser(updatedUser);
         return updatedUser;
       }
-
+      
       return currentUser;
     } catch (e) {
-      print(
-        'Erreur lors du rafraîchissement des données utilisateur: ${e.toString()}',
-      );
+      print('Erreur lors du rafraîchissement des données utilisateur: ${e.toString()}');
       return currentUser;
-    }
-  }
-
-  // Générer un token de vérification d'email
-  Future<String> generateEmailVerificationToken(String email) async {
-    try {
-      // Envoyer un email de vérification via Firebase Auth
-      final user = _auth.currentUser;
-      if (user != null) {
-        await user.sendEmailVerification();
-        return 'Email de vérification envoyé';
-      }
-      throw Exception('Utilisateur non connecté');
-    } catch (e) {
-      print(
-        'Erreur lors de l\'envoi de l\'email de vérification: ${e.toString()}',
-      );
-      rethrow;
-    }
-  }
-
-  // Réinitialiser le mot de passe
-  Future<bool> resetPassword(String email) async {
-    try {
-      await _auth.sendPasswordResetEmail(email: email);
-      return true;
-    } catch (e) {
-      print(
-        'Erreur lors de la réinitialisation du mot de passe: ${e.toString()}',
-      );
-      return false;
-    }
-  }
-
-  // Mettre à jour le mot de passe
-  Future<bool> updatePassword(String newPassword) async {
-    try {
-      final user = _auth.currentUser;
-      if (user != null) {
-        await user.updatePassword(newPassword);
-
-        // Mettre à jour le mot de passe dans l'objet User local
-        final currentUser = await getCurrentUser();
-        if (currentUser != null) {
-          final updatedUser = User(
-            id: currentUser.id,
-            email: currentUser.email,
-            roles: currentUser.roles,
-            password: newPassword,
-            nom: currentUser.nom,
-            prenom: currentUser.prenom,
-            telephone: currentUser.telephone,
-            isVerified: currentUser.isVerified,
-            isBlocked: currentUser.isBlocked,
-            isValid: currentUser.isValid,
-          );
-          await saveCurrentUser(updatedUser);
-        }
-
-        return true;
-      }
-      return false;
-    } catch (e) {
-      print('Erreur lors de la mise à jour du mot de passe: ${e.toString()}');
-      return false;
     }
   }
 }

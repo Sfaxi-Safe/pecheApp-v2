@@ -1,19 +1,17 @@
 class Espece {
-  final int? id;
+  final String? id; // Changé de int? à String? pour Firebase
   final String nom;
   final String? imageUrl;
 
-  Espece({
-    this.id,
-    required this.nom,
-    this.imageUrl,
-  });
+  Espece({this.id, required this.nom, this.imageUrl});
 
   factory Espece.fromMap(Map<String, dynamic> map) {
     return Espece(
       id: map['id'],
       nom: map['nom'],
-      imageUrl: map['image_url'],
+      imageUrl:
+          map['image_url'] ??
+          map['imageUrl'], // Gérer les deux formats de noms de champs
     );
   }
 
@@ -21,10 +19,10 @@ class Espece {
     return {
       'id': id,
       'nom': nom,
-      'image_url': imageUrl,
+      'imageUrl': imageUrl, // Utiliser le format Firebase
     };
   }
-  
+
   @override
   String toString() {
     return 'Espece{id: $id, nom: $nom, imageUrl: $imageUrl}';

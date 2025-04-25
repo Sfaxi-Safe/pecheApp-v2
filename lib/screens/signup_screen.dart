@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:seatrace/services/database_helper.dart';
 import 'package:seatrace/services/auth_service.dart';
+import 'package:seatrace/services/firestore_service.dart';
 import 'package:seatrace/screens/login_screen.dart';
 import 'package:seatrace/utils/validators.dart';
 import 'package:seatrace/widgets/password_strength_indicator.dart';
@@ -97,19 +97,6 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     try {
-      // Check if email already exists
-      final emailExists = await DatabaseHelper.instance.emailExists(
-        _emailController.text.trim(),
-      );
-
-      if (emailExists) {
-        setState(() {
-          _errorMessage = 'Cet email est déjà utilisé';
-          _isLoading = false;
-        });
-        return;
-      }
-
       // Create user based on selected role
       final email = _emailController.text.trim();
       final password = _passwordController.text;
@@ -121,63 +108,36 @@ class _SignupScreenState extends State<SignupScreen> {
         telephone = int.tryParse(_telephoneController.text);
       }
 
-      if (_selectedRole == 'ROLE_CLIENT') {
-        await DatabaseHelper.instance.insertUser({
-          'email': email,
-          'roles': jsonEncode(["ROLE_CLIENT"]),
-          'password': password,
-          'nom': nom,
-          'prenom': prenom,
-          'telephone': telephone,
-          'is_verified': 0, // Nécessite vérification d'email
-          'is_blocked': 0,
-          'is_valid': 1,
-        });
-      } else if (_selectedRole == 'ROLE_PECHEUR') {
-        await DatabaseHelper.instance.insertPecheur({
-          'email': email,
-          'roles': jsonEncode(["ROLE_PECHEUR"]),
-          'password': password,
-          'nom': nom,
-          'prenom': prenom,
-          'telephone': telephone,
-          'cin': _cinController.text.trim(),
-          'matricule': _matriculeController.text.trim(),
-          'bateau': _bateauController.text.trim(),
-          'port': _portController.text.trim(),
-          'capacite': _capaciteController.text.trim(),
-          'is_valid': 0, // Nécessite validation par admin
-        });
-      } else if (_selectedRole == 'ROLE_VETERINAIRE') {
-        await DatabaseHelper.instance.insertVitirinaire({
-          'email': email,
-          'roles': jsonEncode(["ROLE_VETERINAIRE"]),
-          'password': password,
-          'nom': nom,
-          'prenom': prenom,
-          'telephone': telephone,
-          'cin': _cinController.text.trim(),
-          'matricule': _matriculeController.text.trim(),
-          'port': _portController.text.trim(),
-          'is_valid': 0, // Nécessite validation par admin
-        });
-      } else if (_selectedRole == 'ROLE_MARYEUR') {
-        await DatabaseHelper.instance.insertMaryeur({
-          'email': email,
-          'roles': jsonEncode(["ROLE_MARYEUR"]),
-          'password': password,
-          'nom': nom,
-          'prenom': prenom,
-          'telephone': telephone,
-          'cin': _cinController.text.trim(),
-          'matricule': _matriculeController.text.trim(),
-          'port': _portController.text.trim(),
-          'is_valid': 0, // Nécessite validation par admin
-        });
+      // Préparer les données utilisateur
+      final userData = {
+        'email': email,
+        'nom': nom,
+        'prenom': prenom,
+        'telephone': telephone,
+      };
+
+      // Ajouter les champs spécifiques selon le rôle
+      if (_selectedRole != 'ROLE_CLIENT') {
+        userData['cin'] = _cinController.text.trim();
+        userData['matricule'] = _matriculeController.text.trim();
+        userData['port'] = _portController.text.trim();
       }
 
-      // Envoyer un email de vérification (simulé)
-      await _sendVerificationEmail(email);
+      if (_selectedRole == 'ROLE_PECHEUR') {
+        userData['bateau'] = _bateauController.text.trim();
+        userData['capacite'] = _capaciteController.text.trim();
+      }
+
+      // Créer l'utilisateur avec Firebase
+      final user = await AuthService().register(
+        userData,
+        password,
+        _selectedRole,
+      );
+
+      if (user == null) {
+        throw Exception('Échec de la création du compte');
+      }
 
       // Navigate to login screen
       if (!mounted) return;
@@ -633,12 +593,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
 
     try {
-      // Vérifier si l'email existe
-      final emailExists = await DatabaseHelper.instance.emailExists(
+      // Réinitialiser le mot de passe avec Firebase
+      final success = await AuthService().resetPassword(
         _emailController.text.trim(),
       );
 
-      if (!emailExists) {
+      if (!success) {
         setState(() {
           _message = 'Aucun compte associé à cet email';
           _isLoading = false;
@@ -646,9 +606,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         });
         return;
       }
-
-      // Simuler l'envoi d'un email de réinitialisation
-      await Future.delayed(const Duration(seconds: 2));
 
       setState(() {
         _message =

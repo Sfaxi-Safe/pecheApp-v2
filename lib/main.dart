@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'utils/app_theme.dart';
-import 'services/database_helper.dart';
+import 'services/firebase_service.dart';
 import 'screens/video_splash_screen.dart';
+import 'firebase_options.dart';
+import 'utils/firebase_data_initializer.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize the database
-  await DatabaseHelper.instance.database;
+  // Initialize Firebase with options
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize Firebase service
+  await FirebaseService().initialize();
+
+  // Initialize demo data in Firebase
+  await FirebaseDataInitializer().initializeDemoData();
 
   runApp(const MyApp());
 }

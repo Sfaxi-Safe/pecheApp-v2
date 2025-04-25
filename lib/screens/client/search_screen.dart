@@ -1,6 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../services/database_helper.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'auction_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -11,6 +10,7 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final _searchController = TextEditingController();
   List<Map<String, dynamic>> _searchResults = [];
   bool _isSearching = false;
@@ -38,11 +38,26 @@ class _SearchScreenState extends State<SearchScreen> {
 
     try {
       // Search for lots by espece name
-      final results = await DatabaseHelper.instance.queryWhere(
-        'marketplace_lots',
-        'espece LIKE ? AND prixinitial IS NOT NULL AND vendre = ?',
-        ['%$query%', 0],
-      );
+      final querySnapshot =
+          await _firestore
+              .collection('lots')
+              .where('prixinitial', isNull: false)
+              .where('vendre', isEqualTo: false)
+              .get();
+
+      // Filter results manually since Firestore doesn't support LIKE queries
+      final results =
+          querySnapshot.docs
+              .where((doc) {
+                final data = doc.data();
+                final espece = data['espece'] as String? ?? '';
+                return espece.toLowerCase().contains(query.toLowerCase());
+              })
+              .map((doc) {
+                final data = doc.data();
+                return <String, dynamic>{'id': doc.id, ...data};
+              })
+              .toList();
 
       setState(() {
         _searchResults = results;
@@ -176,7 +191,8 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildAuctionCard(BuildContext context, Map<String, dynamic> auction) {
     final espece = auction['espece'] ?? 'Inconnu';
     final currentPrice = auction['current'] ?? auction['prixinitial'] ?? 'N/A';
-    final photoPath = auction['photo'];
+    final devise = auction['devise'] ?? 'TND'; // Utiliser TND par défaut
+    final photoUrl = auction['photo'];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -202,9 +218,9 @@ class _SearchScreenState extends State<SearchScreen> {
                     bottomLeft: Radius.circular(12),
                   ),
                   child:
-                      photoPath != null && File(photoPath).existsSync()
-                          ? Image.file(
-                            File(photoPath),
+                      photoUrl != null
+                          ? Image.network(
+                            photoUrl,
                             width: 120,
                             height: 120,
                             fit: BoxFit.cover,
@@ -259,7 +275,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'Prix actuel: $currentPrice TND',
+                              'Prix actuel: $currentPrice $devise',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.green,

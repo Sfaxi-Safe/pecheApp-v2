@@ -1,6 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:seatrace/services/database_helper.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:seatrace/services/auth_service.dart';
 import 'package:intl/intl.dart';
 
@@ -12,42 +11,72 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  List<Map<String, dynamic>> _lots = [];
-  bool _isLoading = true;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  Stream<QuerySnapshot>? _lotsStream;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _loadLots();
+    _initLotsStream();
   }
 
-  Future<void> _loadLots() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+  Future<void> _initLotsStream() async {
     try {
       final user = await AuthService().getCurrentUser();
       if (user == null || !user.isPecheur()) {
         throw Exception('Utilisateur non autorisé');
       }
 
-      if (user.id != null) {
-        _lots = await DatabaseHelper.instance.getLotsByPecheurId(user.id!);
-      } else {
-        _lots = [];
-      }
+      // Créer un stream pour les lots du pêcheur
+      _lotsStream =
+          _firestore
+              .collection('lots')
+              .where('pecheur_id', isEqualTo: user.id)
+              .orderBy('datesoumettre', descending: true)
+              .snapshots();
 
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() {});
     } catch (e) {
       setState(() {
         _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
-        _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _deleteLot(String lotId) async {
+    try {
+      // Vérifier que le lot est en attente de validation
+      final lotDoc = await _firestore.collection('lots').doc(lotId).get();
+
+      if (!lotDoc.exists) {
+        throw Exception('Lot non trouvé');
+      }
+
+      final lotData = lotDoc.data() as Map<String, dynamic>;
+
+      if (lotData['test'] != 0) {
+        throw Exception('Seuls les lots en attente peuvent être supprimés');
+      }
+
+      // Supprimer le lot
+      await _firestore.collection('lots').doc(lotId).delete();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Capture supprimée avec succès'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la suppression: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -56,36 +85,66 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Historique des captures'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _initLotsStream,
+            tooltip: 'Actualiser',
+          ),
+        ],
       ),
       body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null
+        child:
+            _errorMessage != null
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 48,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage!,
+                        style: TextStyle(
                           color: Theme.of(context).colorScheme.error,
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _errorMessage!,
-                          style: TextStyle(color: Theme.of(context).colorScheme.error),
-                          textAlign: TextAlign.center,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _initLotsStream,
+                        child: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                )
+                : _lotsStream == null
+                ? const Center(child: CircularProgressIndicator())
+                : StreamBuilder<QuerySnapshot>(
+                  stream: _lotsStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Erreur: ${snapshot.error}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
                         ),
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: _loadLots,
-                          child: const Text('Réessayer'),
-                        ),
-                      ],
-                    ),
-                  )
-                : _lots.isEmpty
-                    ? Center(
+                      );
+                    }
+
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final lots = snapshot.data?.docs ?? [];
+
+                    if (lots.isEmpty) {
+                      return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -105,37 +164,44 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             const SizedBox(height: 8),
                             Text(
                               'Scannez votre premier poisson pour commencer',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                              ),
+                              style: TextStyle(color: Colors.grey[500]),
                             ),
                           ],
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _lots.length,
-                        itemBuilder: (context, index) {
-                          final lot = _lots[index];
-                          return _buildLotCard(context, lot);
-                        },
-                      ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: lots.length,
+                      itemBuilder: (context, index) {
+                        final lot = lots[index].data() as Map<String, dynamic>;
+                        // Ajouter l'ID du document au lot
+                        lot['id'] = lots[index].id;
+                        return _buildLotCard(context, lot);
+                      },
+                    );
+                  },
+                ),
       ),
     );
   }
 
   Widget _buildLotCard(BuildContext context, Map<String, dynamic> lot) {
     final espece = lot['espece'] ?? 'Inconnu';
-    final date = lot['datetest'] != null
-        ? DateFormat('dd/MM/yyyy').format(DateTime.parse(lot['datetest']))
-        : 'Date inconnue';
-    final status = lot['test'] == 1
-        ? (lot['status'] == 1 ? 'Validé' : 'Refusé')
-        : 'En attente';
-    final statusColor = lot['test'] == 1
-        ? (lot['status'] == 1 ? Colors.green : Colors.red)
-        : Colors.orange;
-    final photoPath = lot['photo'];
+    final date =
+        lot['datetest'] != null
+            ? DateFormat('dd/MM/yyyy').format(DateTime.parse(lot['datetest']))
+            : 'Date inconnue';
+    final status =
+        lot['test'] == true
+            ? (lot['status'] == true ? 'Validé' : 'Refusé')
+            : 'En attente';
+    final statusColor =
+        lot['test'] == true
+            ? (lot['status'] == true ? Colors.green : Colors.red)
+            : Colors.orange;
+    final photoUrl = lot['photo'];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -152,25 +218,38 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   topLeft: Radius.circular(12),
                   bottomLeft: Radius.circular(12),
                 ),
-                child: photoPath != null && File(photoPath).existsSync()
-                    ? Image.file(
-                        File(photoPath),
-                        width: 120,
-                        height: 120,
-                        fit: BoxFit.cover,
-                      )
-                    : Container(
-                        width: 120,
-                        height: 120,
-                        color: Colors.grey[300],
-                        child: Icon(
-                          Icons.image_not_supported,
-                          size: 40,
-                          color: Colors.grey[500],
+                child:
+                    photoUrl != null
+                        ? Image.network(
+                          photoUrl,
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 120,
+                              height: 120,
+                              color: Colors.grey[300],
+                              child: Icon(
+                                Icons.image_not_supported,
+                                size: 40,
+                                color: Colors.grey[500],
+                              ),
+                            );
+                          },
+                        )
+                        : Container(
+                          width: 120,
+                          height: 120,
+                          color: Colors.grey[300],
+                          child: Icon(
+                            Icons.image_not_supported,
+                            size: 40,
+                            color: Colors.grey[500],
+                          ),
                         ),
-                      ),
               ),
-              
+
               // Info
               Expanded(
                 child: Padding(
@@ -201,23 +280,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                             ),
                             backgroundColor: statusColor,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 0,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Date: $date',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Quantité: ${lot['quantite'] ?? 'N/A'} | Poids: ${lot['poid'] ?? 'N/A'} kg',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -225,7 +303,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ],
           ),
-          
+
           // Actions
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -240,7 +318,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   icon: const Icon(Icons.visibility),
                   label: const Text('Détails'),
                 ),
-                if (lot['test'] == 0) ...[
+                if (lot['test'] == false) ...[
                   TextButton.icon(
                     onPressed: () {
                       // Edit action
@@ -255,7 +333,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       _confirmDelete(context, lot);
                     },
                     icon: const Icon(Icons.delete, color: Colors.red),
-                    label: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+                    label: const Text(
+                      'Supprimer',
+                      style: TextStyle(color: Colors.red),
+                    ),
                   ),
                 ],
               ],
@@ -269,56 +350,78 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void _showLotDetails(BuildContext context, Map<String, dynamic> lot) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Détails - ${lot['espece'] ?? 'Inconnu'}'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (lot['photo'] != null && File(lot['photo']).existsSync()) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    File(lot['photo']),
-                    width: double.infinity,
-                    height: 200,
-                    fit: BoxFit.cover,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Détails - ${lot['espece'] ?? 'Inconnu'}'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (lot['photo'] != null) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        lot['photo'],
+                        width: double.infinity,
+                        height: 200,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: double.infinity,
+                            height: 200,
+                            color: Colors.grey[300],
+                            child: Icon(
+                              Icons.image_not_supported,
+                              size: 50,
+                              color: Colors.grey[500],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  _buildDetailItem('Identifiant', lot['identifiant'] ?? 'N/A'),
+                  _buildDetailItem('Espèce', lot['espece'] ?? 'N/A'),
+                  _buildDetailItem('Quantité', lot['quantite'] ?? 'N/A'),
+                  _buildDetailItem('Poids', '${lot['poid'] ?? 'N/A'} kg'),
+                  _buildDetailItem(
+                    'Température',
+                    '${lot['temperature'] ?? 'N/A'} °C',
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              _buildDetailItem('Identifiant', lot['identifiant'] ?? 'N/A'),
-              _buildDetailItem('Espèce', lot['espece'] ?? 'N/A'),
-              _buildDetailItem('Quantité', lot['quantite'] ?? 'N/A'),
-              _buildDetailItem('Poids', '${lot['poid'] ?? 'N/A'} kg'),
-              _buildDetailItem('Température', '${lot['temperature'] ?? 'N/A'} °C'),
-              _buildDetailItem('Date de soumission', lot['datesoumettre'] ?? 'N/A'),
-              _buildDetailItem('Statut', lot['test'] == 1
-                  ? (lot['status'] == 1 ? 'Validé' : 'Refusé')
-                  : 'En attente'),
-              if (lot['test'] == 1 && lot['status'] == 0) ...[
-                const SizedBox(height: 16),
-                const Text(
-                  'Motif de refus:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Le poisson ne répond pas aux critères de qualité requis.',
-                  style: TextStyle(color: Colors.red[700]),
-                ),
-              ],
+                  _buildDetailItem(
+                    'Date de soumission',
+                    lot['datesoumettre'] ?? 'N/A',
+                  ),
+                  _buildDetailItem(
+                    'Statut',
+                    lot['test'] == true
+                        ? (lot['status'] == true ? 'Validé' : 'Refusé')
+                        : 'En attente',
+                  ),
+                  if (lot['test'] == true && lot['status'] == false) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Motif de refus:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Le poisson ne répond pas aux critères de qualité requis.',
+                      style: TextStyle(color: Colors.red[700]),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Fermer'),
+              ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -328,13 +431,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$label: ',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          Expanded(
-            child: Text(value),
-          ),
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value)),
         ],
       ),
     );
@@ -343,55 +441,29 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void _confirmDelete(BuildContext context, Map<String, dynamic> lot) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmer la suppression'),
-        content: const Text(
-          'Êtes-vous sûr de vouloir supprimer cette capture ? Cette action est irréversible.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              
-              // Delete the lot
-              try {
-                await DatabaseHelper.instance.delete(
-                  'marketplace_lots',
-                  'id = ?',
-                  [lot['id']],
-                );
-                
-                // Refresh the list
-                _loadLots();
-                
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Capture supprimée avec succès'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              } catch (e) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erreur lors de la suppression: ${e.toString()}'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            child: const Text(
-              'Supprimer',
-              style: TextStyle(color: Colors.red),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Confirmer la suppression'),
+            content: const Text(
+              'Êtes-vous sûr de vouloir supprimer cette capture ? Cette action est irréversible.',
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Annuler'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _deleteLot(lot['id']);
+                },
+                child: const Text(
+                  'Supprimer',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 }
