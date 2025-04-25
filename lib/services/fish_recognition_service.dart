@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:seatrace/models/espece.dart';
-import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/services/firestore_service.dart';
+import 'package:seatrace/services/storage_service.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 
@@ -66,6 +68,10 @@ class FishRecognitionService {
     }
   }
 
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirestoreService _firestoreService = FirestoreService();
+  final StorageService _storageService = StorageService();
+
   Future<Espece?> recognizeFish(File imageFile) async {
     await initialize();
 
@@ -107,37 +113,36 @@ class FishRecognitionService {
         return null;
       }
 
-      // Récupérer l'espèce correspondante depuis la base de données
-      final especes = await DatabaseHelper.instance.queryWhere(
-        'marketplace_espece',
-        'nom = ?',
-        [_labels[maxIndex]],
+      // Récupérer l'espèce correspondante depuis Firestore
+      final especeData = await _firestoreService.getEspeceByNom(
+        _labels[maxIndex],
       );
 
-      if (especes.isNotEmpty) {
-        return Espece.fromMap(especes.first);
+      if (especeData != null) {
+        return Espece.fromMap(especeData);
       } else {
         // Si l'espèce n'est pas dans la base de données, créer une nouvelle entrée
-        final id = await DatabaseHelper.instance.insert('marketplace_espece', {
+        final especeId = await _firestoreService.addEspece({
           'nom': _labels[maxIndex],
           'image_url': null,
+          'createdAt': FieldValue.serverTimestamp(),
         });
 
-        return Espece(id: id, nom: _labels[maxIndex]);
+        return Espece(id: especeId, nom: _labels[maxIndex]);
       }
     } catch (e) {
-      // Erreur lors de la reconnaissance du poisson: $e
+      print('Erreur lors de la reconnaissance du poisson: ${e.toString()}');
 
       // En cas d'erreur, essayer de récupérer une espèce aléatoire de la base de données
       // comme solution de secours
       try {
-        final allEspeces = await DatabaseHelper.instance.queryAllEspeces();
+        final allEspeces = await _firestoreService.getAllEspeces();
         if (allEspeces.isNotEmpty) {
           final randomIndex = Random().nextInt(allEspeces.length);
           return Espece.fromMap(allEspeces[randomIndex]);
         }
       } catch (e) {
-        // Erreur lors de la récupération des espèces: $e
+        print('Erreur lors de la récupération des espèces: ${e.toString()}');
       }
 
       return null;

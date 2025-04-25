@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/auth_service.dart';
 import '../../screens/login_screen.dart';
-import '../../services/database_helper.dart';
 import 'pending_lots_screen.dart';
 import 'active_auctions_screen.dart';
 
@@ -13,10 +13,13 @@ class MaryeurDashboardScreen extends StatefulWidget {
 }
 
 class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _userName = '';
   int _pendingLots = 0;
   int _activeAuctions = 0;
   int _completedAuctions = 0;
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -25,27 +28,59 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
   }
 
   Future<void> _loadUserData() async {
-    final user = await AuthService().getCurrentUser();
-    if (user != null) {
-      setState(() {
-        _userName = '${user.prenom} ${user.nom}';
-      });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-      // Load statistics
-      if (user.id != null) {
-        final lots = await DatabaseHelper.instance.getLotsByMaryeurId(user.id!);
-
+    try {
+      final user = await AuthService().getCurrentUser();
+      if (user != null) {
         setState(() {
-          _pendingLots = lots.where((lot) => lot['prixinitial'] == null).length;
-          _activeAuctions =
-              lots
-                  .where(
-                    (lot) => lot['prixinitial'] != null && lot['vendre'] == 0,
-                  )
-                  .length;
-          _completedAuctions = lots.where((lot) => lot['vendre'] == 1).length;
+          _userName = '${user.prenom} ${user.nom}';
         });
+
+        // Load statistics
+        if (user.id != null) {
+          // Lots en attente de prix initial
+          final pendingLotsQuery =
+              await _firestore
+                  .collection('lots')
+                  .where('test', isEqualTo: true)
+                  .where('status', isEqualTo: true)
+                  .where('prixinitial', isNull: true)
+                  .get();
+
+          // Enchères actives
+          final activeAuctionsQuery =
+              await _firestore
+                  .collection('lots')
+                  .where('maryeur_id', isEqualTo: user.id)
+                  .where('prixinitial', isNull: false)
+                  .where('vendre', isEqualTo: false)
+                  .get();
+
+          // Enchères complétées
+          final completedAuctionsQuery =
+              await _firestore
+                  .collection('lots')
+                  .where('maryeur_id', isEqualTo: user.id)
+                  .where('vendre', isEqualTo: true)
+                  .get();
+
+          setState(() {
+            _pendingLots = pendingLotsQuery.docs.length;
+            _activeAuctions = activeAuctionsQuery.docs.length;
+            _completedAuctions = completedAuctionsQuery.docs.length;
+            _isLoading = false;
+          });
+        }
       }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
+        _isLoading = false;
+      });
     }
   }
 
@@ -64,6 +99,11 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
         title: const Text('Tableau de bord Maryeur'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadUserData,
+            tooltip: 'Actualiser',
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _logout,
             tooltip: 'Déconnexion',
@@ -71,129 +111,160 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome card
-              Card(
-                child: Padding(
+        child:
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
+                ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _loadUserData,
+                        child: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                )
+                : SingleChildScrollView(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Bienvenue, $_userName',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.bold),
+                      // Welcome card
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Bienvenue, $_userName',
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Vous avez $_pendingLots lots en attente de prix initial',
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Vous avez $_pendingLots lots en attente de prix initial',
-                        style: Theme.of(context).textTheme.bodyLarge,
+                      const SizedBox(height: 24),
+
+                      // Main actions
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildActionCard(
+                              context,
+                              icon: Icons.pending_actions,
+                              title: 'Lots en attente',
+                              description: 'Définir les prix initiaux',
+                              count: _pendingLots,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (_) => const PendingLotsMaryeurScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildActionCard(
+                              context,
+                              icon: Icons.gavel,
+                              title: 'Enchères actives',
+                              description: 'Suivre les enchères en cours',
+                              count: _activeAuctions,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (_) => const ActiveAuctionsScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 24),
+
+                      // Statistics
+                      Text(
+                        'Statistiques',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildStatCard(
+                              context,
+                              icon: Icons.pending_actions,
+                              value: _pendingLots.toString(),
+                              label: 'En attente',
+                              color: Colors.orange,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildStatCard(
+                              context,
+                              icon: Icons.gavel,
+                              value: _activeAuctions.toString(),
+                              label: 'Enchères actives',
+                              color: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildStatCard(
+                              context,
+                              icon: Icons.check_circle,
+                              value: _completedAuctions.toString(),
+                              label: 'Complétées',
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Recent activity
+                      Text(
+                        'Activité récente',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildRecentActivityList(),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-
-              // Main actions
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildActionCard(
-                      context,
-                      icon: Icons.pending_actions,
-                      title: 'Lots en attente',
-                      description: 'Définir les prix initiaux',
-                      count: _pendingLots,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const PendingLotsMaryeurScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildActionCard(
-                      context,
-                      icon: Icons.gavel,
-                      title: 'Enchères actives',
-                      description: 'Suivre les enchères en cours',
-                      count: _activeAuctions,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const ActiveAuctionsScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Statistics
-              Text(
-                'Statistiques',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      icon: Icons.pending_actions,
-                      value: _pendingLots.toString(),
-                      label: 'En attente',
-                      color: Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      icon: Icons.gavel,
-                      value: _activeAuctions.toString(),
-                      label: 'Enchères actives',
-                      color: Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      icon: Icons.check_circle,
-                      value: _completedAuctions.toString(),
-                      label: 'Complétées',
-                      color: Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Recent activity
-              Text(
-                'Activité récente',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              _buildRecentActivityList(),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -301,71 +372,99 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
   }
 
   Widget _buildRecentActivityList() {
-    return Card(
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: 3,
-        separatorBuilder: (context, index) => const Divider(),
-        itemBuilder: (context, index) {
-          // Sample data - in a real app, this would come from the database
-          final activities = [
-            {
-              'title': 'Thon rouge',
-              'status': 'Vendu',
-              'price': '120 TND',
-              'date': '23/04/2023',
-              'icon': Icons.check_circle,
-              'color': Colors.green,
-            },
-            {
-              'title': 'Dorade',
-              'status': 'En enchère',
-              'price': '45 TND',
-              'date': '22/04/2023',
-              'icon': Icons.gavel,
-              'color': Colors.blue,
-            },
-            {
-              'title': 'Sardine',
-              'status': 'Prix défini',
-              'price': '30 TND',
-              'date': '21/04/2023',
-              'icon': Icons.price_check,
-              'color': Colors.orange,
-            },
-          ];
-
-          if (index >= activities.length) return const SizedBox();
-
-          final activity = activities[index];
-          return ListTile(
-            leading: Icon(
-              activity['icon'] as IconData,
-              color: activity['color'] as Color,
-            ),
-            title: Text(activity['title'] as String),
-            subtitle: Text(activity['date'] as String),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  activity['price'] as String,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  activity['status'] as String,
-                  style: TextStyle(
-                    color: activity['color'] as Color,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+    return StreamBuilder<QuerySnapshot>(
+      stream:
+          _firestore
+              .collection('lots')
+              .where('maryeur_id', isNull: false)
+              .orderBy('dateEnchere', descending: true)
+              .limit(3)
+              .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Erreur lors du chargement des activités récentes',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ),
           );
-        },
-      ),
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+
+        final activities = snapshot.data?.docs ?? [];
+
+        if (activities.isEmpty) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: Text(
+                  'Aucune activité récente',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Card(
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: activities.length,
+            separatorBuilder: (context, index) => const Divider(),
+            itemBuilder: (context, index) {
+              final activity = activities[index].data() as Map<String, dynamic>;
+
+              IconData icon;
+              Color color;
+              String status;
+
+              if (activity['vendre'] == true) {
+                icon = Icons.check_circle;
+                color = Colors.green;
+                status = 'Vendu';
+              } else if (activity['prixinitial'] != null) {
+                icon = Icons.gavel;
+                color = Colors.blue;
+                status = 'En enchère';
+              } else {
+                icon = Icons.price_check;
+                color = Colors.orange;
+                status = 'Prix défini';
+              }
+
+              return ListTile(
+                leading: Icon(icon, color: color),
+                title: Text(activity['espece'] ?? 'Inconnu'),
+                subtitle: Text(activity['dateEnchere'] ?? 'Date inconnue'),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${activity['prixinitial'] ?? 'N/A'} ${activity['devise'] ?? 'TND'}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(status, style: TextStyle(color: color, fontSize: 12)),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

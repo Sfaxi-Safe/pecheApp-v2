@@ -1,7 +1,7 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    id("com.google.gms.google-services") // ✅ Place ici !
+    id("com.google.gms.google-services") // Plugin Google Services
     id("dev.flutter.flutter-gradle-plugin") // Flutter toujours en dernier
 }
 
@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.peche_app"
-        minSdk = 21 // ✅ Minimum recommandé pour desugaring
+        minSdk = 23 // Augmenté à 23 pour compatibilité avec Firebase Auth 23.2.0
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -36,8 +36,15 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.10.1")
+    implementation("androidx.core:core-ktx:1.12.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5") // ✅ Important pour certaines API Java
+    // Import the Firebase BoM
+    implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
+    // Firebase products
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-storage")
 }
 
 flutter {

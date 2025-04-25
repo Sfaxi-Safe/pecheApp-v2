@@ -1,12 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:seatrace/services/auth_service.dart';
-import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/services/firestore_service.dart';
+import 'package:seatrace/services/storage_service.dart';
 import 'package:seatrace/utils/validators.dart';
 import 'package:seatrace/screens/login_screen.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -17,6 +18,10 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirestoreService _firestoreService = FirestoreService();
+  final StorageService _storageService = StorageService();
 
   final _nomController = TextEditingController();
   final _prenomController = TextEditingController();
@@ -34,7 +39,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Map<String, dynamic>? _userData;
   String _userType = '';
-  String? _photoPath;
+  String? _photoUrl;
 
   @override
   void initState() {
@@ -65,34 +70,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
         throw Exception('Utilisateur non connecté');
       }
 
-      Map<String, dynamic>? userData;
+      DocumentSnapshot? userDoc;
+      String collection = '';
 
       if (user.isPecheur()) {
-        userData = await DatabaseHelper.instance.queryPecheurById(user.id!);
+        collection = 'pecheurs';
         _userType = 'Pêcheur';
       } else if (user.isVeterinaire()) {
-        userData = await DatabaseHelper.instance.queryVitirinaireById(user.id!);
+        collection = 'vitirinaires';
         _userType = 'Vétérinaire';
       } else if (user.isMaryeur()) {
-        userData = await DatabaseHelper.instance.queryMaryeurById(user.id!);
+        collection = 'maryeurs';
         _userType = 'Maryeur';
       } else {
-        userData = await DatabaseHelper.instance.queryUserById(user.id!);
+        collection = 'users';
         _userType = 'Client';
       }
 
-      if (userData != null) {
-        // Utiliser une variable locale pour éviter les problèmes de null-safety
-        final Map<String, dynamic> data = userData;
+      userDoc = await _firestore.collection(collection).doc(user.id).get();
+
+      if (userDoc.exists) {
+        final data = userDoc.data() as Map<String, dynamic>;
 
         setState(() {
           _userData = data;
-
-          // Accéder aux propriétés de manière sécurisée
           _nomController.text = (data['nom'] ?? '').toString();
           _prenomController.text = (data['prenom'] ?? '').toString();
           _telephoneController.text = (data['telephone'] ?? '').toString();
-          _photoPath = data['photo']?.toString();
+          _photoUrl = data['photo']?.toString();
           _isLoading = false;
         });
       } else {
@@ -121,30 +126,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
       if (pickedFile != null) {
-        // Copier l'image dans le répertoire de l'application
-        final appDir = await getApplicationDocumentsDirectory();
-        final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final savedImage = File(path.join(appDir.path, fileName));
-
-        await File(pickedFile.path).copy(savedImage.path);
-
-        // Mettre à jour le chemin de la photo dans la base de données
+        // Télécharger l'image vers Firebase Storage
         final user = await AuthService().getCurrentUser();
         if (user == null) {
           throw Exception('Utilisateur non connecté');
         }
 
-        final updatedData = {'id': user.id, 'photo': savedImage.path};
+        // Télécharger l'image
+        final photoUrl = await _storageService.uploadProfileImage(
+          File(pickedFile.path),
+          user.id!,
+        );
 
+        // Mettre à jour l'URL de la photo dans Firestore
+        String collection = '';
         if (user.isPecheur()) {
-          await DatabaseHelper.instance.updatePecheur(updatedData);
+          collection = 'pecheurs';
         } else if (user.isVeterinaire()) {
-          await DatabaseHelper.instance.updateVitirinaire(updatedData);
+          collection = 'vitirinaires';
         } else if (user.isMaryeur()) {
-          await DatabaseHelper.instance.updateMaryeur(updatedData);
+          collection = 'maryeurs';
         } else {
-          await DatabaseHelper.instance.updateUser(updatedData);
+          collection = 'users';
         }
+
+        await _firestore.collection(collection).doc(user.id).update({
+          'photo': photoUrl,
+        });
 
         // Rafraîchir les données utilisateur
         await _loadUserData();
@@ -218,7 +226,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
 
       final updatedData = {
-        'id': user.id,
         'nom': _nomController.text.trim(),
         'prenom': _prenomController.text.trim(),
         'telephone':
@@ -227,15 +234,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 : int.tryParse(_telephoneController.text),
       };
 
+      String collection = '';
       if (user.isPecheur()) {
-        await DatabaseHelper.instance.updatePecheur(updatedData);
+        collection = 'pecheurs';
       } else if (user.isVeterinaire()) {
-        await DatabaseHelper.instance.updateVitirinaire(updatedData);
+        collection = 'vitirinaires';
       } else if (user.isMaryeur()) {
-        await DatabaseHelper.instance.updateMaryeur(updatedData);
+        collection = 'maryeurs';
       } else {
-        await DatabaseHelper.instance.updateUser(updatedData);
+        collection = 'users';
       }
+
+      await _firestore.collection(collection).doc(user.id).update(updatedData);
 
       // Mettre à jour les données de l'utilisateur en session
       await AuthService().refreshCurrentUser();
@@ -276,31 +286,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      final user = await AuthService().getCurrentUser();
+      // Réauthentifier l'utilisateur avec son mot de passe actuel
+      final user = _auth.currentUser;
       if (user == null) {
         throw Exception('Utilisateur non connecté');
       }
 
-      // Vérifier l'ancien mot de passe
-      if (_userData!['password'] != _currentPasswordController.text) {
-        throw Exception('Mot de passe actuel incorrect');
-      }
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: _currentPasswordController.text,
+      );
+
+      await user.reauthenticateWithCredential(credential);
 
       // Mettre à jour le mot de passe
-      final updatedData = {
-        'id': user.id,
-        'password': _newPasswordController.text,
-      };
-
-      if (user.isPecheur()) {
-        await DatabaseHelper.instance.updatePecheur(updatedData);
-      } else if (user.isVeterinaire()) {
-        await DatabaseHelper.instance.updateVitirinaire(updatedData);
-      } else if (user.isMaryeur()) {
-        await DatabaseHelper.instance.updateMaryeur(updatedData);
-      } else {
-        await DatabaseHelper.instance.updateUser(updatedData);
-      }
+      await user.updatePassword(_newPasswordController.text);
 
       // Effacer les champs
       _currentPasswordController.clear();
@@ -417,15 +417,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         context,
                                       ).primaryColor.withOpacity(0.1),
                                       backgroundImage:
-                                          _photoPath != null &&
-                                                  File(_photoPath!).existsSync()
-                                              ? FileImage(File(_photoPath!))
+                                          _photoUrl != null
+                                              ? NetworkImage(_photoUrl!)
                                               : null,
                                       child:
-                                          _photoPath == null ||
-                                                  !File(
-                                                    _photoPath!,
-                                                  ).existsSync()
+                                          _photoUrl == null
                                               ? Text(
                                                 _getInitials(),
                                                 style: const TextStyle(
@@ -507,19 +503,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Messages de succès ou d'erreur
-                      if (_successMessage != null) ...[
+                      // Messages d'erreur ou de succès
+                      if (_errorMessage != null)
                         Container(
                           padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.error.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.error,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      if (_successMessage != null)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 16),
                           decoration: BoxDecoration(
                             color: Colors.green.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green),
+                            border: Border.all(color: Colors.green, width: 1),
                           ),
                           child: Row(
                             children: [
                               const Icon(
-                                Icons.check_circle,
+                                Icons.check_circle_outline,
                                 color: Colors.green,
                               ),
                               const SizedBox(width: 8),
@@ -532,34 +562,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
-                      ],
 
-                      if (_errorMessage != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.red),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.error, color: Colors.red),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _errorMessage!,
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Formulaire de modification du profil
+                      // Formulaire de profil
                       Card(
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
@@ -570,62 +574,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               children: [
                                 Text(
                                   'Informations personnelles',
-                                  style: Theme.of(context).textTheme.titleMedium
+                                  style: Theme.of(context).textTheme.titleLarge
                                       ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 16),
-
-                                // Nom
                                 TextFormField(
                                   controller: _nomController,
                                   decoration: const InputDecoration(
                                     labelText: 'Nom',
-                                    prefixIcon: Icon(Icons.person_outline),
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.person),
                                   ),
-                                  validator: Validators.validateName,
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Veuillez entrer votre nom';
+                                    }
+                                    return null;
+                                  },
                                 ),
                                 const SizedBox(height: 16),
-
-                                // Prénom
                                 TextFormField(
                                   controller: _prenomController,
                                   decoration: const InputDecoration(
                                     labelText: 'Prénom',
-                                    prefixIcon: Icon(Icons.person_outline),
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.person),
                                   ),
-                                  validator: Validators.validateName,
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Veuillez entrer votre prénom';
+                                    }
+                                    return null;
+                                  },
                                 ),
                                 const SizedBox(height: 16),
-
-                                // Téléphone
                                 TextFormField(
                                   controller: _telephoneController,
-                                  keyboardType: TextInputType.phone,
                                   decoration: const InputDecoration(
-                                    labelText: 'Téléphone (optionnel)',
-                                    prefixIcon: Icon(Icons.phone_outlined),
+                                    labelText: 'Téléphone',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.phone),
                                   ),
+                                  keyboardType: TextInputType.phone,
                                   validator: Validators.validatePhone,
                                 ),
                                 const SizedBox(height: 24),
-
-                                // Bouton de sauvegarde
                                 SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton(
                                     onPressed: _isSaving ? null : _saveProfile,
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
+                                    ),
                                     child:
                                         _isSaving
                                             ? const SizedBox(
-                                              height: 20,
-                                              width: 20,
+                                              width: 24,
+                                              height: 24,
                                               child: CircularProgressIndicator(
                                                 strokeWidth: 2,
-                                                color: Colors.white,
                                               ),
                                             )
                                             : const Text(
                                               'Enregistrer les modifications',
+                                              style: TextStyle(fontSize: 16),
                                             ),
                                   ),
                                 ),
@@ -645,48 +659,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             children: [
                               Text(
                                 'Changer le mot de passe',
-                                style: Theme.of(context).textTheme.titleMedium
+                                style: Theme.of(context).textTheme.titleLarge
                                     ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 16),
-
-                              // Mot de passe actuel
                               TextFormField(
                                 controller: _currentPasswordController,
-                                obscureText: true,
                                 decoration: const InputDecoration(
                                   labelText: 'Mot de passe actuel',
-                                  prefixIcon: Icon(Icons.lock_outline),
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.lock),
                                 ),
+                                obscureText: true,
                               ),
                               const SizedBox(height: 16),
-
-                              // Nouveau mot de passe
                               TextFormField(
                                 controller: _newPasswordController,
-                                obscureText: true,
                                 decoration: const InputDecoration(
                                   labelText: 'Nouveau mot de passe',
+                                  border: OutlineInputBorder(),
                                   prefixIcon: Icon(Icons.lock_outline),
-                                  helperText:
-                                      'Au moins 8 caractères avec lettres, chiffres et symboles',
                                 ),
+                                obscureText: true,
                               ),
                               const SizedBox(height: 16),
-
-                              // Confirmation du nouveau mot de passe
                               TextFormField(
                                 controller: _confirmPasswordController,
-                                obscureText: true,
                                 decoration: const InputDecoration(
                                   labelText:
                                       'Confirmer le nouveau mot de passe',
+                                  border: OutlineInputBorder(),
                                   prefixIcon: Icon(Icons.lock_outline),
                                 ),
+                                obscureText: true,
                               ),
                               const SizedBox(height: 24),
-
-                              // Bouton de changement de mot de passe
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton(
@@ -694,18 +701,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       _isChangingPassword
                                           ? null
                                           : _changePassword,
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                  ),
                                   child:
                                       _isChangingPassword
                                           ? const SizedBox(
-                                            height: 20,
-                                            width: 20,
+                                            width: 24,
+                                            height: 24,
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
-                                              color: Colors.white,
                                             ),
                                           )
                                           : const Text(
                                             'Changer le mot de passe',
+                                            style: TextStyle(fontSize: 16),
                                           ),
                                 ),
                               ),
@@ -713,6 +725,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 24),
+
+                      // Bouton de déconnexion
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _logout,
+                          icon: const Icon(Icons.logout),
+                          label: const Text('Déconnexion'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),

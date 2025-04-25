@@ -1,5 +1,5 @@
 class Vitirinaire {
-  final int? id;
+  final String? id; // Changé de int? à String? pour Firebase
   final String email;
   final String roles;
   final String password;
@@ -46,7 +46,7 @@ class Vitirinaire {
       wallet: map['wallet'],
       mykeyss: map['mykeyss'],
       telephone: map['telephone'],
-      isValid: map['is_valid'] == 1,
+      isValid: map['isValid'] == true,
     );
   }
 
@@ -65,7 +65,7 @@ class Vitirinaire {
       'wallet': wallet,
       'mykeyss': mykeyss,
       'telephone': telephone,
-      'is_valid': isValid ? 1 : 0,
+      'isValid': isValid,
     };
   }
 }

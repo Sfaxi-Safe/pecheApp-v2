@@ -1,86 +1,73 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../services/database_helper.dart';
-import '../../services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:seatrace/services/auth_service.dart';
+import 'package:seatrace/services/firestore_service.dart';
 import 'package:intl/intl.dart';
 
 class PendingLotsMaryeurScreen extends StatefulWidget {
   const PendingLotsMaryeurScreen({Key? key}) : super(key: key);
 
   @override
-  _PendingLotsMaryeurScreenState createState() => _PendingLotsMaryeurScreenState();
+  _PendingLotsMaryeurScreenState createState() =>
+      _PendingLotsMaryeurScreenState();
 }
 
 class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
-  List<Map<String, dynamic>> _pendingLots = [];
-  bool _isLoading = true;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirestoreService _firestoreService = FirestoreService();
+  Stream<QuerySnapshot>? _lotsStream;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _loadPendingLots();
+    _initLotsStream();
   }
 
-  Future<void> _loadPendingLots() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+  Future<void> _initLotsStream() async {
     try {
       final user = await AuthService().getCurrentUser();
       if (user == null || !user.isMaryeur()) {
         throw Exception('Utilisateur non autorisé');
       }
 
-      if (user.id != null) {
-        // Get lots that have been approved by veterinarian but don't have initial price
-        _pendingLots = await DatabaseHelper.instance.queryWhere(
-          'marketplace_lots',
-          'test = ? AND status = ? AND prixinitial IS NULL',
-          [1, 1], // 1 means approved by vitirinaire
-        );
-      } else {
-        _pendingLots = [];
-      }
+      // Créer un stream pour les lots approuvés par le vétérinaire mais sans prix initial
+      _lotsStream =
+          _firestore
+              .collection('lots')
+              .where('test', isEqualTo: true)
+              .where('status', isEqualTo: true)
+              .where('prixinitial', isNull: true)
+              .snapshots();
 
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() {});
     } catch (e) {
       setState(() {
         _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
-        _isLoading = false;
       });
     }
   }
 
   // Mise à jour pour définir uniquement le prix minimal
-  Future<void> _setMinPrice(int lotId, String minPrice) async {
+  Future<void> _setMinPrice(String lotId, String minPrice) async {
     try {
       final user = await AuthService().getCurrentUser();
       if (user == null || !user.isMaryeur() || user.id == null) {
         throw Exception('Utilisateur non autorisé');
       }
 
-      // Correction de l'appel à update - maintenant on définit seulement le prix minimal
-      await DatabaseHelper.instance.update(
-        'marketplace_lots',
-        {
-          'prixminimal': minPrice,
-          'prixinitial': minPrice, // Le prix initial est égal au prix minimal au début
-          'typeenchere': 'standard',
-          'current': minPrice, // Le prix courant commence au prix minimal
-          'online': '1',
-          'devise': 'TND', // Utilisation du Dinar Tunisien
-        },
-        'id = ?',
-        [lotId],
-      );
-
-      // Refresh the list
-      _loadPendingLots();
+      // Mettre à jour le lot dans Firestore
+      await _firestore.collection('lots').doc(lotId).update({
+        'prixminimal': minPrice,
+        'prixinitial':
+            minPrice, // Le prix initial est égal au prix minimal au début
+        'typeenchere': 'standard',
+        'current': minPrice, // Le prix courant commence au prix minimal
+        'online': '1',
+        'devise': 'TND', // Utilisation du Dinar Tunisien
+        'maryeur_id': user.id,
+        'dateEnchere': DateTime.now().toIso8601String(),
+      });
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -106,56 +93,56 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Définir le prix minimal - ${lot['espece'] ?? 'Inconnu'}'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: minPriceController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Prix minimal (TND)',
-                  prefixIcon: Icon(Icons.price_change),
-                  helperText: 'Le prix de départ de l\'enchère',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer un prix minimal';
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              'Définir le prix minimal - ${lot['espece'] ?? 'Inconnu'}',
+            ),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: minPriceController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Prix minimal (TND)',
+                      prefixIcon: Icon(Icons.price_change),
+                      helperText: 'Le prix de départ de l\'enchère',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Veuillez entrer un prix minimal';
+                      }
+                      if (double.tryParse(value) == null) {
+                        return 'Veuillez entrer un nombre valide';
+                      }
+                      if (double.parse(value) <= 0) {
+                        return 'Le prix doit être supérieur à 0';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (formKey.currentState!.validate()) {
+                    Navigator.of(context).pop();
+                    _setMinPrice(lot['id'], minPriceController.text);
                   }
-                  if (double.tryParse(value) == null) {
-                    return 'Veuillez entrer un nombre valide';
-                  }
-                  if (double.parse(value) <= 0) {
-                    return 'Le prix doit être supérieur à 0';
-                  }
-                  return null;
                 },
+                child: const Text('Confirmer'),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.of(context).pop();
-                _setMinPrice(
-                  lot['id'],
-                  minPriceController.text,
-                );
-              }
-            },
-            child: const Text('Confirmer'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -167,40 +154,63 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadPendingLots,
+            onPressed: _initLotsStream,
             tooltip: 'Actualiser',
           ),
         ],
       ),
       body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null
+        child:
+            _errorMessage != null
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 48,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage!,
+                        style: TextStyle(
                           color: Theme.of(context).colorScheme.error,
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _errorMessage!,
-                          style: TextStyle(color: Theme.of(context).colorScheme.error),
-                          textAlign: TextAlign.center,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _initLotsStream,
+                        child: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                )
+                : _lotsStream == null
+                ? const Center(child: CircularProgressIndicator())
+                : StreamBuilder<QuerySnapshot>(
+                  stream: _lotsStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Erreur: ${snapshot.error}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
                         ),
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: _loadPendingLots,
-                          child: const Text('Réessayer'),
-                        ),
-                      ],
-                    ),
-                  )
-                : _pendingLots.isEmpty
-                    ? Center(
+                      );
+                    }
+
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final lots = snapshot.data?.docs ?? [];
+
+                    if (lots.isEmpty) {
+                      return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -220,31 +230,36 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
                             const SizedBox(height: 8),
                             Text(
                               'Tous les lots ont des prix définis',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                              ),
+                              style: TextStyle(color: Colors.grey[500]),
                             ),
                           ],
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _pendingLots.length,
-                        itemBuilder: (context, index) {
-                          final lot = _pendingLots[index];
-                          return _buildLotCard(context, lot);
-                        },
-                      ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: lots.length,
+                      itemBuilder: (context, index) {
+                        final lot = lots[index].data() as Map<String, dynamic>;
+                        // Ajouter l'ID du document au lot
+                        lot['id'] = lots[index].id;
+                        return _buildLotCard(context, lot);
+                      },
+                    );
+                  },
+                ),
       ),
     );
   }
 
   Widget _buildLotCard(BuildContext context, Map<String, dynamic> lot) {
     final espece = lot['espece'] ?? 'Inconnu';
-    final date = lot['datetest'] != null
-        ? DateFormat('dd/MM/yyyy').format(DateTime.parse(lot['datetest']))
-        : 'Date inconnue';
-    final photoPath = lot['photo'];
+    final date =
+        lot['datetest'] != null
+            ? DateFormat('dd/MM/yyyy').format(DateTime.parse(lot['datetest']))
+            : 'Date inconnue';
+    final photoUrl = lot['photo'];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -261,37 +276,38 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
                   topLeft: Radius.circular(12),
                   bottomLeft: Radius.circular(12),
                 ),
-                child: photoPath != null && File(photoPath).existsSync()
-                    ? Image.file(
-                        File(photoPath),
-                        width: 120,
-                        height: 120,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: 120,
-                            height: 120,
-                            color: Colors.grey[300],
-                            child: Icon(
-                              Icons.image_not_supported,
-                              size: 40,
-                              color: Colors.grey[500],
-                            ),
-                          );
-                        },
-                      )
-                    : Container(
-                        width: 120,
-                        height: 120,
-                        color: Colors.grey[300],
-                        child: Icon(
-                          Icons.image_not_supported,
-                          size: 40,
-                          color: Colors.grey[500],
+                child:
+                    photoUrl != null
+                        ? Image.network(
+                          photoUrl,
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 120,
+                              height: 120,
+                              color: Colors.grey[300],
+                              child: Icon(
+                                Icons.image_not_supported,
+                                size: 40,
+                                color: Colors.grey[500],
+                              ),
+                            );
+                          },
+                        )
+                        : Container(
+                          width: 120,
+                          height: 120,
+                          color: Colors.grey[300],
+                          child: Icon(
+                            Icons.image_not_supported,
+                            size: 40,
+                            color: Colors.grey[500],
+                          ),
                         ),
-                      ),
               ),
-              
+
               // Info
               Expanded(
                 child: Padding(
@@ -311,23 +327,17 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
                       const SizedBox(height: 8),
                       Text(
                         'Date: $date',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Quantité: ${lot['quantite'] ?? 'N/A'} | Poids: ${lot['poid'] ?? 'N/A'} kg',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Température: ${lot['temperature'] ?? 'N/A'} °C',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -335,10 +345,10 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
               ),
             ],
           ),
-          
+
           // Divider
           const Divider(),
-          
+
           // Actions
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -376,66 +386,73 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
   void _showLotDetails(BuildContext context, Map<String, dynamic> lot) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Détails - ${lot['espece'] ?? 'Inconnu'}'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (lot['photo'] != null && File(lot['photo']).existsSync()) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    File(lot['photo']),
-                    width: double.infinity,
-                    height: 200,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
+      builder:
+          (context) => AlertDialog(
+            title: Text('Détails - ${lot['espece'] ?? 'Inconnu'}'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (lot['photo'] != null) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        lot['photo'],
                         width: double.infinity,
                         height: 200,
-                        color: Colors.grey[300],
-                        child: Icon(
-                          Icons.image_not_supported,
-                          size: 50,
-                          color: Colors.grey[500],
-                        ),
-                      );
-                    },
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: double.infinity,
+                            height: 200,
+                            color: Colors.grey[300],
+                            child: Icon(
+                              Icons.image_not_supported,
+                              size: 50,
+                              color: Colors.grey[500],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  _buildDetailItem('Identifiant', lot['identifiant'] ?? 'N/A'),
+                  _buildDetailItem('Espèce', lot['espece'] ?? 'N/A'),
+                  _buildDetailItem('Quantité', lot['quantite'] ?? 'N/A'),
+                  _buildDetailItem('Poids', '${lot['poid'] ?? 'N/A'} kg'),
+                  _buildDetailItem(
+                    'Température',
+                    '${lot['temperature'] ?? 'N/A'} °C',
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              _buildDetailItem('Identifiant', lot['identifiant'] ?? 'N/A'),
-              _buildDetailItem('Espèce', lot['espece'] ?? 'N/A'),
-              _buildDetailItem('Quantité', lot['quantite'] ?? 'N/A'),
-              _buildDetailItem('Poids', '${lot['poid'] ?? 'N/A'} kg'),
-              _buildDetailItem('Température', '${lot['temperature'] ?? 'N/A'} °C'),
-              _buildDetailItem('Date de soumission', lot['datesoumettre'] ?? 'N/A'),
-              
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _showSetPriceDialog(context, lot);
-                },
-                icon: const Icon(Icons.price_change),
-                label: const Text('Définir le prix minimal'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                ),
+                  _buildDetailItem(
+                    'Date de soumission',
+                    lot['datesoumettre'] ?? 'N/A',
+                  ),
+
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _showSetPriceDialog(context, lot);
+                    },
+                    icon: const Icon(Icons.price_change),
+                    label: const Text('Définir le prix minimal'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Fermer'),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -445,13 +462,8 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$label: ',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          Expanded(
-            child: Text(value),
-          ),
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value)),
         ],
       ),
     );

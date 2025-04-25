@@ -1,5 +1,5 @@
 class Pecheur {
-  final int? id;
+  final String? id; // Changé de int? à String? pour Firebase
   final String email;
   final String roles;
   final String password;
@@ -70,7 +70,7 @@ class Pecheur {
       wallet: map['wallet'],
       mykeyss: map['mykeyss'],
       telephone: map['telephone'],
-      isValid: map['is_valid'] == 1,
+      isValid: map['isValid'] == true,
     );
   }
 
@@ -97,7 +97,7 @@ class Pecheur {
       'wallet': wallet,
       'mykeyss': mykeyss,
       'telephone': telephone,
-      'is_valid': isValid == true ? 1 : 0,
+      'isValid': isValid,
     };
   }
 }

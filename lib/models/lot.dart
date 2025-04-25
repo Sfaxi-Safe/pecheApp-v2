@@ -1,7 +1,7 @@
 class Lot {
-  final int? id;
-  final int? rfidId;
-  final int? vitirinaireId;
+  final String? id; // Changé de int? à String? pour Firebase
+  final String? rfidId; // Changé de int? à String? pour Firebase
+  final String? vitirinaireId; // Changé de int? à String? pour Firebase
   final String? identifiant;
   final String? photo;
   final String? quantite;
@@ -15,14 +15,19 @@ class Lot {
   final bool? test;
   final bool? status;
   final bool? vendre;
-  final int? priseId;
-  final int? userId;
+  final String? priseId; // Changé de int? à String? pour Firebase
+  final String? userId; // Changé de int? à String? pour Firebase
   final String? datesoumettre;
   final String? poidestimatif;
   final String? typeenchere;
   final String? current;
   final String? online;
   final bool? isProduit;
+  final String? devise;
+  final String? maryeurId;
+  final String? pecheurId;
+  final String? dateEnchere;
+  final String? createdAt;
 
   Lot({
     this.id,
@@ -49,6 +54,11 @@ class Lot {
     this.current,
     this.online,
     this.isProduit,
+    this.devise,
+    this.maryeurId,
+    this.pecheurId,
+    this.dateEnchere,
+    this.createdAt,
   });
 
   factory Lot.fromMap(Map<String, dynamic> map) {
@@ -66,9 +76,9 @@ class Lot {
       prixminimal: map['prixminimal'],
       prixfinale: map['prixfinale'],
       datetest: map['datetest'],
-      test: map['test'] == 1,
-      status: map['status'] == 1,
-      vendre: map['vendre'] == 1,
+      test: map['test'] == true,
+      status: map['status'] == true,
+      vendre: map['vendre'] == true,
       priseId: map['prise_id'],
       userId: map['user_id'],
       datesoumettre: map['datesoumettre'],
@@ -76,7 +86,12 @@ class Lot {
       typeenchere: map['typeenchere'],
       current: map['current'],
       online: map['online'],
-      isProduit: map['is_produit'] == 1,
+      isProduit: map['isProduit'] == true,
+      devise: map['devise'],
+      maryeurId: map['maryeur_id'],
+      pecheurId: map['pecheur_id'],
+      dateEnchere: map['dateEnchere'],
+      createdAt: map['createdAt'],
     );
   }
 
@@ -95,9 +110,9 @@ class Lot {
       'prixminimal': prixminimal,
       'prixfinale': prixfinale,
       'datetest': datetest,
-      'test': test == true ? 1 : 0,
-      'status': status == true ? 1 : 0,
-      'vendre': vendre == true ? 1 : 0,
+      'test': test,
+      'status': status,
+      'vendre': vendre,
       'prise_id': priseId,
       'user_id': userId,
       'datesoumettre': datesoumettre,
@@ -105,7 +120,12 @@ class Lot {
       'typeenchere': typeenchere,
       'current': current,
       'online': online,
-      'is_produit': isProduit == true ? 1 : 0,
+      'isProduit': isProduit,
+      'devise': devise,
+      'maryeur_id': maryeurId,
+      'pecheur_id': pecheurId,
+      'dateEnchere': dateEnchere,
+      'createdAt': createdAt,
     };
   }
 }

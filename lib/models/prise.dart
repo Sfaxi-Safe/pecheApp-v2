@@ -1,16 +1,17 @@
 class Prise {
-  final int? id;
-  final int? pecheurId;
-  final int? maryeurId;
+  final String? id; // Changé de int? à String? pour Firebase
+  final String? pecheurId; // Changé de int? à String? pour Firebase
+  final String? maryeurId; // Changé de int? à String? pour Firebase
   final String? nom;
   final String? debut;
   final String? fin;
   final String? latitude;
-  final String? langitude;
+  final String? longitude; // Corrigé l'orthographe de "langitude"
   final String? engin;
   final String? zone;
   final String? affectationdate;
   final String? datedebarquement;
+  final String? createdAt;
 
   Prise({
     this.id,
@@ -20,11 +21,12 @@ class Prise {
     this.debut,
     this.fin,
     this.latitude,
-    this.langitude,
+    this.longitude,
     this.engin,
     this.zone,
     this.affectationdate,
     this.datedebarquement,
+    this.createdAt,
   });
 
   factory Prise.fromMap(Map<String, dynamic> map) {
@@ -36,11 +38,12 @@ class Prise {
       debut: map['debut'],
       fin: map['fin'],
       latitude: map['latitude'],
-      langitude: map['langitude'],
+      longitude: map['longitude'] ?? map['langitude'], // Support des deux orthographes
       engin: map['engin'],
       zone: map['zone'],
       affectationdate: map['affectationdate'],
       datedebarquement: map['datedebarquement'],
+      createdAt: map['createdAt'],
     );
   }
 
@@ -53,11 +56,12 @@ class Prise {
       'debut': debut,
       'fin': fin,
       'latitude': latitude,
-      'langitude': langitude,
+      'longitude': longitude,
       'engin': engin,
       'zone': zone,
       'affectationdate': affectationdate,
       'datedebarquement': datedebarquement,
+      'createdAt': createdAt,
     };
   }
 }
