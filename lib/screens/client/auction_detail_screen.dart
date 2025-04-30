@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
@@ -6,14 +7,13 @@ import 'package:intl/intl.dart';
 class AuctionDetailScreen extends StatefulWidget {
   final int auctionId;
 
-  const AuctionDetailScreen({Key? key, required this.auctionId})
-    : super(key: key);
+  const AuctionDetailScreen({super.key, required this.auctionId});
 
   @override
-  _AuctionDetailScreenState createState() => _AuctionDetailScreenState();
+  State<AuctionDetailScreen> createState() => AuctionDetailScreenState();
 }
 
-class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
+class AuctionDetailScreenState extends State<AuctionDetailScreen> {
   Map<String, dynamic>? _auction;
   Map<String, dynamic>? _pecheur; // Ajout de cette variable
   Map<String, dynamic>? _veterinaire; // Ajout de cette variable

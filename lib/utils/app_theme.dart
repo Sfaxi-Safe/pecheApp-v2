@@ -18,9 +18,8 @@ class AppTheme {
     colorScheme: ColorScheme.light(
       primary: primaryColor,
       secondary: secondaryColor,
-      background: backgroundColor,
+      surface: backgroundColor,
       error: errorColor,
-      surface: Colors.white,
     ),
     scaffoldBackgroundColor: backgroundColor,
     appBarTheme: const AppBarTheme(
@@ -39,23 +38,17 @@ class AppTheme {
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(
-        foregroundColor: primaryColor,
-      ),
+      style: TextButton.styleFrom(foregroundColor: primaryColor),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: primaryColor,
         side: const BorderSide(color: primaryColor),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -81,9 +74,7 @@ class AppTheme {
     ),
     cardTheme: CardTheme(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: Colors.white,
     ),
     textTheme: const TextTheme(
@@ -108,7 +99,6 @@ class AppTheme {
     colorScheme: ColorScheme.dark(
       primary: primaryColor,
       secondary: secondaryColor,
-      background: const Color(0xFF121212),
       error: errorColor,
       surface: const Color(0xFF1E1E1E),
     ),
@@ -129,23 +119,17 @@ class AppTheme {
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(
-        foregroundColor: accentColor,
-      ),
+      style: TextButton.styleFrom(foregroundColor: accentColor),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: accentColor,
         side: const BorderSide(color: accentColor),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -171,17 +155,24 @@ class AppTheme {
     ),
     cardTheme: CardTheme(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: const Color(0xFF1E1E1E),
     ),
     textTheme: const TextTheme(
       displayLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      displayMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      displayMedium: TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.bold,
+      ),
       displaySmall: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      headlineMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      headlineSmall: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      headlineMedium: TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.bold,
+      ),
+      headlineSmall: TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.bold,
+      ),
       titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
       titleMedium: TextStyle(color: Colors.white),
       titleSmall: TextStyle(color: Colors.white),

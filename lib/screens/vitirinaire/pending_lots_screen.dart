@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/services/auth_service.dart';
 import 'package:intl/intl.dart';
 
@@ -35,11 +35,12 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
       }
 
       if (user.id != null) {
-        _pendingLots = await DatabaseHelper.instance.queryWhere(
-          'marketplace_lots',
-          'test = 0',
-          [],
-        );
+        try {
+          final response = await ApiService.instance.get('lots/pending');
+          _pendingLots = List<Map<String, dynamic>>.from(response['data']);
+        } catch (e) {
+          throw Exception('Erreur lors de la récupération des lots: $e');
+        }
       } else {
         _pendingLots = [];
       }
@@ -62,16 +63,11 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
         throw Exception('Utilisateur non autorisé');
       }
 
-      await DatabaseHelper.instance.update(
-        'marketplace_lots',
-        {
-          'test': 1,
-          'status': 1,
-          'vitirinaire_id': user.id,
-        },
-        'id = ?',
-        [lotId],
-      );
+      await ApiService.instance.put('lots/$lotId/approve', {
+        'test': true,
+        'status': true,
+        'veterinaire_id': user.id,
+      });
 
       // Refresh the list
       _loadPendingLots();
@@ -101,16 +97,11 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
         throw Exception('Utilisateur non autorisé');
       }
 
-      await DatabaseHelper.instance.update(
-        'marketplace_lots',
-        {
-          'test': 1,
-          'status': 0,
-          'vitirinaire_id': user.id,
-        },
-        'id = ?',
-        [lotId],
-      );
+      await ApiService.instance.put('lots/$lotId/reject', {
+        'test': true,
+        'status': false,
+        'veterinaire_id': user.id,
+      });
 
       // Refresh the list
       _loadPendingLots();
@@ -147,77 +138,76 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
         ],
       ),
       body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null
+        child:
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 48,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage!,
+                        style: TextStyle(
                           color: Theme.of(context).colorScheme.error,
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _errorMessage!,
-                          style: TextStyle(color: Theme.of(context).colorScheme.error),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: _loadPendingLots,
-                          child: const Text('Réessayer'),
-                        ),
-                      ],
-                    ),
-                  )
-                : _pendingLots.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.check_circle_outline,
-                              size: 64,
-                              color: Colors.green[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Aucun lot en attente',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Tous les lots ont été traités',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _pendingLots.length,
-                        itemBuilder: (context, index) {
-                          final lot = _pendingLots[index];
-                          return _buildLotCard(context, lot);
-                        },
+                        textAlign: TextAlign.center,
                       ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _loadPendingLots,
+                        child: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                )
+                : _pendingLots.isEmpty
+                ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.check_circle_outline,
+                        size: 64,
+                        color: Colors.green[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Aucun lot en attente',
+                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tous les lots ont été traités',
+                        style: TextStyle(color: Colors.grey[500]),
+                      ),
+                    ],
+                  ),
+                )
+                : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _pendingLots.length,
+                  itemBuilder: (context, index) {
+                    final lot = _pendingLots[index];
+                    return _buildLotCard(context, lot);
+                  },
+                ),
       ),
     );
   }
 
   Widget _buildLotCard(BuildContext context, Map<String, dynamic> lot) {
     final espece = lot['espece'] ?? 'Inconnu';
-    final date = lot['datetest'] != null
-        ? DateFormat('dd/MM/yyyy').format(DateTime.parse(lot['datetest']))
-        : 'Date inconnue';
+    final date =
+        lot['datetest'] != null
+            ? DateFormat('dd/MM/yyyy').format(DateTime.parse(lot['datetest']))
+            : 'Date inconnue';
     final photoPath = lot['photo'];
 
     return Card(
@@ -235,25 +225,26 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
                   topLeft: Radius.circular(12),
                   bottomLeft: Radius.circular(12),
                 ),
-                child: photoPath != null && File(photoPath).existsSync()
-                    ? Image.file(
-                        File(photoPath),
-                        width: 120,
-                        height: 120,
-                        fit: BoxFit.cover,
-                      )
-                    : Container(
-                        width: 120,
-                        height: 120,
-                        color: Colors.grey[300],
-                        child: Icon(
-                          Icons.image_not_supported,
-                          size: 40,
-                          color: Colors.grey[500],
+                child:
+                    photoPath != null && File(photoPath).existsSync()
+                        ? Image.file(
+                          File(photoPath),
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.cover,
+                        )
+                        : Container(
+                          width: 120,
+                          height: 120,
+                          color: Colors.grey[300],
+                          child: Icon(
+                            Icons.image_not_supported,
+                            size: 40,
+                            color: Colors.grey[500],
+                          ),
                         ),
-                      ),
               ),
-              
+
               // Info
               Expanded(
                 child: Padding(
@@ -273,23 +264,17 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
                       const SizedBox(height: 8),
                       Text(
                         'Date: $date',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Quantité: ${lot['quantite'] ?? 'N/A'} | Poids: ${lot['poid'] ?? 'N/A'} kg',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Température: ${lot['temperature'] ?? 'N/A'} °C',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -297,10 +282,10 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
               ),
             ],
           ),
-          
+
           // Divider
           const Divider(),
-          
+
           // Actions
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -331,7 +316,10 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
                   child: OutlinedButton.icon(
                     onPressed: () => _rejectLot(lot['id']),
                     icon: const Icon(Icons.close, color: Colors.red),
-                    label: const Text('Refuser', style: TextStyle(color: Colors.red)),
+                    label: const Text(
+                      'Refuser',
+                      style: TextStyle(color: Colors.red),
+                    ),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.red),
                     ),
@@ -348,80 +336,91 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
   void _showLotDetails(BuildContext context, Map<String, dynamic> lot) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Détails - ${lot['espece'] ?? 'Inconnu'}'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (lot['photo'] != null && File(lot['photo']).existsSync()) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    File(lot['photo']),
-                    width: double.infinity,
-                    height: 200,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              _buildDetailItem('Identifiant', lot['identifiant'] ?? 'N/A'),
-              _buildDetailItem('Espèce', lot['espece'] ?? 'N/A'),
-              _buildDetailItem('Quantité', lot['quantite'] ?? 'N/A'),
-              _buildDetailItem('Poids', '${lot['poid'] ?? 'N/A'} kg'),
-              _buildDetailItem('Température', '${lot['temperature'] ?? 'N/A'} °C'),
-              _buildDetailItem('Date de soumission', lot['datesoumettre'] ?? 'N/A'),
-              
-              const SizedBox(height: 16),
-              const Text(
-                'Décision:',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Détails - ${lot['espece'] ?? 'Inconnu'}'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        _approveLot(lot['id']);
-                      },
-                      icon: const Icon(Icons.check),
-                      label: const Text('Approuver'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                  if (lot['photo'] != null &&
+                      File(lot['photo']).existsSync()) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(lot['photo']),
+                        width: double.infinity,
+                        height: 200,
+                        fit: BoxFit.cover,
                       ),
                     ),
+                    const SizedBox(height: 16),
+                  ],
+                  _buildDetailItem('Identifiant', lot['identifiant'] ?? 'N/A'),
+                  _buildDetailItem('Espèce', lot['espece'] ?? 'N/A'),
+                  _buildDetailItem('Quantité', lot['quantite'] ?? 'N/A'),
+                  _buildDetailItem('Poids', '${lot['poid'] ?? 'N/A'} kg'),
+                  _buildDetailItem(
+                    'Température',
+                    '${lot['temperature'] ?? 'N/A'} °C',
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        _rejectLot(lot['id']);
-                      },
-                      icon: const Icon(Icons.close, color: Colors.red),
-                      label: const Text('Refuser', style: TextStyle(color: Colors.red)),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Colors.red),
+                  _buildDetailItem(
+                    'Date de soumission',
+                    lot['datesoumettre'] ?? 'N/A',
+                  ),
+
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Décision:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _approveLot(lot['id']);
+                          },
+                          icon: const Icon(Icons.check),
+                          label: const Text('Approuver'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _rejectLot(lot['id']);
+                          },
+                          icon: const Icon(Icons.close, color: Colors.red),
+                          label: const Text(
+                            'Refuser',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.red),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Fermer'),
+              ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -431,13 +430,8 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$label: ',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          Expanded(
-            child: Text(value),
-          ),
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value)),
         ],
       ),
     );

@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:seatrace/services/database_helper.dart';
-import 'package:seatrace/services/auth_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/screens/login_screen.dart';
 import 'package:seatrace/utils/validators.dart';
 import 'package:seatrace/widgets/password_strength_indicator.dart';
-import 'dart:convert';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({Key? key}) : super(key: key);
+  const SignupScreen({super.key});
 
   @override
-  _SignupScreenState createState() => _SignupScreenState();
+  State<SignupScreen> createState() => SignupScreenState();
 }
 
-class _SignupScreenState extends State<SignupScreen> {
+class SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _scrollController = ScrollController();
 
@@ -97,19 +96,6 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     try {
-      // Check if email already exists
-      final emailExists = await DatabaseHelper.instance.emailExists(
-        _emailController.text.trim(),
-      );
-
-      if (emailExists) {
-        setState(() {
-          _errorMessage = 'Cet email est déjà utilisé';
-          _isLoading = false;
-        });
-        return;
-      }
-
       // Create user based on selected role
       final email = _emailController.text.trim();
       final password = _passwordController.text;
@@ -121,68 +107,39 @@ class _SignupScreenState extends State<SignupScreen> {
         telephone = int.tryParse(_telephoneController.text);
       }
 
-      if (_selectedRole == 'ROLE_CLIENT') {
-        await DatabaseHelper.instance.insertUser({
-          'email': email,
-          'roles': jsonEncode(["ROLE_CLIENT"]),
-          'password': password,
-          'nom': nom,
-          'prenom': prenom,
-          'telephone': telephone,
-          'is_verified': 0, // Nécessite vérification d'email
-          'is_blocked': 0,
-          'is_verified': 0, // Nécessite vérification d'email
-          'is_blocked': 0,
-          'is_valid': 0, // Nécessite validation par admin
-        });
-      } else if (_selectedRole == 'ROLE_PECHEUR') {
-        await DatabaseHelper.instance.insertPecheur({
-          'email': email,
-          'roles': jsonEncode(["ROLE_PECHEUR"]),
-          'password': password,
-          'nom': nom,
-          'prenom': prenom,
-          'telephone': telephone,
-          'cin': _cinController.text.trim(),
-          'matricule': _matriculeController.text.trim(),
-          'bateau': _bateauController.text.trim(),
-          'port': _portController.text.trim(),
-          'capacite': _capaciteController.text.trim(),
-          'is_verified': 0, // Nécessite vérification d'email
-          'is_blocked': 0,
-          'is_valid': 0, // Nécessite validation par admin
-        });
+      // Préparer les données utilisateur de base
+      final userData = {
+        'email': email,
+        'password': password,
+        'nom': nom,
+        'prenom': prenom,
+        'telephone': telephone,
+      };
+
+      // Ajouter les champs spécifiques selon le rôle
+      if (_selectedRole == 'ROLE_PECHEUR') {
+        userData['role'] = 'ROLE_PECHEUR';
+        userData['cin'] = _cinController.text.trim();
+        userData['matricule'] = _matriculeController.text.trim();
+        userData['bateau'] = _bateauController.text.trim();
+        userData['port'] = _portController.text.trim();
+        userData['capacite'] = _capaciteController.text.trim();
       } else if (_selectedRole == 'ROLE_VETERINAIRE') {
-        await DatabaseHelper.instance.insertVitirinaire({
-          'email': email,
-          'roles': jsonEncode(["ROLE_VETERINAIRE"]),
-          'password': password,
-          'nom': nom,
-          'prenom': prenom,
-          'telephone': telephone,
-          'cin': _cinController.text.trim(),
-          'matricule': _matriculeController.text.trim(),
-          'port': _portController.text.trim(),
-          'is_verified': 0, // Nécessite vérification d'email
-          'is_blocked': 0,
-          'is_valid': 0, // Nécessite validation par admin
-        });
+        userData['role'] = 'ROLE_VETERINAIRE';
+        userData['cin'] = _cinController.text.trim();
+        userData['matricule'] = _matriculeController.text.trim();
+        userData['port'] = _portController.text.trim();
       } else if (_selectedRole == 'ROLE_MARYEUR') {
-        await DatabaseHelper.instance.insertMaryeur({
-          'email': email,
-          'roles': jsonEncode(["ROLE_MARYEUR"]),
-          'password': password,
-          'nom': nom,
-          'prenom': prenom,
-          'telephone': telephone,
-          'cin': _cinController.text.trim(),
-          'matricule': _matriculeController.text.trim(),
-          'port': _portController.text.trim(),
-          'is_verified': 0, // Nécessite vérification d'email
-          'is_blocked': 0,
-          'is_valid': 0, // Nécessite validation par admin
-        });
+        userData['role'] = 'ROLE_MARYEUR';
+        userData['cin'] = _cinController.text.trim();
+        userData['matricule'] = _matriculeController.text.trim();
+        userData['port'] = _portController.text.trim();
+      } else {
+        userData['role'] = 'ROLE_CLIENT';
       }
+
+      // Envoyer la requête d'inscription à l'API
+      await ApiService.instance.register(userData);
 
       // Envoyer un email de vérification (simulé)
       await _sendVerificationEmail(email);
@@ -205,7 +162,13 @@ class _SignupScreenState extends State<SignupScreen> {
       ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
     } catch (e) {
       setState(() {
-        _errorMessage = 'Une erreur est survenue: ${e.toString()}';
+        // Vérifier si l'erreur concerne un email déjà utilisé
+        if (e.toString().contains('email') &&
+            e.toString().contains('utilisé')) {
+          _errorMessage = 'Cet email est déjà utilisé';
+        } else {
+          _errorMessage = 'Une erreur est survenue: ${e.toString()}';
+        }
         _isLoading = false;
       });
     }
@@ -215,7 +178,7 @@ class _SignupScreenState extends State<SignupScreen> {
     // Simulation d'envoi d'email de vérification
     // Dans une application réelle, vous utiliseriez un service d'email
     await Future.delayed(const Duration(seconds: 1));
-    print('Email de vérification envoyé à $email');
+    debugPrint('Email de vérification envoyé à $email');
   }
 
   void _scrollToFirstError() {
@@ -613,13 +576,13 @@ class _SignupScreenState extends State<SignupScreen> {
 }
 
 class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({Key? key}) : super(key: key);
+  const ForgotPasswordScreen({super.key});
 
   @override
-  _ForgotPasswordScreenState createState() => _ForgotPasswordScreenState();
+  State<ForgotPasswordScreen> createState() => ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   bool _isLoading = false;
@@ -641,29 +604,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
 
     try {
-      // Vérifier si l'email existe
-      final emailExists = await DatabaseHelper.instance.emailExists(
-        _emailController.text.trim(),
-      );
+      // Appeler l'API pour réinitialiser le mot de passe
+      try {
+        // Simuler un appel API pour vérifier si l'email existe
+        await ApiService.instance.post('auth/request-reset', {
+          'email': _emailController.text.trim(),
+        });
 
-      if (!emailExists) {
+        setState(() {
+          _message =
+              'Un email de réinitialisation a été envoyé à ${_emailController.text}';
+          _isLoading = false;
+          _isSuccess = true;
+        });
+      } catch (apiError) {
+        // Si l'API renvoie une erreur indiquant que l'email n'existe pas
         setState(() {
           _message = 'Aucun compte associé à cet email';
           _isLoading = false;
           _isSuccess = false;
         });
-        return;
       }
-
-      // Simuler l'envoi d'un email de réinitialisation
-      await Future.delayed(const Duration(seconds: 2));
-
-      setState(() {
-        _message =
-            'Un email de réinitialisation a été envoyé à ${_emailController.text}';
-        _isLoading = false;
-        _isSuccess = true;
-      });
     } catch (e) {
       setState(() {
         _message = 'Une erreur est survenue: ${e.toString()}';

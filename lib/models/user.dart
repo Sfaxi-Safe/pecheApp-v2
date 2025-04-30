@@ -1,11 +1,11 @@
 class User {
-  final String? id;
+  final String id;
   final String email;
   final String roles;
   final String password;
   final String nom;
   final String prenom;
-  final int? telephone;
+  final String? telephone;
   final String? civilite;
   final String? service;
   final String? fonction;
@@ -15,9 +15,11 @@ class User {
   final String? tweeter;
   final String? photo;
   final String? adresse;
+  final bool isValidated;
+  final bool isBlocked;
 
   User({
-    this.id,
+    required this.id,
     required this.email,
     required this.roles,
     required this.password,
@@ -33,17 +35,19 @@ class User {
     this.tweeter,
     this.photo,
     this.adresse,
+    this.isValidated = false,
+    this.isBlocked = false,
   });
 
   factory User.fromMap(Map<String, dynamic> map) {
     return User(
-      id: map['_id']?.toString(),
-      email: map['email'],
-      roles: map['roles'],
-      password: map['password'],
-      nom: map['nom'],
-      prenom: map['prenom'],
-      telephone: map['telephone'],
+      id: map['_id']?.toString() ?? map['id']?.toString() ?? '',
+      email: map['email'] ?? '',
+      roles: map['roles'] ?? '',
+      password: map['password'] ?? '',
+      nom: map['nom'] ?? '',
+      prenom: map['prenom'] ?? '',
+      telephone: map['telephone']?.toString(),
       civilite: map['civilite'],
       service: map['service'],
       fonction: map['fonction'],
@@ -53,12 +57,14 @@ class User {
       tweeter: map['tweeter'],
       photo: map['photo'],
       adresse: map['adresse'],
+      isValidated: map['isValidated'] ?? map['isValid'] ?? false,
+      isBlocked: map['isBlocked'] ?? false,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      '_id': id,
+      'id': id,
       'email': email,
       'roles': roles,
       'password': password,
@@ -74,6 +80,8 @@ class User {
       'tweeter': tweeter,
       'photo': photo,
       'adresse': adresse,
+      'isValidated': isValidated,
+      'isBlocked': isBlocked,
     }..removeWhere((key, value) => value == null);
   }
 

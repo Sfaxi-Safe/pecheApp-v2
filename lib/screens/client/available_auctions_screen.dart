@@ -1,7 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
+import '../../services/image_service.dart';
 import 'auction_detail_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -236,9 +236,9 @@ class _AvailableAuctionsScreenState extends State<AvailableAuctionsScreen> {
                     bottomLeft: Radius.circular(12),
                   ),
                   child:
-                      photoPath != null && File(photoPath).existsSync()
-                          ? Image.file(
-                            File(photoPath),
+                      photoPath != null && photoPath.toString().isNotEmpty
+                          ? Image.network(
+                            ImageService.instance.getImageUrl(photoPath),
                             width: 120,
                             height: 120,
                             fit: BoxFit.cover,

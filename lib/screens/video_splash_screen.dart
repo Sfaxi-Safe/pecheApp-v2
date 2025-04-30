@@ -6,10 +6,10 @@ class VideoSplashScreen extends StatefulWidget {
   const VideoSplashScreen({super.key});
 
   @override
-  State<VideoSplashScreen> createState() => _VideoSplashScreenState();
+  State<VideoSplashScreen> createState() => VideoSplashScreenState();
 }
 
-class _VideoSplashScreenState extends State<VideoSplashScreen> {
+class VideoSplashScreenState extends State<VideoSplashScreen> {
   late VideoPlayerController _controller;
   bool _isVideoInitialized = false;
   bool _showStartButton = false;
@@ -61,7 +61,9 @@ class _VideoSplashScreenState extends State<VideoSplashScreen> {
 
           // Contenu superposé
           Container(
-            decoration: BoxDecoration(color: Colors.black.withOpacity(0.4)),
+            decoration: BoxDecoration(
+              color: Colors.black.withAlpha(102), // 0.4 * 255 = 102
+            ),
           ),
 
           // Texte et bouton

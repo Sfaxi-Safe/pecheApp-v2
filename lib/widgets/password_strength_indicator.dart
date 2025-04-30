@@ -3,10 +3,7 @@ import 'package:flutter/material.dart';
 class PasswordStrengthIndicator extends StatelessWidget {
   final double strength;
 
-  const PasswordStrengthIndicator({
-    Key? key,
-    required this.strength,
-  }) : super(key: key);
+  const PasswordStrengthIndicator({super.key, required this.strength});
 
   @override
   Widget build(BuildContext context) {
@@ -38,10 +35,7 @@ class PasswordStrengthIndicator extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           'Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
         ),
       ],
     );

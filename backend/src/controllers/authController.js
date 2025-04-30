@@ -3,6 +3,12 @@ const User = require('../models/User');
 const Pecheur = require('../models/Pecheur');
 const Vitirinaire = require('../models/Vitirinaire');
 const Maryeur = require('../models/Maryeur');
+const {
+  NotFoundError,
+  ForbiddenError,
+  BadRequestError,
+  CustomValidationError
+} = require('../middleware/errorHandler');
 
 // Générer le token JWT
 const generateToken = (user) => {
@@ -75,9 +81,14 @@ const register = async (req, res) => {
 };
 
 // Connexion
-const login = async (req, res) => {
+const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
+
+    // Valider les données d'entrée
+    if (!email || !password) {
+      throw new BadRequestError('Email et mot de passe requis');
+    }
 
     // Chercher l'utilisateur dans toutes les collections
     const userPromises = [
@@ -91,23 +102,26 @@ const login = async (req, res) => {
     const user = users.find(u => u !== null);
 
     if (!user) {
-      return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+      throw new BadRequestError('Email ou mot de passe incorrect');
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+      throw new BadRequestError('Email ou mot de passe incorrect');
     }
 
     if (!user.isValidated) {
-      return res.status(403).json({ error: 'Votre compte est en attente de validation par un administrateur' });
+      throw new ForbiddenError('Votre compte est en attente de validation par un administrateur');
     }
 
     if (user.isBlocked) {
-      return res.status(403).json({ error: 'Votre compte a été bloqué. Veuillez contacter un administrateur' });
+      throw new ForbiddenError('Votre compte a été bloqué. Veuillez contacter un administrateur');
     }
 
     const token = generateToken(user);
+
+    // Journaliser la connexion réussie
+    console.log(`[${new Date().toISOString()}] INFO [AUTH] Connexion réussie: ${email}`);
 
     res.json({
       user: {
@@ -120,25 +134,33 @@ const login = async (req, res) => {
       token
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 };
 
 // Obtenir le profil de l'utilisateur connecté
-const getProfile = async (req, res) => {
+const getProfile = async (req, res, next) => {
   try {
     const user = req.user;
+
+    if (!user) {
+      throw new NotFoundError('Utilisateur non trouvé');
+    }
+
     res.json({
-      _id: user._id,
-      email: user.email,
-      roles: user.roles,
-      nom: user.nom,
-      prenom: user.prenom,
-      telephone: user.telephone,
-      // Ajouter d'autres champs selon le type d'utilisateur
+      user: {
+        _id: user._id,
+        email: user.email,
+        roles: user.roles,
+        nom: user.nom,
+        prenom: user.prenom,
+        telephone: user.telephone,
+        photo: user.photo,
+        // Ajouter d'autres champs selon le type d'utilisateur
+      }
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 };
 

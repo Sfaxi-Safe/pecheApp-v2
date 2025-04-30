@@ -6,15 +6,17 @@ import 'package:seatrace/screens/maryeur/dashboard_screen.dart';
 import 'package:seatrace/screens/client/dashboard_screen.dart';
 import 'package:seatrace/screens/signup_screen.dart';
 import 'package:seatrace/utils/validators.dart';
+import 'package:seatrace/utils/error_handler.dart';
+import 'package:seatrace/widgets/error_display.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  State<LoginScreen> createState() => LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -76,11 +78,29 @@ class _LoginScreenState extends State<LoginScreen> {
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } on AppError catch (e) {
+      // Utiliser le message d'erreur convivial de AppError
       setState(() {
-        _errorMessage = 'Une erreur est survenue: ${e.toString()}';
+        _errorMessage = e.message;
         _isLoading = false;
       });
+
+      // Journaliser l'erreur
+      ErrorHandler.instance.logError(e, context: 'LoginScreen._login');
+    } catch (e) {
+      // Créer une AppError pour les autres types d'erreurs
+      final appError = ErrorHandler.instance.handleException(
+        e,
+        context: 'LoginScreen._login',
+      );
+
+      setState(() {
+        _errorMessage = appError.message;
+        _isLoading = false;
+      });
+
+      // Journaliser l'erreur
+      ErrorHandler.instance.logError(appError);
     }
   }
 
@@ -165,13 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       if (_errorMessage != null) ...[
                         const SizedBox(height: 16),
-                        Text(
-                          _errorMessage!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
+                        FormErrorDisplay(message: _errorMessage),
                       ],
                       const SizedBox(height: 24),
                       ElevatedButton(

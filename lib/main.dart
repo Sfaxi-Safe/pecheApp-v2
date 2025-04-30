@@ -7,7 +7,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize API Service
-  final apiService = ApiService.instance;
+  ApiService.instance; // Initialize singleton
 
   runApp(const MyApp());
 }

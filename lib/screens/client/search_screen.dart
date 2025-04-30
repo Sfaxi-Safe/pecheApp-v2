@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import 'auction_detail_screen.dart';
@@ -36,12 +37,11 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     try {
-      // Search for lots by espece name
-      final results = await DatabaseHelper.instance.queryWhere(
-        'marketplace_lots',
-        'espece LIKE ? AND prixinitial IS NOT NULL AND vendre = ?',
-        ['%$query%', 0],
+      // Search for lots by espece name via API
+      final response = await ApiService.instance.get(
+        'lots/search?query=$query',
       );
+      final results = List<Map<String, dynamic>>.from(response['data']);
 
       setState(() {
         _searchResults = results;

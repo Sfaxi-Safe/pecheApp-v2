@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:seatrace/services/auth_service.dart';
 import 'package:seatrace/screens/login_screen.dart';
-import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/screens/vitirinaire/pending_lots_screen.dart';
 
 class VitirinaireScreen extends StatefulWidget {
@@ -32,17 +32,35 @@ class _VitirinaireScreenState extends State<VitirinaireScreen> {
 
       // Load statistics
       if (user.id != null) {
-        final lots = await DatabaseHelper.instance.queryWhere(
-          'marketplace_lots',
-          'vitirinaire_id = ?',
-          [user.id],
-        );
-        
-        setState(() {
-          _pendingLots = lots.where((lot) => lot['test'] == 0).length;
-          _approvedLots = lots.where((lot) => lot['test'] == 1 && lot['status'] == 1).length;
-          _rejectedLots = lots.where((lot) => lot['test'] == 1 && lot['status'] == 0).length;
-        });
+        try {
+          final response = await ApiService.instance.get(
+            'lots/veterinaire/${user.id}',
+          );
+          final lots = List<Map<String, dynamic>>.from(response['data']);
+
+          setState(() {
+            _pendingLots = lots.where((lot) => lot['test'] == false).length;
+            _approvedLots =
+                lots
+                    .where(
+                      (lot) => lot['test'] == true && lot['status'] == true,
+                    )
+                    .length;
+            _rejectedLots =
+                lots
+                    .where(
+                      (lot) => lot['test'] == true && lot['status'] == false,
+                    )
+                    .length;
+          });
+        } catch (e) {
+          debugPrint('Erreur lors du chargement des lots: $e');
+          setState(() {
+            _pendingLots = 0;
+            _approvedLots = 0;
+            _rejectedLots = 0;
+          });
+        }
       }
     }
   }
@@ -50,9 +68,9 @@ class _VitirinaireScreenState extends State<VitirinaireScreen> {
   Future<void> _logout() async {
     await AuthService().logout();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   @override
@@ -83,9 +101,8 @@ class _VitirinaireScreenState extends State<VitirinaireScreen> {
                     children: [
                       Text(
                         'Bienvenue, $_userName',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -97,7 +114,7 @@ class _VitirinaireScreenState extends State<VitirinaireScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Main actions
               _buildActionCard(
                 context,
@@ -107,18 +124,20 @@ class _VitirinaireScreenState extends State<VitirinaireScreen> {
                 count: _pendingLots,
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PendingLotsScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const PendingLotsScreen(),
+                    ),
                   );
                 },
               ),
               const SizedBox(height: 24),
-              
+
               // Statistics
               Text(
                 'Statistiques',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               Row(
@@ -155,13 +174,13 @@ class _VitirinaireScreenState extends State<VitirinaireScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-              
+
               // Recent activity
               Text(
                 'Activité récente',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               _buildRecentActivityList(),
@@ -256,11 +275,7 @@ class _VitirinaireScreenState extends State<VitirinaireScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Icon(
-              icon,
-              size: 32,
-              color: color,
-            ),
+            Icon(icon, size: 32, color: color),
             const SizedBox(height: 8),
             Text(
               value,
@@ -327,10 +342,7 @@ class _VitirinaireScreenState extends State<VitirinaireScreen> {
             trailing: Chip(
               label: Text(
                 activity['status'] as String,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 12),
               ),
               backgroundColor: activity['color'] as Color,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),

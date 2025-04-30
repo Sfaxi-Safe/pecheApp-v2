@@ -6,13 +6,13 @@ import 'pending_lots_screen.dart';
 import 'active_auctions_screen.dart';
 
 class MaryeurDashboardScreen extends StatefulWidget {
-  const MaryeurDashboardScreen({Key? key}) : super(key: key);
+  const MaryeurDashboardScreen({super.key});
 
   @override
-  _MaryeurDashboardScreenState createState() => _MaryeurDashboardScreenState();
+  State<MaryeurDashboardScreen> createState() => MaryeurDashboardScreenState();
 }
 
-class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
+class MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
   String _userName = '';
   int _pendingLots = 0;
   int _activeAuctions = 0;
@@ -32,20 +32,21 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
       });
 
       // Load statistics
-      if (user.id != null) {
-        try {
-          final stats = await ApiService.instance.getMaryeurStats(user.id!);
-          setState(() {
-            _pendingLots = stats['pendingLots'] ?? 0;
-            _activeAuctions = stats['activeAuctions'] ?? 0;
-            _completedAuctions = stats['completedAuctions'] ?? 0;
-          });
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Erreur lors du chargement des statistiques')),
-            );
-          }
+      try {
+        final stats = await ApiService.instance.getMaryeurStats(user.id);
+        setState(() {
+          _pendingLots = stats['pendingLots'] ?? 0;
+          _activeAuctions = stats['activeAuctions'] ?? 0;
+          _completedAuctions = stats['completedAuctions'] ?? 0;
+        });
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erreur lors du chargement des statistiques'),
+            ),
+          );
+        }
       }
     }
   }
@@ -223,7 +224,7 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withOpacity(0.1),
+                      color: Theme.of(context).primaryColor.withAlpha(25),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(

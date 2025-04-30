@@ -1,7 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../services/database_helper.dart';
+import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/image_service.dart';
 
 class ActiveAuctionsScreen extends StatefulWidget {
   const ActiveAuctionsScreen({Key? key}) : super(key: key);
@@ -34,17 +34,25 @@ class _ActiveAuctionsScreenState extends State<ActiveAuctionsScreen> {
       }
 
       if (user.id != null) {
-        final lots = await DatabaseHelper.instance.getLotsByMaryeurId(user.id!);
+        try {
+          final response = await ApiService.instance.get(
+            'auctions/maryeur/${user.id}',
+          );
+          final lots = List<Map<String, dynamic>>.from(response['data']);
 
-        setState(() {
-          _activeAuctions =
-              lots
-                  .where(
-                    (lot) => lot['prixinitial'] != null && lot['vendre'] == 0,
-                  )
-                  .toList();
-          _isLoading = false;
-        });
+          setState(() {
+            _activeAuctions =
+                lots
+                    .where(
+                      (lot) =>
+                          lot['prixInitial'] != null && lot['vendu'] == false,
+                    )
+                    .toList();
+            _isLoading = false;
+          });
+        } catch (e) {
+          throw Exception('Erreur lors de la récupération des enchères: $e');
+        }
       } else {
         setState(() {
           _activeAuctions = [];
@@ -139,9 +147,11 @@ class _ActiveAuctionsScreenState extends State<ActiveAuctionsScreen> {
                             color: Colors.grey[300],
                             child:
                                 auction['photo'] != null &&
-                                        File(auction['photo']).existsSync()
-                                    ? Image.file(
-                                      File(auction['photo']),
+                                        auction['photo'].toString().isNotEmpty
+                                    ? Image.network(
+                                      ImageService.instance.getImageUrl(
+                                        auction['photo'],
+                                      ),
                                       fit: BoxFit.cover,
                                       errorBuilder: (
                                         context,

@@ -1,21 +1,21 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:seatrace/services/auth_service.dart';
 import 'package:seatrace/services/api_service.dart';
+import 'package:seatrace/services/image_service.dart';
 import 'package:seatrace/utils/validators.dart';
 import 'package:seatrace/screens/login_screen.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  const ProfileScreen({super.key});
 
   @override
-  _ProfileScreenState createState() => _ProfileScreenState();
+  State<ProfileScreen> createState() => ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class ProfileScreenState extends State<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _nomController = TextEditingController();
@@ -81,8 +81,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _userType = 'Client';
       }
 
+      // Utiliser une variable locale pour éviter les problèmes de null-safety
       if (userData != null) {
-        // Utiliser une variable locale pour éviter les problèmes de null-safety
         final Map<String, dynamic> data = userData;
 
         setState(() {
@@ -121,12 +121,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
       if (pickedFile != null) {
-        // Copier l'image dans le répertoire de l'application
-        final appDir = await getApplicationDocumentsDirectory();
-        final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final savedImage = File(path.join(appDir.path, fileName));
+        // Télécharger l'image sur le serveur
+        final imageFile = File(pickedFile.path);
+        final imageUrl = await ImageService.instance.uploadImage(imageFile);
 
-        await File(pickedFile.path).copy(savedImage.path);
+        if (imageUrl == null) {
+          throw Exception('Échec du téléchargement de l\'image');
+        }
 
         // Mettre à jour le chemin de la photo dans la base de données
         final user = await AuthService().getCurrentUser();
@@ -134,7 +135,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           throw Exception('Utilisateur non connecté');
         }
 
-        final updatedData = {'id': user.id, 'photo': savedImage.path};
+        final updatedData = {'id': user.id, 'photo': imageUrl};
 
         String endpoint = '';
         if (user.isPecheur()) {
@@ -229,15 +230,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 : int.tryParse(_telephoneController.text),
       };
 
+      String endpoint = '';
       if (user.isPecheur()) {
-        await DatabaseHelper.instance.updatePecheur(updatedData);
+        endpoint = 'pecheurs/${user.id}';
       } else if (user.isVeterinaire()) {
-        await DatabaseHelper.instance.updateVitirinaire(updatedData);
+        endpoint = 'veterinaires/${user.id}';
       } else if (user.isMaryeur()) {
-        await DatabaseHelper.instance.updateMaryeur(updatedData);
+        endpoint = 'maryeurs/${user.id}';
       } else {
-        await DatabaseHelper.instance.updateUser(updatedData);
+        endpoint = 'users/${user.id}';
       }
+
+      await ApiService.instance.put(endpoint, updatedData);
 
       // Mettre à jour les données de l'utilisateur en session
       await AuthService().refreshCurrentUser();
@@ -405,17 +409,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       radius: 60,
                                       backgroundColor: Theme.of(
                                         context,
-                                      ).primaryColor.withOpacity(0.1),
+                                      ).primaryColor.withAlpha(25),
                                       backgroundImage:
                                           _photoPath != null &&
-                                                  File(_photoPath!).existsSync()
-                                              ? FileImage(File(_photoPath!))
+                                                  _photoPath!.isNotEmpty
+                                              ? NetworkImage(
+                                                ImageService.instance
+                                                    .getImageUrl(_photoPath!),
+                                              )
                                               : null,
                                       child:
                                           _photoPath == null ||
-                                                  !File(
-                                                    _photoPath!,
-                                                  ).existsSync()
+                                                  _photoPath!.isEmpty
                                               ? Text(
                                                 _getInitials(),
                                                 style: const TextStyle(
@@ -480,7 +485,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 decoration: BoxDecoration(
                                   color: Theme.of(
                                     context,
-                                  ).primaryColor.withOpacity(0.1),
+                                  ).primaryColor.withAlpha(25),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
@@ -502,7 +507,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
+                            color: Colors.green.withAlpha(25),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: Colors.green),
                           ),
@@ -529,7 +534,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
+                            color: Colors.red.withAlpha(25),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: Colors.red),
                           ),

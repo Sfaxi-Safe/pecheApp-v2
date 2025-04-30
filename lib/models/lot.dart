@@ -1,112 +1,140 @@
 class Lot {
-  final String? id;
-  final String? rfidId;
-  final String? vitirinaireId;
-  final String? identifiant;
+  final String id;
+  final String identifiant;
   final String? photo;
-  final String? quantite;
-  final String? poid;
-  final String? espece;
-  final String? temperature;
-  final String? prixinitial;
-  final String? prixminimal;
-  final String? prixfinale;
-  final String? datetest;
-  final bool? test;
-  final bool? status;
-  final bool? vendre;
-  final int? priseId;
-  final int? userId;
-  final String? datesoumettre;
-  final String? poidestimatif;
-  final String? typeenchere;
-  final String? current;
-  final String? online;
-  final bool? isProduit;
+  final int quantite;
+  final double poids;
+  final String espece;
+  final double temperature;
+  final String dateTest;
+  final bool test;
+  final bool status;
+  final bool vendu;
+  final String priseId;
+  final String userId;
+  final String dateSoumission;
+  final bool isProduit;
+  final double? prixInitial;
+  final double? prixMinimal;
+  final double? prixFinal;
+  final String? acheteurId;
 
   Lot({
-    this.id,
-    this.rfidId,
-    this.vitirinaireId,
-    this.identifiant,
+    required this.id,
+    required this.identifiant,
     this.photo,
-    this.quantite,
-    this.poid,
-    this.espece,
-    this.temperature,
-    this.prixinitial,
-    this.prixminimal,
-    this.prixfinale,
-    this.datetest,
-    this.test,
-    this.status,
-    this.vendre,
-    this.priseId,
-    this.userId,
-    this.datesoumettre,
-    this.poidestimatif,
-    this.typeenchere,
-    this.current,
-    this.online,
-    this.isProduit,
+    required this.quantite,
+    required this.poids,
+    required this.espece,
+    required this.temperature,
+    required this.dateTest,
+    required this.test,
+    required this.status,
+    required this.vendu,
+    required this.priseId,
+    required this.userId,
+    required this.dateSoumission,
+    required this.isProduit,
+    this.prixInitial,
+    this.prixMinimal,
+    this.prixFinal,
+    this.acheteurId,
   });
 
   factory Lot.fromMap(Map<String, dynamic> map) {
     return Lot(
-      id: map['_id']?.toString(),
-      rfidId: map['rfid_id']?.toString(),
-      vitirinaireId: map['vitirinaire_id']?.toString(),
-      identifiant: map['identifiant'],
+      id: map['_id']?.toString() ?? map['id']?.toString() ?? '',
+      identifiant: map['identifiant'] ?? '',
       photo: map['photo'],
-      quantite: map['quantite'],
-      poid: map['poid'],
-      espece: map['espece'],
-      temperature: map['temperature'],
-      prixinitial: map['prixinitial'],
-      prixminimal: map['prixminimal'],
-      prixfinale: map['prixfinale'],
-      datetest: map['datetest'],
-      test: map['test'] == 1,
-      status: map['status'] == 1,
-      vendre: map['vendre'] == 1,
-      priseId: map['prise_id'],
-      userId: map['user_id'],
-      datesoumettre: map['datesoumettre'],
-      poidestimatif: map['poidestimatif'],
-      typeenchere: map['typeenchere'],
-      current: map['current'],
-      online: map['online'],
-      isProduit: map['is_produit'] == 1,
+      quantite: _parseInt(map['quantite']) ?? 0,
+      poids: _parseDouble(map['poids'] ?? map['poid']) ?? 0.0,
+      espece: map['espece'] ?? '',
+      temperature: _parseDouble(map['temperature']) ?? 0.0,
+      dateTest: map['dateTest'] ?? map['datetest'] ?? '',
+      test: _parseBool(map['test']),
+      status: _parseBool(map['status']),
+      vendu: _parseBool(map['vendu'] ?? map['vendre']),
+      priseId:
+          map['prise']?.toString() ??
+          map['priseId']?.toString() ??
+          map['prise_id']?.toString() ??
+          '',
+      userId:
+          map['user']?.toString() ??
+          map['userId']?.toString() ??
+          map['user_id']?.toString() ??
+          '',
+      dateSoumission: map['dateSoumission'] ?? map['datesoumettre'] ?? '',
+      isProduit: _parseBool(map['isProduit'] ?? map['is_produit']),
+      prixInitial: _parseDouble(map['prixInitial'] ?? map['prixinitial']),
+      prixMinimal: _parseDouble(map['prixMinimal'] ?? map['prixminimal']),
+      prixFinal: _parseDouble(map['prixFinal'] ?? map['prixfinale']),
+      acheteurId: map['acheteur']?.toString() ?? map['acheteurId']?.toString(),
     );
   }
 
   Map<String, dynamic> toMap() {
-    final map = {
+    return {
       'id': id,
-      'rfid_id': rfidId,
-      'vitirinaire_id': vitirinaireId,
       'identifiant': identifiant,
       'photo': photo,
       'quantite': quantite,
-      'poid': poid,
+      'poids': poids,
       'espece': espece,
       'temperature': temperature,
-      'prixinitial': prixinitial,
-      'prixminimal': prixminimal,
-      'prixfinale': prixfinale,
-      'datetest': datetest,
-      'test': test == true ? 1 : 0,
-      'status': status == true ? 1 : 0,
-      'vendre': vendre == true ? 1 : 0,
-      'prise_id': priseId,
-      'user_id': userId,
-      'datesoumettre': datesoumettre,
-      'poidestimatif': poidestimatif,
-      'typeenchere': typeenchere,
-      'current': current,
-      'online': online,
-      'is_produit': isProduit == true ? 1 : 0,
+      'dateTest': dateTest,
+      'test': test,
+      'status': status,
+      'vendu': vendu,
+      'prise': priseId,
+      'user': userId,
+      'dateSoumission': dateSoumission,
+      'isProduit': isProduit,
+      'prixInitial': prixInitial,
+      'prixMinimal': prixMinimal,
+      'prixFinal': prixFinal,
+      'acheteur': acheteurId,
     };
-    return map;
+  }
+
+  /// Convertit une valeur en double
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) {
+      try {
+        return double.parse(value);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /// Convertit une valeur en int
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) {
+      try {
+        return int.parse(value);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /// Convertit une valeur en bool
+  static bool _parseBool(dynamic value) {
+    if (value == null) return false;
+    if (value is bool) return value;
+    if (value is int) return value == 1;
+    if (value is String) {
+      return value.toLowerCase() == 'true' || value == '1';
+    }
+    return false;
   }
 }

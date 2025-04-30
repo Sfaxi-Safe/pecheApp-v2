@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:seatrace/models/espece.dart';
-import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/services/auth_service.dart';
+import 'package:seatrace/services/image_service.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
-
 
 class FishDetailsScreen extends StatefulWidget {
   final File imageFile;
@@ -28,7 +28,7 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
   final _temperatureController = TextEditingController();
   final _enginController = TextEditingController();
   final _zoneController = TextEditingController();
-  
+
   String? _latitude;
   String? _longitude;
   bool _isLoading = false;
@@ -65,14 +65,14 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
           throw Exception('Location permissions are denied');
         }
       }
-      
+
       if (permission == LocationPermission.deniedForever) {
         throw Exception('Location permissions are permanently denied');
       }
 
       // Get current position
       final position = await Geolocator.getCurrentPosition();
-      
+
       setState(() {
         _latitude = position.latitude.toString();
         _longitude = position.longitude.toString();
@@ -103,45 +103,52 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
       // Create a new prise (catch)
       final now = DateTime.now();
       final dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
-      
-      final priseId = await DatabaseHelper.instance.insert(
-        'marketplace_prise',
-        {
-          'pecheur_id': user.id,
-          'nom': 'Prise du ${DateFormat('dd/MM/yyyy').format(now)}',
-          'debut': dateFormat.format(now.subtract(const Duration(hours: 2))),
-          'fin': dateFormat.format(now),
-          'latitude': _latitude,
-          'langitude': _longitude,
-          'engin': _enginController.text,
-          'zone': _zoneController.text,
-          'datedebarquement': dateFormat.format(now),
-        },
+
+      // Créer une nouvelle prise via l'API
+      final priseResponse = await ApiService.instance.post('prises', {
+        'pecheur_id': user.id,
+        'nom': 'Prise du ${DateFormat('dd/MM/yyyy').format(now)}',
+        'debut': dateFormat.format(now.subtract(const Duration(hours: 2))),
+        'fin': dateFormat.format(now),
+        'latitude': _latitude,
+        'longitude': _longitude,
+        'engin': _enginController.text,
+        'zone': _zoneController.text,
+        'dateDebarquement': dateFormat.format(now),
+      });
+
+      // Récupérer l'ID de la prise créée
+      final priseId = priseResponse['data']['_id'];
+
+      // Télécharger l'image sur le serveur
+      String? imageUrl = await ImageService.instance.uploadImage(
+        widget.imageFile,
       );
 
-      // Create a new lot
-      final lotId = await DatabaseHelper.instance.insert(
-        'marketplace_lots',
-        {
-          'identifiant': 'LOT-${now.millisecondsSinceEpoch}',
-          'photo': widget.imageFile.path, // In a real app, you'd upload this to a server
-          'quantite': _quantiteController.text,
-          'poid': _poidController.text,
-          'espece': widget.espece.nom,
-          'temperature': _temperatureController.text,
-          'datetest': dateFormat.format(now),
-          'test': 0, // Not tested yet
-          'status': 0, // Not approved yet
-          'vendre': 0, // Not sold yet
-          'prise_id': priseId,
-          'user_id': user.id,
-          'datesoumettre': dateFormat.format(now),
-          'is_produit': 1,
-        },
-      );
+      if (imageUrl == null) {
+        throw Exception('Échec du téléchargement de l\'image');
+      }
+
+      // Créer un nouveau lot via l'API
+      await ApiService.instance.post('lots', {
+        'identifiant': 'LOT-${now.millisecondsSinceEpoch}',
+        'photo': imageUrl,
+        'quantite': int.parse(_quantiteController.text),
+        'poids': double.parse(_poidController.text),
+        'espece': widget.espece.nom,
+        'temperature': double.parse(_temperatureController.text),
+        'dateTest': dateFormat.format(now),
+        'test': false, // Pas encore testé
+        'status': false, // Pas encore approuvé
+        'vendu': false, // Pas encore vendu
+        'prise': priseId,
+        'user': user.id,
+        'dateSoumission': dateFormat.format(now),
+        'isProduit': true,
+      });
 
       if (!mounted) return;
-      
+
       // Show success message and navigate back to dashboard
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -149,7 +156,7 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
           backgroundColor: Colors.green,
         ),
       );
-      
+
       Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       setState(() {
@@ -162,9 +169,7 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Détails du poisson'),
-      ),
+      appBar: AppBar(title: const Text('Détails du poisson')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
@@ -204,7 +209,9 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                               children: [
                                 Text(
                                   widget.espece.nom,
-                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.headlineSmall?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: Theme.of(context).primaryColor,
                                   ),
@@ -212,9 +219,7 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                                 const SizedBox(height: 8),
                                 Text(
                                   'Identification réussie avec notre système d\'IA',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                  ),
+                                  style: TextStyle(color: Colors.grey[600]),
                                 ),
                               ],
                             ),
@@ -226,7 +231,7 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Fish details form
               Card(
                 child: Padding(
@@ -238,12 +243,11 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                       children: [
                         Text(
                           'Informations complémentaires',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Quantity
                         TextFormField(
                           controller: _quantiteController,
@@ -260,7 +264,7 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                           },
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Weight
                         TextFormField(
                           controller: _poidController,
@@ -277,7 +281,7 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                           },
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Temperature
                         TextFormField(
                           controller: _temperatureController,
@@ -294,7 +298,7 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                           },
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Fishing method
                         TextFormField(
                           controller: _enginController,
@@ -310,7 +314,7 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                           },
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Fishing zone
                         TextFormField(
                           controller: _zoneController,
@@ -326,13 +330,12 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                           },
                         ),
                         const SizedBox(height: 24),
-                        
+
                         // Location
                         Text(
                           'Localisation',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
                         if (_latitude != null && _longitude != null) ...[
@@ -352,11 +355,13 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                           ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
-                          onPressed: _isGettingLocation ? null : _getCurrentLocation,
+                          onPressed:
+                              _isGettingLocation ? null : _getCurrentLocation,
                           icon: const Icon(Icons.location_on),
-                          label: _isGettingLocation
-                              ? const Text('Récupération...')
-                              : const Text('Obtenir ma position actuelle'),
+                          label:
+                              _isGettingLocation
+                                  ? const Text('Récupération...')
+                                  : const Text('Obtenir ma position actuelle'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue[700],
                           ),
@@ -366,7 +371,7 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                   ),
                 ),
               ),
-              
+
               if (_errorMessage != null) ...[
                 const SizedBox(height: 16),
                 Text(
@@ -376,30 +381,31 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                 ),
               ],
               const SizedBox(height: 24),
-              
+
               // Save button
               ElevatedButton(
                 onPressed: _isLoading ? null : _saveFishData,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: _isLoading
-                    ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+                child:
+                    _isLoading
+                        ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                          SizedBox(width: 12),
-                          Text('Enregistrement...'),
-                        ],
-                      )
-                    : const Text('Enregistrer et soumettre'),
+                            SizedBox(width: 12),
+                            Text('Enregistrement...'),
+                          ],
+                        )
+                        : const Text('Enregistrer et soumettre'),
               ),
             ],
           ),
