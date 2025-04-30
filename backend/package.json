@@ -4,8 +4,8 @@
   "description": "Backend pour l'application de marché aux poissons",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "start": "node ./src/index.js",
+    "dev": "nodemon ./src/index.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

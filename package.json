@@ -1,0 +1,9 @@
+{
+  "name": "peche-app",
+  "version": "1.0.0",
+  "description": "Application de marché aux poissons",
+  "scripts": {
+    "start:backend": "cd backend && node ./src/index.js",
+    "dev:backend": "cd backend && nodemon ./src/index.js"
+  }
+}

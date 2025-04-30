@@ -28,10 +28,10 @@ veterinaireSchema.pre('save', async function(next) {
   next();
 });
 
-// Ajouter automatiquement le rôle VETERINAIRE
+// Ajouter automatiquement le rôle ROLE_VETERINAIRE
 veterinaireSchema.pre('save', function(next) {
-  if (!this.roles.includes('VETERINAIRE')) {
-    this.roles = [...new Set([...this.roles.split(','), 'VETERINAIRE'])].join(',');
+  if (!this.roles.includes('ROLE_VETERINAIRE')) {
+    this.roles.push('ROLE_VETERINAIRE');
   }
   next();
 });

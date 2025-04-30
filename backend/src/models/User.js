@@ -11,10 +11,16 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     validate: [validator.isEmail, 'Email invalide']
   },
-  role: {
-    type: String,
+  roles: {
+    type: [String],
     required: true,
-    enum: ['admin', 'pecheur', 'maryeur', 'vitirinaire']
+    validate: {
+      validator: function(v) {
+        return v.every(role => ['ROLE_ADMIN', 'ROLE_CLIENT', 'ROLE_PECHEUR', 'ROLE_MARYEUR', 'ROLE_VETERINAIRE'].includes(role));
+      },
+      message: props => `${props.value} contient un rôle invalide`
+    },
+    default: ['ROLE_CLIENT']
   },
   password: {
     type: String,
