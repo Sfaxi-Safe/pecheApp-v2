@@ -15,6 +15,7 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
   File? _imageFile;
   bool _isAnalyzing = false;
   String? _errorMessage;
+  bool _useOnlineApi = true; // Par défaut, utiliser l'API en ligne
   final FishRecognitionService _recognitionService = FishRecognitionService();
 
   @override
@@ -54,17 +55,29 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
     });
 
     try {
+      // Configurer le service de reconnaissance pour utiliser l'API en ligne ou le modèle local
+      _recognitionService.setPreferOnlineRecognition(_useOnlineApi);
+
+      // Afficher un message indiquant la méthode utilisée
+      final String methodMessage =
+          _useOnlineApi
+              ? 'Analyse avec Google Cloud Vision API...'
+              : 'Analyse avec le modèle local...';
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(methodMessage)));
+
       final espece = await _recognitionService.recognizeFish(_imageFile!);
-      
+
       if (!mounted) return;
-      
+
       if (espece != null) {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => FishDetailsScreen(
-              imageFile: _imageFile!,
-              espece: espece,
-            ),
+            builder:
+                (_) =>
+                    FishDetailsScreen(imageFile: _imageFile!, espece: espece),
           ),
         );
       } else {
@@ -84,9 +97,7 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Scanner un poisson'),
-      ),
+      appBar: AppBar(title: const Text('Scanner un poisson')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
@@ -111,28 +122,31 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
                         context,
                         number: '1',
                         title: 'Prendre une photo',
-                        description: 'Prenez une photo claire du poisson ou importez-en une depuis votre galerie.',
+                        description:
+                            'Prenez une photo claire du poisson ou importez-en une depuis votre galerie.',
                       ),
                       const SizedBox(height: 12),
                       _buildInstructionStep(
                         context,
                         number: '2',
                         title: 'Analyser',
-                        description: 'Notre IA identifiera automatiquement l\'espèce de poisson.',
+                        description:
+                            'Notre IA identifiera automatiquement l\'espèce de poisson.',
                       ),
                       const SizedBox(height: 12),
                       _buildInstructionStep(
                         context,
                         number: '3',
                         title: 'Ajouter les détails',
-                        description: 'Complétez les informations sur votre capture pour l\'enregistrer.',
+                        description:
+                            'Complétez les informations sur votre capture pour l\'enregistrer.',
                       ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Image preview
               Container(
                 height: 300,
@@ -141,35 +155,36 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.grey[300]!),
                 ),
-                child: _imageFile != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.file(
-                          _imageFile!,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                        ),
-                      )
-                    : Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.image,
-                              size: 80,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Aucune image sélectionnée',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 16,
+                child:
+                    _imageFile != null
+                        ? ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(
+                            _imageFile!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                          ),
+                        )
+                        : Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.image,
+                                size: 80,
+                                color: Colors.grey[400],
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 16),
+                              Text(
+                                'Aucune image sélectionnée',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
               ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 16),
@@ -180,13 +195,16 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
                 ),
               ],
               const SizedBox(height: 24),
-              
+
               // Image source buttons
               Row(
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: _isAnalyzing ? null : () => _getImage(ImageSource.camera),
+                      onPressed:
+                          _isAnalyzing
+                              ? null
+                              : () => _getImage(ImageSource.camera),
                       icon: const Icon(Icons.camera_alt),
                       label: const Text('Appareil photo'),
                       style: ElevatedButton.styleFrom(
@@ -197,7 +215,10 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _isAnalyzing ? null : () => _getImage(ImageSource.gallery),
+                      onPressed:
+                          _isAnalyzing
+                              ? null
+                              : () => _getImage(ImageSource.gallery),
                       icon: const Icon(Icons.photo_library),
                       label: const Text('Galerie'),
                       style: OutlinedButton.styleFrom(
@@ -208,7 +229,48 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-              
+
+              // API selection
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Méthode d\'analyse',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        title: const Text('Utiliser Google Cloud Vision API'),
+                        subtitle: Text(
+                          _useOnlineApi
+                              ? 'Analyse en ligne (plus précise, nécessite une connexion internet)'
+                              : 'Analyse locale (fonctionne hors ligne)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        value: _useOnlineApi,
+                        onChanged: (value) {
+                          setState(() {
+                            _useOnlineApi = value;
+                          });
+                        },
+                        secondary: Icon(
+                          _useOnlineApi ? Icons.cloud : Icons.phone_android,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
               // Analyze button
               ElevatedButton(
                 onPressed: _isAnalyzing ? null : _analyzeImage,
@@ -216,23 +278,24 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   backgroundColor: Theme.of(context).primaryColor,
                 ),
-                child: _isAnalyzing
-                    ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+                child:
+                    _isAnalyzing
+                        ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                          SizedBox(width: 12),
-                          Text('Analyse en cours...'),
-                        ],
-                      )
-                    : const Text('Analyser l\'image'),
+                            SizedBox(width: 12),
+                            Text('Analyse en cours...'),
+                          ],
+                        )
+                        : const Text('Analyser l\'image'),
               ),
             ],
           ),
@@ -280,12 +343,7 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                description,
-                style: TextStyle(
-                  color: Colors.grey[600],
-                ),
-              ),
+              Text(description, style: TextStyle(color: Colors.grey[600])),
             ],
           ),
         ),

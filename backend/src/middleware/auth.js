@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Pecheur = require('../models/Pecheur');
-const Vitirinaire = require('../models/Vitirinaire');
+const Veterinaire = require('../models/Veterinaire');
 const Maryeur = require('../models/Maryeur');
 
 const auth = async (req, res, next) => {
@@ -20,7 +20,7 @@ const auth = async (req, res, next) => {
     } else if (decoded.roles.includes('ROLE_PECHEUR')) {
       user = await Pecheur.findById(decoded._id);
     } else if (decoded.roles.includes('ROLE_VETERINAIRE')) {
-      user = await Vitirinaire.findById(decoded._id);
+      user = await Veterinaire.findById(decoded._id);
     } else if (decoded.roles.includes('ROLE_MARYEUR')) {
       user = await Maryeur.findById(decoded._id);
     }

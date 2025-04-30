@@ -64,8 +64,13 @@ class AuctionDetailScreenState extends State<AuctionDetailScreen> {
 
       // Charger les détails du vétérinaire
       Map<String, dynamic>? veterinaire;
-      if (auction['vitirinaire_id'] != null) {
-        veterinaire = await ApiService.instance.getVitirinaireDetails(
+      if (auction['veterinaire_id'] != null) {
+        veterinaire = await ApiService.instance.getVeterinaireDetails(
+          auction['veterinaire_id'],
+        );
+      } else if (auction['vitirinaire_id'] != null) {
+        // Compatibilité avec les anciennes données
+        veterinaire = await ApiService.instance.getVeterinaireDetails(
           auction['vitirinaire_id'],
         );
       }

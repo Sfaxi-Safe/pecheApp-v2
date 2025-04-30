@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:seatrace/services/auth_service.dart';
 import 'package:seatrace/screens/login_screen.dart';
 import 'package:seatrace/services/api_service.dart';
-import 'package:seatrace/screens/vitirinaire/pending_lots_screen.dart';
+import 'package:seatrace/screens/veterinaire/pending_lots_screen.dart';
 
-class VitirinaireScreen extends StatefulWidget {
-  const VitirinaireScreen({Key? key}) : super(key: key);
+class VeterinaireScreen extends StatefulWidget {
+  const VeterinaireScreen({Key? key}) : super(key: key);
 
   @override
-  _VitirinaireScreenState createState() => _VitirinaireScreenState();
+  _VeterinaireScreenState createState() => _VeterinaireScreenState();
 }
 
-class _VitirinaireScreenState extends State<VitirinaireScreen> {
+class _VeterinaireScreenState extends State<VeterinaireScreen> {
   String _userName = '';
   int _pendingLots = 0;
   int _approvedLots = 0;
@@ -31,36 +31,34 @@ class _VitirinaireScreenState extends State<VitirinaireScreen> {
       });
 
       // Load statistics
-      if (user.id != null) {
-        try {
-          final response = await ApiService.instance.get(
-            'lots/veterinaire/${user.id}',
-          );
-          final lots = List<Map<String, dynamic>>.from(response['data']);
+      try {
+        final response = await ApiService.instance.get(
+          'lots/veterinaire/${user.id}',
+        );
+        final lots = List<Map<String, dynamic>>.from(response['data']);
 
-          setState(() {
-            _pendingLots = lots.where((lot) => lot['test'] == false).length;
-            _approvedLots =
-                lots
-                    .where(
-                      (lot) => lot['test'] == true && lot['status'] == true,
-                    )
-                    .length;
-            _rejectedLots =
-                lots
-                    .where(
-                      (lot) => lot['test'] == true && lot['status'] == false,
-                    )
-                    .length;
-          });
-        } catch (e) {
-          debugPrint('Erreur lors du chargement des lots: $e');
-          setState(() {
-            _pendingLots = 0;
-            _approvedLots = 0;
-            _rejectedLots = 0;
-          });
-        }
+        setState(() {
+          _pendingLots = lots.where((lot) => lot['test'] == false).length;
+          _approvedLots =
+              lots
+                  .where(
+                    (lot) => lot['test'] == true && lot['status'] == true,
+                  )
+                  .length;
+          _rejectedLots =
+              lots
+                  .where(
+                    (lot) => lot['test'] == true && lot['status'] == false,
+                  )
+                  .length;
+        });
+      } catch (e) {
+        debugPrint('Erreur lors du chargement des lots: $e');
+        setState(() {
+          _pendingLots = 0;
+          _approvedLots = 0;
+          _rejectedLots = 0;
+        });
       }
     }
   }

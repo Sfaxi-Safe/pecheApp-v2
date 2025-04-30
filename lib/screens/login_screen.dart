@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:seatrace/services/auth_service.dart';
 import 'package:seatrace/screens/pecheur/dashboard_screen.dart';
-import 'package:seatrace/screens/vitirinaire/dashboard_screen.dart';
+import 'package:seatrace/screens/veterinaire/dashboard_screen.dart';
 import 'package:seatrace/screens/maryeur/dashboard_screen.dart';
 import 'package:seatrace/screens/client/dashboard_screen.dart';
 import 'package:seatrace/screens/signup_screen.dart';
@@ -62,7 +62,7 @@ class LoginScreenState extends State<LoginScreen> {
         );
       } else if (user.isVeterinaire()) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const VitirinaireScreen()),
+          MaterialPageRoute(builder: (_) => const VeterinaireScreen()),
         );
       } else if (user.isMaryeur()) {
         Navigator.of(context).pushReplacement(

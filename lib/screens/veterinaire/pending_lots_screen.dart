@@ -30,19 +30,15 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
 
     try {
       final user = await AuthService().getCurrentUser();
-      if (user == null || !user.isVeterinaire()) {
+      if (user == null) {
         throw Exception('Utilisateur non autorisé');
       }
 
-      if (user.id != null) {
-        try {
-          final response = await ApiService.instance.get('lots/pending');
-          _pendingLots = List<Map<String, dynamic>>.from(response['data']);
-        } catch (e) {
-          throw Exception('Erreur lors de la récupération des lots: $e');
-        }
-      } else {
-        _pendingLots = [];
+      try {
+        final response = await ApiService.instance.get('lots/pending');
+        _pendingLots = List<Map<String, dynamic>>.from(response['data']);
+      } catch (e) {
+        throw Exception('Erreur lors de la récupération des lots: $e');
       }
 
       setState(() {
@@ -56,17 +52,17 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
     }
   }
 
-  Future<void> _approveLot(int lotId) async {
+  Future<void> _approveLot(String lotId) async {
     try {
       final user = await AuthService().getCurrentUser();
-      if (user == null || !user.isVeterinaire() || user.id == null) {
+      if (user == null) {
         throw Exception('Utilisateur non autorisé');
       }
 
       await ApiService.instance.put('lots/$lotId/approve', {
         'test': true,
         'status': true,
-        'veterinaire_id': user.id,
+        'veterinaire': user.id,
       });
 
       // Refresh the list
@@ -90,17 +86,17 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
     }
   }
 
-  Future<void> _rejectLot(int lotId) async {
+  Future<void> _rejectLot(String lotId) async {
     try {
       final user = await AuthService().getCurrentUser();
-      if (user == null || !user.isVeterinaire() || user.id == null) {
+      if (user == null) {
         throw Exception('Utilisateur non autorisé');
       }
 
       await ApiService.instance.put('lots/$lotId/reject', {
         'test': true,
         'status': false,
-        'veterinaire_id': user.id,
+        'veterinaire': user.id,
       });
 
       // Refresh the list
@@ -205,8 +201,8 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
   Widget _buildLotCard(BuildContext context, Map<String, dynamic> lot) {
     final espece = lot['espece'] ?? 'Inconnu';
     final date =
-        lot['datetest'] != null
-            ? DateFormat('dd/MM/yyyy').format(DateTime.parse(lot['datetest']))
+        lot['dateTest'] != null
+            ? DateFormat('dd/MM/yyyy').format(DateTime.parse(lot['dateTest']))
             : 'Date inconnue';
     final photoPath = lot['photo'];
 
@@ -226,12 +222,24 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
                   bottomLeft: Radius.circular(12),
                 ),
                 child:
-                    photoPath != null && File(photoPath).existsSync()
-                        ? Image.file(
-                          File(photoPath),
+                    photoPath != null && photoPath.isNotEmpty
+                        ? Image.network(
+                          ApiService.instance.getImageUrl(photoPath),
                           width: 120,
                           height: 120,
                           fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 120,
+                              height: 120,
+                              color: Colors.grey[300],
+                              child: Icon(
+                                Icons.image_not_supported,
+                                size: 40,
+                                color: Colors.grey[500],
+                              ),
+                            );
+                          },
                         )
                         : Container(
                           width: 120,
@@ -268,7 +276,7 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Quantité: ${lot['quantite'] ?? 'N/A'} | Poids: ${lot['poid'] ?? 'N/A'} kg',
+                        'Quantité: ${lot['quantite'] ?? 'N/A'} | Poids: ${lot['poids'] ?? 'N/A'} kg',
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 4),
@@ -344,30 +352,41 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (lot['photo'] != null &&
-                      File(lot['photo']).existsSync()) ...[
+                  if (lot['photo'] != null && lot['photo'].isNotEmpty) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(lot['photo']),
+                      child: Image.network(
+                        ApiService.instance.getImageUrl(lot['photo']),
                         width: double.infinity,
                         height: 200,
                         fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: double.infinity,
+                            height: 200,
+                            color: Colors.grey[300],
+                            child: Icon(
+                              Icons.image_not_supported,
+                              size: 40,
+                              color: Colors.grey[500],
+                            ),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 16),
                   ],
                   _buildDetailItem('Identifiant', lot['identifiant'] ?? 'N/A'),
                   _buildDetailItem('Espèce', lot['espece'] ?? 'N/A'),
-                  _buildDetailItem('Quantité', lot['quantite'] ?? 'N/A'),
-                  _buildDetailItem('Poids', '${lot['poid'] ?? 'N/A'} kg'),
+                  _buildDetailItem('Quantité', lot['quantite']?.toString() ?? 'N/A'),
+                  _buildDetailItem('Poids', '${lot['poids'] ?? 'N/A'} kg'),
                   _buildDetailItem(
                     'Température',
                     '${lot['temperature'] ?? 'N/A'} °C',
                   ),
                   _buildDetailItem(
                     'Date de soumission',
-                    lot['datesoumettre'] ?? 'N/A',
+                    lot['dateSoumission'] ?? 'N/A',
                   ),
 
                   const SizedBox(height: 16),

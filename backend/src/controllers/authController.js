@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Pecheur = require('../models/Pecheur');
-const Vitirinaire = require('../models/Vitirinaire');
+const Veterinaire = require('../models/Veterinaire');
 const Maryeur = require('../models/Maryeur');
 const {
   NotFoundError,
@@ -28,7 +28,7 @@ const register = async (req, res) => {
     const emailExists = await Promise.all([
       User.findOne({ email }),
       Pecheur.findOne({ email }),
-      Vitirinaire.findOne({ email }),
+      Veterinaire.findOne({ email }),
       Maryeur.findOne({ email })
     ]);
 
@@ -53,7 +53,7 @@ const register = async (req, res) => {
         user = new Pecheur(userDataWithRole);
         break;
       case 'ROLE_VETERINAIRE':
-        user = new Vitirinaire(userDataWithRole);
+        user = new Veterinaire(userDataWithRole);
         break;
       case 'ROLE_MARYEUR':
         user = new Maryeur(userDataWithRole);
@@ -94,7 +94,7 @@ const login = async (req, res, next) => {
     const userPromises = [
       User.findOne({ email }),
       Pecheur.findOne({ email }),
-      Vitirinaire.findOne({ email }),
+      Veterinaire.findOne({ email }),
       Maryeur.findOne({ email })
     ];
 

@@ -12,7 +12,9 @@ import '../services/dto_service.dart';
 
 class ApiService {
   static final ApiService instance = ApiService._init();
-  final String baseUrl = 'http://localhost:3000/api';
+  // Utilisez l'adresse IP de votre ordinateur au lieu de localhost pour les appareils physiques
+  // Pour les émulateurs Android, utilisez 10.0.2.2 au lieu de localhost
+  final String baseUrl = 'http://10.0.2.2:3000/api';
   String? _authToken;
 
   ApiService._init();
@@ -490,10 +492,26 @@ class ApiService {
     return List<Map<String, dynamic>>.from(response['data']);
   }
 
-  // Alias pour getVeterinaireDetails pour corriger l'erreur d'orthographe
+  // Cette méthode est obsolète, utilisez getVeterinaireDetails à la place
+  @Deprecated(
+    "Cette méthode est obsolète, utilisez getVeterinaireDetails à la place",
+  )
   Future<Map<String, dynamic>> getVitirinaireDetails(
     dynamic veterinaireId,
   ) async {
-    return await get('veterinaires/$veterinaireId');
+    return await getVeterinaireDetails(veterinaireId);
+  }
+
+  // Méthode pour construire l'URL complète d'une image
+  String getImageUrl(String imagePath) {
+    // Si le chemin commence déjà par http, c'est une URL complète
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+
+    // Sinon, construire l'URL complète
+    // Supprimer le slash initial si présent pour éviter les doubles slashes
+    final path = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    return '$baseUrl/images/$path';
   }
 }

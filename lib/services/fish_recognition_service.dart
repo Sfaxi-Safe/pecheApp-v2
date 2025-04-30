@@ -1,9 +1,12 @@
 import 'dart:io';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:seatrace/models/espece.dart';
 import 'package:image/image.dart' as img;
 import 'package:seatrace/services/api_service.dart';
+import 'package:seatrace/services/google_vision_service.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class FishRecognitionService {
   static final FishRecognitionService _instance =
@@ -12,6 +15,7 @@ class FishRecognitionService {
 
   Interpreter? _interpreter;
   bool _isInitialized = false;
+  bool _preferOnlineRecognition = true; // Préférer l'API en ligne si disponible
 
   // Définir les labels des espèces de poissons que le modèle peut reconnaître
   final List<String> _labels = [
@@ -67,6 +71,33 @@ class FishRecognitionService {
   }
 
   Future<Espece?> recognizeFish(File imageFile) async {
+    // Vérifier la connectivité
+    final connectivityResult = await Connectivity().checkConnectivity();
+    final bool hasInternet = connectivityResult != ConnectivityResult.none;
+
+    // Si nous avons une connexion internet et que nous préférons l'API en ligne
+    if (hasInternet && _preferOnlineRecognition) {
+      try {
+        debugPrint(
+          'Utilisation de Google Cloud Vision API pour la reconnaissance',
+        );
+        // Utiliser l'API Google Cloud Vision
+        final espece = await GoogleVisionService.instance.identifyFish(
+          imageFile,
+        );
+        if (espece != null) {
+          return espece;
+        }
+        // Si l'API échoue, utiliser le modèle local comme solution de secours
+        debugPrint('Google Cloud Vision a échoué, utilisation du modèle local');
+      } catch (e) {
+        debugPrint('Erreur avec Google Cloud Vision: $e');
+        // Continuer avec le modèle local en cas d'erreur
+      }
+    }
+
+    // Utiliser le modèle local (TensorFlow Lite)
+    debugPrint('Utilisation du modèle local pour la reconnaissance');
     await initialize();
 
     if (_interpreter == null) {
@@ -103,9 +134,13 @@ class FishRecognitionService {
 
       // Si la probabilité est trop faible, considérer comme non reconnu
       if (maxProb < 0.5) {
-        // Confiance trop faible: $maxProb pour ${_labels[maxIndex]}
+        debugPrint('Confiance trop faible: $maxProb pour ${_labels[maxIndex]}');
         return null;
       }
+
+      debugPrint(
+        'Espèce identifiée localement: ${_labels[maxIndex]} (confiance: ${(maxProb * 100).toStringAsFixed(1)}%)',
+      );
 
       // Récupérer l'espèce correspondante depuis l'API
       try {
@@ -121,7 +156,7 @@ class FishRecognitionService {
         return Espece.fromMap(nouvelleEspece);
       }
     } catch (e) {
-      // Erreur lors de la reconnaissance du poisson: $e
+      debugPrint('Erreur lors de la reconnaissance du poisson: $e');
 
       // En cas d'erreur, essayer de récupérer une espèce aléatoire via l'API
       // comme solution de secours
@@ -132,11 +167,16 @@ class FishRecognitionService {
           return Espece.fromMap(allEspeces[randomIndex]);
         }
       } catch (e) {
-        // Erreur lors de la récupération des espèces: $e
+        debugPrint('Erreur lors de la récupération des espèces: $e');
       }
 
       return null;
     }
+  }
+
+  /// Définit si l'API en ligne doit être préférée au modèle local
+  void setPreferOnlineRecognition(bool prefer) {
+    _preferOnlineRecognition = prefer;
   }
 
   Future<List<List<List<double>>>> _preprocessImage(File imageFile) async {

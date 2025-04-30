@@ -8,12 +8,13 @@ const { v4: uuidv4 } = require('uuid');
 // Import des routes
 const userRoutes = require('./routes/userRoutes');
 const pecheurRoutes = require('./routes/pecheurRoutes');
-const vitirinaireRoutes = require('./routes/vitirinaireRoutes');
+const veterinaireRoutes = require('./routes/veterinaireRoutes');
 const maryeurRoutes = require('./routes/maryeurRoutes');
 const especeRoutes = require('./routes/especeRoutes');
 const priseRoutes = require('./routes/priseRoutes');
 const lotRoutes = require('./routes/lotRoutes');
 const imageRoutes = require('./routes/imageRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
@@ -43,12 +44,13 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/peche_mar
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/pecheurs', pecheurRoutes);
-app.use('/api/vitirinaires', vitirinaireRoutes);
+app.use('/api/veterinaires', veterinaireRoutes);
 app.use('/api/maryeurs', maryeurRoutes);
 app.use('/api/especes', especeRoutes);
 app.use('/api/prises', priseRoutes);
 app.use('/api/lots', lotRoutes);
 app.use('/api/images', imageRoutes);
+app.use('/api/auth', authRoutes);
 
 // Gestion des erreurs
 app.use(errorHandler);

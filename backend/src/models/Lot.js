@@ -5,9 +5,9 @@ const lotSchema = new mongoose.Schema({
     type: String,
     unique: true
   },
-  vitirinaire: {
+  veterinaire: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Vitirinaire'
+    ref: 'Veterinaire'
   },
   identifiant: {
     type: String,
