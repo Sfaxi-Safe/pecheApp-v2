@@ -1,6 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../services/database_helper.dart';
+import '../../services/api_service.dart';
 import 'auction_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {

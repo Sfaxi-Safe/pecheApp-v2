@@ -3,7 +3,7 @@ import 'package:seatrace/services/auth_service.dart';
 import 'package:seatrace/screens/login_screen.dart';
 import 'package:seatrace/screens/pecheur/scan_fish_screen.dart';
 import 'package:seatrace/screens/pecheur/history_screen.dart';
-import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/services/api_service.dart';
 
 class PecheurDashboardScreen extends StatefulWidget {
   const PecheurDashboardScreen({Key? key}) : super(key: key);
@@ -33,12 +33,21 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
 
       // Load statistics
       if (user.id != null) {
-        final lots = await DatabaseHelper.instance.getLotsByPecheurId(user.id!);
-        setState(() {
-          _totalCaptures = lots.length;
-          _pendingValidation = lots.where((lot) => lot['test'] == 0).length;
-          _validated = lots.where((lot) => lot['test'] == 1).length;
-        });
+        try {
+          final stats = await ApiService.instance.getPecheurStats(user.id!);
+          setState(() {
+            _totalCaptures = stats['totalCaptures'] ?? 0;
+            _pendingValidation = stats['pendingValidation'] ?? 0;
+            _validated = stats['validated'] ?? 0;
+          });
+        } catch (e) {
+          // Handle error silently but show user-friendly message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erreur lors du chargement des statistiques'),
+            ),
+          );
+        }
       }
     }
   }
@@ -46,9 +55,9 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
   Future<void> _logout() async {
     await AuthService().logout();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   @override
@@ -79,9 +88,8 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
                     children: [
                       Text(
                         'Bienvenue, $_userName',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -93,7 +101,7 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Main actions
               Row(
                 children: [
@@ -102,10 +110,13 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
                       context,
                       icon: Icons.camera_alt,
                       title: 'Scanner un poisson',
-                      description: 'Identifier et enregistrer une nouvelle capture',
+                      description:
+                          'Identifier et enregistrer une nouvelle capture',
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const ScanFishScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const ScanFishScreen(),
+                          ),
                         );
                       },
                     ),
@@ -119,7 +130,9 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
                       description: 'Consulter vos captures précédentes',
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const HistoryScreen(),
+                          ),
                         );
                       },
                     ),
@@ -127,13 +140,13 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-              
+
               // Statistics
               Text(
                 'Statistiques',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               Row(
@@ -170,13 +183,13 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-              
+
               // Recent activity
               Text(
                 'Activité récente',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               _buildRecentActivityList(),
@@ -203,23 +216,16 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                icon,
-                size: 40,
-                color: Theme.of(context).primaryColor,
-              ),
+              Icon(icon, size: 40, color: Theme.of(context).primaryColor),
               const SizedBox(height: 16),
               Text(
                 title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              Text(
-                description,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+              Text(description, style: Theme.of(context).textTheme.bodyMedium),
             ],
           ),
         ),
@@ -239,11 +245,7 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Icon(
-              icon,
-              size: 32,
-              color: color,
-            ),
+            Icon(icon, size: 32, color: color),
             const SizedBox(height: 8),
             Text(
               value,
@@ -310,10 +312,7 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
             trailing: Chip(
               label: Text(
                 activity['status'] as String,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 12),
               ),
               backgroundColor: activity['color'] as Color,
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 0),

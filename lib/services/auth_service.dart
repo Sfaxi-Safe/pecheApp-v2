@@ -1,9 +1,6 @@
 import 'dart:convert';
 import 'package:seatrace/models/user.dart';
-import 'package:seatrace/models/pecheur.dart';
-import 'package:seatrace/models/vitirinaire.dart';
-import 'package:seatrace/models/maryeur.dart';
-import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
@@ -11,300 +8,105 @@ class AuthService {
   factory AuthService() => _instance;
   AuthService._internal();
 
-  // Clé pour stocker l'utilisateur dans les préférences partagées
   static const String _userKey = 'current_user';
-  
-  // Clé pour stocker le token de vérification d'email
-  static const String _verificationTokenKey = 'email_verification_token';
 
-  // Obtenir l'utilisateur actuellement connecté
+  /// Obtenir l'utilisateur actuel
   Future<User?> getCurrentUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userJson = prefs.getString(_userKey);
-    if (userJson == null) return null;
-    
     try {
-      final userMap = json.decode(userJson);
-      return User.fromMap(userMap);
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      if (token == null) return null;
+
+      ApiService.instance.setAuthToken(token);
+      final response = await ApiService.instance.get('auth/me');
+
+      if (response.containsKey('user')) {
+        return User.fromMap(response['user']);
+      }
     } catch (e) {
-      return null;
+      print('Erreur lors de la récupération de l\'utilisateur: $e');
+      await logout(); // Déconnexion en cas d'erreur
     }
+    return null;
   }
 
-  // Sauvegarder l'utilisateur courant
-  Future<void> saveCurrentUser(User user) async {
+  /// Sauvegarder l'utilisateur actuel
+  Future<void> saveCurrentUser(User updatedUser) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_userKey, json.encode(user.toMap()));
+    await prefs.setString(_userKey, json.encode(updatedUser.toMap()));
   }
 
-  // Déconnexion
+  /// Déconnexion
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userKey);
+    await prefs.remove('auth_token');
+    ApiService.instance.setAuthToken(null);
   }
 
-  // Connexion
+  /// Connexion
   Future<User?> login(String email, String password) async {
-    // Essayer de trouver l'utilisateur dans marketplace_user
-    final userMap = await DatabaseHelper.instance.getUserByEmail(email);
-    if (userMap != null && userMap['password'] == password) {
-      final user = User.fromMap(userMap);
-      
-      // Vérifier si l'utilisateur est vérifié
-      if (!user.isVerified) {
-        throw Exception('Veuillez vérifier votre email avant de vous connecter');
-      }
-      
-      // Vérifier si l'utilisateur est bloqué
-      if (user.isBlocked) {
-        throw Exception('Votre compte a été bloqué. Veuillez contacter l\'administrateur');
-      }
-      
-      await saveCurrentUser(user);
-      return user;
-    }
+    try {
+      final response = await ApiService.instance.post('auth/login', {
+        'email': email,
+        'password': password,
+      });
 
-    // Essayer de trouver l'utilisateur dans marketplace_pecheur
-    final pecheurMap = await DatabaseHelper.instance.getPecheurByEmail(email);
-    if (pecheurMap != null && pecheurMap['password'] == password) {
-      final pecheur = Pecheur.fromMap(pecheurMap);
-      
-      // Vérifier si le pêcheur est validé
-      if (pecheur.isValid != true) {
-        throw Exception('Votre compte est en attente de validation par l\'administrateur');
+      if (response.containsKey('token') && response.containsKey('user')) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', response['token']);
+        ApiService.instance.setAuthToken(response['token']);
+        final user = User.fromMap(response['user']);
+        await saveCurrentUser(user);
+        return user;
       }
-      
-      final user = User(
-        id: pecheur.id,
-        email: pecheur.email,
-        roles: pecheur.roles,
-        password: pecheur.password,
-        nom: pecheur.nom,
-        prenom: pecheur.prenom,
-        telephone: pecheur.telephone,
-        isVerified: true,
-        isBlocked: false,
-        isValid: pecheur.isValid,
-      );
-      await saveCurrentUser(user);
-      return user;
+    } catch (e) {
+      print('Erreur lors de la connexion: $e');
     }
-
-    // Essayer de trouver l'utilisateur dans marketplace_vitirinaire
-    final vitirinaireMap = await DatabaseHelper.instance.getVitirinaireByEmail(email);
-    if (vitirinaireMap != null && vitirinaireMap['password'] == password) {
-      final vitirinaire = Vitirinaire.fromMap(vitirinaireMap);
-      
-      // Vérifier si le vétérinaire est validé
-      if (!vitirinaire.isValid) {
-        throw Exception('Votre compte est en attente de validation par l\'administrateur');
-      }
-      
-      final user = User(
-        id: vitirinaire.id,
-        email: vitirinaire.email,
-        roles: vitirinaire.roles,
-        password: vitirinaire.password,
-        nom: vitirinaire.nom,
-        prenom: vitirinaire.prenom,
-        telephone: vitirinaire.telephone,
-        isVerified: true,
-        isBlocked: false,
-        isValid: vitirinaire.isValid,
-      );
-      await saveCurrentUser(user);
-      return user;
-    }
-
-    // Essayer de trouver l'utilisateur dans marketplace_maryeur
-    final maryeurMap = await DatabaseHelper.instance.getMaryeurByEmail(email);
-    if (maryeurMap != null && maryeurMap['password'] == password) {
-      final maryeur = Maryeur.fromMap(maryeurMap);
-      
-      // Vérifier si le maryeur est validé
-      if (!maryeur.isValid) {
-        throw Exception('Votre compte est en attente de validation par l\'administrateur');
-      }
-      
-      final user = User(
-        id: maryeur.id,
-        email: maryeur.email,
-        roles: maryeur.roles,
-        password: maryeur.password,
-        nom: maryeur.nom,
-        prenom: maryeur.prenom,
-        telephone: maryeur.telephone,
-        isVerified: true,
-        isBlocked: false,
-        isValid: maryeur.isValid,
-      );
-      await saveCurrentUser(user);
-      return user;
-    }
-
     return null;
   }
-  
-  // Rafraîchir les données de l'utilisateur courant
+
+  /// Rafraîchir l'utilisateur actuel
   Future<User?> refreshCurrentUser() async {
-    final currentUser = await getCurrentUser();
-    if (currentUser == null) return null;
-    
-    User? updatedUser;
-    
-    if (currentUser.isPecheur()) {
-      final pecheurMap = await DatabaseHelper.instance.queryPecheurById(currentUser.id!);
-      if (pecheurMap != null) {
-        final pecheur = Pecheur.fromMap(pecheurMap);
-        updatedUser = User(
-          id: pecheur.id,
-          email: pecheur.email,
-          roles: pecheur.roles,
-          password: pecheur.password,
-          nom: pecheur.nom,
-          prenom: pecheur.prenom,
-          telephone: pecheur.telephone,
-          isVerified: true,
-          isBlocked: false,
-          isValid: pecheur.isValid,
-        );
+    try {
+      final response = await ApiService.instance.get('auth/me');
+      if (response.containsKey('user')) {
+        final updatedUser = User.fromMap(response['user']);
+        await saveCurrentUser(updatedUser);
+        return updatedUser;
       }
-    } else if (currentUser.isVeterinaire()) {
-      final vitirinaireMap = await DatabaseHelper.instance.queryVitirinaireById(currentUser.id!);
-      if (vitirinaireMap != null) {
-        final vitirinaire = Vitirinaire.fromMap(vitirinaireMap);
-        updatedUser = User(
-          id: vitirinaire.id,
-          email: vitirinaire.email,
-          roles: vitirinaire.roles,
-          password: vitirinaire.password,
-          nom: vitirinaire.nom,
-          prenom: vitirinaire.prenom,
-          telephone: vitirinaire.telephone,
-          isVerified: true,
-          isBlocked: false,
-          isValid: vitirinaire.isValid,
-        );
-      }
-    } else if (currentUser.isMaryeur()) {
-      final maryeurMap = await DatabaseHelper.instance.queryMaryeurById(currentUser.id!);
-      if (maryeurMap != null) {
-        final maryeur = Maryeur.fromMap(maryeurMap);
-        updatedUser = User(
-          id: maryeur.id,
-          email: maryeur.email,
-          roles: maryeur.roles,
-          password: maryeur.password,
-          nom: maryeur.nom,
-          prenom: maryeur.prenom,
-          telephone: maryeur.telephone,
-          isVerified: true,
-          isBlocked: false,
-          isValid: maryeur.isValid,
-        );
-      }
-    } else {
-      final userMap = await DatabaseHelper.instance.queryUserById(currentUser.id!);
-      if (userMap != null) {
-        updatedUser = User.fromMap(userMap);
-      }
+    } catch (e) {
+      print('Erreur lors du rafraîchissement des données utilisateur: $e');
     }
-    
-    if (updatedUser != null) {
-      await saveCurrentUser(updatedUser);
-      return updatedUser;
-    }
-    
-    return currentUser;
+    return null;
   }
-  
-  // Générer un token de vérification d'email
-  Future<String> generateEmailVerificationToken(String email) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = DateTime.now().millisecondsSinceEpoch.toString();
-    
-    // Stocker le token avec l'email
-    final verificationTokens = prefs.getStringList(_verificationTokenKey) ?? [];
-    verificationTokens.add('$email:$token');
-    await prefs.setStringList(_verificationTokenKey, verificationTokens);
-    
-    return token;
-  }
-  
-  // Vérifier un token d'email
-  Future<bool> verifyEmailToken(String email, String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    final verificationTokens = prefs.getStringList(_verificationTokenKey) ?? [];
-    
-    final tokenEntry = '$email:$token';
-    if (verificationTokens.contains(tokenEntry)) {
-      // Supprimer le token utilisé
-      verificationTokens.remove(tokenEntry);
-      await prefs.setStringList(_verificationTokenKey, verificationTokens);
-      
-      // Mettre à jour le statut de vérification de l'utilisateur
-      final userMap = await DatabaseHelper.instance.getUserByEmail(email);
-      if (userMap != null) {
-        await DatabaseHelper.instance.update(
-          'marketplace_user',
-          {'is_verified': 1},
-          'id = ?',
-          [userMap['id']],
-        );
-        return true;
-      }
-    }
-    
-    return false;
-  }
-  
-  // Réinitialiser le mot de passe
+
+  /// Réinitialisation du mot de passe
   Future<bool> resetPassword(String email, String newPassword) async {
-    // Vérifier si l'email existe
-    final userMap = await DatabaseHelper.instance.getUserByEmail(email);
-    if (userMap != null) {
-      await DatabaseHelper.instance.update(
-        'marketplace_user',
-        {'password': newPassword},
-        'id = ?',
-        [userMap['id']],
-      );
-      return true;
+    try {
+      final response = await ApiService.instance.post('auth/reset-password', {
+        'email': email,
+        'newPassword': newPassword,
+      });
+      return response['success'] ?? false;
+    } catch (e) {
+      print('Erreur lors de la réinitialisation du mot de passe: $e');
     }
-    
-    final pecheurMap = await DatabaseHelper.instance.getPecheurByEmail(email);
-    if (pecheurMap != null) {
-      await DatabaseHelper.instance.update(
-        'marketplace_pecheur',
-        {'password': newPassword},
-        'id = ?',
-        [pecheurMap['id']],
-      );
-      return true;
-    }
-    
-    final vitirinaireMap = await DatabaseHelper.instance.getVitirinaireByEmail(email);
-    if (vitirinaireMap != null) {
-      await DatabaseHelper.instance.update(
-        'marketplace_vitirinaire',
-        {'password': newPassword},
-        'id = ?',
-        [vitirinaireMap['id']],
-      );
-      return true;
-    }
-    
-    final maryeurMap = await DatabaseHelper.instance.getMaryeurByEmail(email);
-    if (maryeurMap != null) {
-      await DatabaseHelper.instance.update(
-        'marketplace_maryeur',
-        {'password': newPassword},
-        'id = ?',
-        [maryeurMap['id']],
-      );
-      return true;
-    }
-    
     return false;
+  }
+
+  /// En-têtes d'authentification pour les requêtes API
+  Future<Map<String, String>> getAuthHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    if (token == null) return {};
+
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
   }
 }
+

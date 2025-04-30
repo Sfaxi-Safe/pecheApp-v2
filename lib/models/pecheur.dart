@@ -1,5 +1,5 @@
 class Pecheur {
-  final int? id;
+  final String? id;
   final String email;
   final String roles;
   final String password;
@@ -19,8 +19,7 @@ class Pecheur {
   final String? engin;
   final String? wallet;
   final String? mykeyss;
-  final int? telephone;
-  final bool? isValid;
+  final String? telephone;
 
   Pecheur({
     this.id,
@@ -44,12 +43,11 @@ class Pecheur {
     this.wallet,
     this.mykeyss,
     this.telephone,
-    this.isValid,
   });
 
   factory Pecheur.fromMap(Map<String, dynamic> map) {
     return Pecheur(
-      id: map['id'],
+      id: map['_id']?.toString(),
       email: map['email'],
       roles: map['roles'],
       password: map['password'],
@@ -70,13 +68,12 @@ class Pecheur {
       wallet: map['wallet'],
       mykeyss: map['mykeyss'],
       telephone: map['telephone'],
-      isValid: map['is_valid'] == 1,
     );
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'id': id,
+    final map = {
+      '_id': id,
       'email': email,
       'roles': roles,
       'password': password,
@@ -97,7 +94,7 @@ class Pecheur {
       'wallet': wallet,
       'mykeyss': mykeyss,
       'telephone': telephone,
-      'is_valid': isValid == true ? 1 : 0,
     };
+    return map;
   }
 }

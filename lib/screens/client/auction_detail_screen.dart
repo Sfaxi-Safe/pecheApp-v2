@@ -1,7 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:seatrace/services/database_helper.dart';
-import 'package:seatrace/services/auth_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/api_service.dart';
 import 'package:intl/intl.dart';
 
 class AuctionDetailScreen extends StatefulWidget {
@@ -16,10 +15,10 @@ class AuctionDetailScreen extends StatefulWidget {
 
 class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
   Map<String, dynamic>? _auction;
-  Map<String, dynamic>? _pecheur;    // Ajout de cette variable
+  Map<String, dynamic>? _pecheur; // Ajout de cette variable
   Map<String, dynamic>? _veterinaire; // Ajout de cette variable
-  Map<String, dynamic>? _maryeur;     // Ajout de cette variable
-  Map<String, dynamic>? _prise;       // Ajout de cette variable
+  Map<String, dynamic>? _maryeur; // Ajout de cette variable
+  Map<String, dynamic>? _prise; // Ajout de cette variable
   bool _isLoading = true;
   String? _errorMessage;
   final _bidController = TextEditingController();
@@ -45,68 +44,38 @@ class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
 
     try {
       // Charger les détails de l'enchère
-      final results = await DatabaseHelper.instance.queryWhere(
-        'marketplace_lots',
-        'id = ?',
-        [widget.auctionId],
+      final auction = await ApiService.instance.getAuctionDetails(
+        widget.auctionId,
       );
 
-      if (results.isEmpty) {
-        throw Exception('Enchère non trouvée');
-      }
-
-      final auction = results.first;
-      
       // Charger les détails de la prise
       Map<String, dynamic>? prise;
       if (auction['prise_id'] != null) {
-        final priseResults = await DatabaseHelper.instance.queryWhere(
-          'marketplace_prise',
-          'id = ?',
-          [auction['prise_id']],
-        );
-        if (priseResults.isNotEmpty) {
-          prise = priseResults.first;
-        }
+        prise = await ApiService.instance.getPriseDetails(auction['prise_id']);
       }
-      
+
       // Charger les détails du pêcheur
       Map<String, dynamic>? pecheur;
       if (prise != null && prise['pecheur_id'] != null) {
-        final pecheurResults = await DatabaseHelper.instance.queryWhere(
-          'marketplace_pecheur',
-          'id = ?',
-          [prise['pecheur_id']],
+        pecheur = await ApiService.instance.getPecheurDetails(
+          prise['pecheur_id'],
         );
-        if (pecheurResults.isNotEmpty) {
-          pecheur = pecheurResults.first;
-        }
       }
-      
+
       // Charger les détails du vétérinaire
       Map<String, dynamic>? veterinaire;
       if (auction['vitirinaire_id'] != null) {
-        final veterinaireResults = await DatabaseHelper.instance.queryWhere(
-          'marketplace_vitirinaire',
-          'id = ?',
-          [auction['vitirinaire_id']],
+        veterinaire = await ApiService.instance.getVitirinaireDetails(
+          auction['vitirinaire_id'],
         );
-        if (veterinaireResults.isNotEmpty) {
-          veterinaire = veterinaireResults.first;
-        }
       }
-      
+
       // Charger les détails du maryeur
       Map<String, dynamic>? maryeur;
       if (prise != null && prise['maryeur_id'] != null) {
-        final maryeurResults = await DatabaseHelper.instance.queryWhere(
-          'marketplace_maryeur',
-          'id = ?',
-          [prise['maryeur_id']],
+        maryeur = await ApiService.instance.getMaryeurDetails(
+          prise['maryeur_id'],
         );
-        if (maryeurResults.isNotEmpty) {
-          maryeur = maryeurResults.first;
-        }
       }
 
       setState(() {
@@ -164,13 +133,8 @@ class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
         throw Exception('Utilisateur non connecté');
       }
 
-      // Update the current price
-      await DatabaseHelper.instance.update(
-        'marketplace_lots',
-        {'current': bidAmount.toString(), 'user_id': user.id},
-        'id = ?',
-        [widget.auctionId],
-      );
+      // Place bid through API
+      await ApiService.instance.placeBid(widget.auctionId, bidAmount, user.id!);
 
       // Reload auction details
       await _loadAuctionDetails();
@@ -285,7 +249,11 @@ class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
                       Row(
                         children: [
                           // Remplacer l'icône Euro par une icône plus générique
-                          const Icon(Icons.price_change, size: 20, color: Colors.green),
+                          const Icon(
+                            Icons.price_change,
+                            size: 20,
+                            color: Colors.green,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             // Afficher le prix en TND
@@ -347,15 +315,15 @@ class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
                                 ),
                               if (_auction!['temperature'] != null)
                                 _buildDetailItem(
-                                  'Température', 
-                                  '${_auction!['temperature']} °C'
+                                  'Température',
+                                  '${_auction!['temperature']} °C',
                                 ),
                             ],
                           ),
                         ),
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Ajouter les informations sur le pêcheur
                       if (_pecheur != null)
                         Card(
@@ -371,21 +339,27 @@ class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 _buildDetailItem(
-                                  'Nom', 
-                                  '${_pecheur!['prenom'] ?? ''} ${_pecheur!['nom'] ?? ''}'
+                                  'Nom',
+                                  '${_pecheur!['prenom'] ?? ''} ${_pecheur!['nom'] ?? ''}',
                                 ),
                                 if (_pecheur!['bateau'] != null)
-                                  _buildDetailItem('Bateau', _pecheur!['bateau']),
+                                  _buildDetailItem(
+                                    'Bateau',
+                                    _pecheur!['bateau'],
+                                  ),
                                 if (_pecheur!['port'] != null)
                                   _buildDetailItem('Port', _pecheur!['port']),
                                 if (_pecheur!['matricule'] != null)
-                                  _buildDetailItem('Matricule', _pecheur!['matricule']),
+                                  _buildDetailItem(
+                                    'Matricule',
+                                    _pecheur!['matricule'],
+                                  ),
                               ],
                             ),
                           ),
                         ),
                       const SizedBox(height: 16),
-                      
+
                       // Ajouter les informations sur la prise
                       if (_prise != null)
                         Card(
@@ -401,32 +375,47 @@ class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 if (_prise!['nom'] != null)
-                                  _buildDetailItem('Nom de la prise', _prise!['nom']),
-                                if (_prise!['debut'] != null && _prise!['fin'] != null)
                                   _buildDetailItem(
-                                    'Période de pêche', 
-                                    '${DateFormat('dd/MM/yyyy').format(DateTime.parse(_prise!['debut']))} - ${DateFormat('dd/MM/yyyy').format(DateTime.parse(_prise!['fin']))}'
+                                    'Nom de la prise',
+                                    _prise!['nom'],
+                                  ),
+                                if (_prise!['debut'] != null &&
+                                    _prise!['fin'] != null)
+                                  _buildDetailItem(
+                                    'Période de pêche',
+                                    '${DateFormat('dd/MM/yyyy').format(DateTime.parse(_prise!['debut']))} - ${DateFormat('dd/MM/yyyy').format(DateTime.parse(_prise!['fin']))}',
                                   ),
                                 if (_prise!['engin'] != null)
-                                  _buildDetailItem('Méthode de pêche', _prise!['engin']),
-                                if (_prise!['zone'] != null)
-                                  _buildDetailItem('Zone de pêche', _prise!['zone']),
-                                if (_prise!['latitude'] != null && _prise!['langitude'] != null)
                                   _buildDetailItem(
-                                    'Coordonnées', 
-                                    '${_prise!['latitude']}, ${_prise!['langitude']}'
+                                    'Méthode de pêche',
+                                    _prise!['engin'],
+                                  ),
+                                if (_prise!['zone'] != null)
+                                  _buildDetailItem(
+                                    'Zone de pêche',
+                                    _prise!['zone'],
+                                  ),
+                                if (_prise!['latitude'] != null &&
+                                    _prise!['langitude'] != null)
+                                  _buildDetailItem(
+                                    'Coordonnées',
+                                    '${_prise!['latitude']}, ${_prise!['langitude']}',
                                   ),
                                 if (_prise!['datedebarquement'] != null)
                                   _buildDetailItem(
-                                    'Date de débarquement', 
-                                    DateFormat('dd/MM/yyyy').format(DateTime.parse(_prise!['datedebarquement']))
+                                    'Date de débarquement',
+                                    DateFormat('dd/MM/yyyy').format(
+                                      DateTime.parse(
+                                        _prise!['datedebarquement'],
+                                      ),
+                                    ),
                                   ),
                               ],
                             ),
                           ),
                         ),
                       const SizedBox(height: 16),
-                      
+
                       // Ajouter les informations sur le vétérinaire
                       if (_veterinaire != null)
                         Card(
@@ -442,22 +431,27 @@ class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 _buildDetailItem(
-                                  'Nom', 
-                                  '${_veterinaire!['prenom'] ?? ''} ${_veterinaire!['nom'] ?? ''}'
+                                  'Nom',
+                                  '${_veterinaire!['prenom'] ?? ''} ${_veterinaire!['nom'] ?? ''}',
                                 ),
                                 if (_veterinaire!['matricule'] != null)
-                                  _buildDetailItem('Matricule', _veterinaire!['matricule']),
+                                  _buildDetailItem(
+                                    'Matricule',
+                                    _veterinaire!['matricule'],
+                                  ),
                                 if (_auction!['datetest'] != null)
                                   _buildDetailItem(
-                                    'Date de validation', 
-                                    DateFormat('dd/MM/yyyy').format(DateTime.parse(_auction!['datetest']))
+                                    'Date de validation',
+                                    DateFormat('dd/MM/yyyy').format(
+                                      DateTime.parse(_auction!['datetest']),
+                                    ),
                                   ),
                               ],
                             ),
                           ),
                         ),
                       const SizedBox(height: 16),
-                      
+
                       // Ajouter les informations sur le maryeur
                       if (_maryeur != null)
                         Card(
@@ -473,11 +467,14 @@ class _AuctionDetailScreenState extends State<AuctionDetailScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 _buildDetailItem(
-                                  'Nom', 
-                                  '${_maryeur!['prenom'] ?? ''} ${_maryeur!['nom'] ?? ''}'
+                                  'Nom',
+                                  '${_maryeur!['prenom'] ?? ''} ${_maryeur!['nom'] ?? ''}',
                                 ),
                                 if (_maryeur!['matricule'] != null)
-                                  _buildDetailItem('Matricule', _maryeur!['matricule']),
+                                  _buildDetailItem(
+                                    'Matricule',
+                                    _maryeur!['matricule'],
+                                  ),
                               ],
                             ),
                           ),

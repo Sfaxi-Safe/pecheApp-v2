@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../screens/login_screen.dart';
-import '../../services/database_helper.dart';
+import '../../services/api_service.dart';
 import 'pending_lots_screen.dart';
 import 'active_auctions_screen.dart';
 
@@ -33,18 +33,19 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
 
       // Load statistics
       if (user.id != null) {
-        final lots = await DatabaseHelper.instance.getLotsByMaryeurId(user.id!);
-
-        setState(() {
-          _pendingLots = lots.where((lot) => lot['prixinitial'] == null).length;
-          _activeAuctions =
-              lots
-                  .where(
-                    (lot) => lot['prixinitial'] != null && lot['vendre'] == 0,
-                  )
-                  .length;
-          _completedAuctions = lots.where((lot) => lot['vendre'] == 1).length;
-        });
+        try {
+          final stats = await ApiService.instance.getMaryeurStats(user.id!);
+          setState(() {
+            _pendingLots = stats['pendingLots'] ?? 0;
+            _activeAuctions = stats['activeAuctions'] ?? 0;
+            _completedAuctions = stats['completedAuctions'] ?? 0;
+          });
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Erreur lors du chargement des statistiques')),
+            );
+          }
       }
     }
   }

@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../services/database_helper.dart';
 import '../../services/auth_service.dart';
+import '../../services/api_service.dart';
 import 'auction_detail_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -9,7 +9,8 @@ class AvailableAuctionsScreen extends StatefulWidget {
   const AvailableAuctionsScreen({Key? key}) : super(key: key);
 
   @override
-  _AvailableAuctionsScreenState createState() => _AvailableAuctionsScreenState();
+  _AvailableAuctionsScreenState createState() =>
+      _AvailableAuctionsScreenState();
 }
 
 class _AvailableAuctionsScreenState extends State<AvailableAuctionsScreen> {
@@ -31,12 +32,8 @@ class _AvailableAuctionsScreenState extends State<AvailableAuctionsScreen> {
     });
 
     try {
-      // Get lots that have initial price set and are not sold yet
-      _availableAuctions = await DatabaseHelper.instance.queryWhere(
-        'marketplace_lots',
-        'prixinitial IS NOT NULL AND vendre = ?',
-        [0], // 0 means not sold yet
-      );
+      // Get available auctions from API
+      _availableAuctions = await ApiService.instance.getAvailableAuctions();
 
       // Apply sorting
       _sortAuctions();
@@ -56,29 +53,45 @@ class _AvailableAuctionsScreenState extends State<AvailableAuctionsScreen> {
     switch (_sortBy) {
       case 'price_asc':
         _availableAuctions.sort((a, b) {
-          final priceA = double.tryParse(a['current'] ?? a['prixinitial'] ?? '0') ?? 0;
-          final priceB = double.tryParse(b['current'] ?? b['prixinitial'] ?? '0') ?? 0;
+          final priceA =
+              double.tryParse(a['current'] ?? a['prixinitial'] ?? '0') ?? 0;
+          final priceB =
+              double.tryParse(b['current'] ?? b['prixinitial'] ?? '0') ?? 0;
           return priceA.compareTo(priceB);
         });
         break;
       case 'price_desc':
         _availableAuctions.sort((a, b) {
-          final priceA = double.tryParse(a['current'] ?? a['prixinitial'] ?? '0') ?? 0;
-          final priceB = double.tryParse(b['current'] ?? b['prixinitial'] ?? '0') ?? 0;
+          final priceA =
+              double.tryParse(a['current'] ?? a['prixinitial'] ?? '0') ?? 0;
+          final priceB =
+              double.tryParse(b['current'] ?? b['prixinitial'] ?? '0') ?? 0;
           return priceB.compareTo(priceA);
         });
         break;
       case 'date_desc':
         _availableAuctions.sort((a, b) {
-          final dateA = a['datesoumettre'] != null ? DateTime.parse(a['datesoumettre']) : DateTime(1970);
-          final dateB = b['datesoumettre'] != null ? DateTime.parse(b['datesoumettre']) : DateTime(1970);
+          final dateA =
+              a['datesoumettre'] != null
+                  ? DateTime.parse(a['datesoumettre'])
+                  : DateTime(1970);
+          final dateB =
+              b['datesoumettre'] != null
+                  ? DateTime.parse(b['datesoumettre'])
+                  : DateTime(1970);
           return dateB.compareTo(dateA);
         });
         break;
       case 'date_asc':
         _availableAuctions.sort((a, b) {
-          final dateA = a['datesoumettre'] != null ? DateTime.parse(a['datesoumettre']) : DateTime(1970);
-          final dateB = b['datesoumettre'] != null ? DateTime.parse(b['datesoumettre']) : DateTime(1970);
+          final dateA =
+              a['datesoumettre'] != null
+                  ? DateTime.parse(a['datesoumettre'])
+                  : DateTime(1970);
+          final dateB =
+              b['datesoumettre'] != null
+                  ? DateTime.parse(b['datesoumettre'])
+                  : DateTime(1970);
           return dateA.compareTo(dateB);
         });
         break;
@@ -105,91 +118,90 @@ class _AvailableAuctionsScreenState extends State<AvailableAuctionsScreen> {
                 _sortAuctions();
               });
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'price_asc',
-                child: Text('Prix croissant'),
-              ),
-              const PopupMenuItem(
-                value: 'price_desc',
-                child: Text('Prix décroissant'),
-              ),
-              const PopupMenuItem(
-                value: 'date_desc',
-                child: Text('Plus récent'),
-              ),
-              const PopupMenuItem(
-                value: 'date_asc',
-                child: Text('Plus ancien'),
-              ),
-            ],
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(
+                    value: 'price_asc',
+                    child: Text('Prix croissant'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'price_desc',
+                    child: Text('Prix décroissant'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'date_desc',
+                    child: Text('Plus récent'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'date_asc',
+                    child: Text('Plus ancien'),
+                  ),
+                ],
           ),
         ],
       ),
       body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null
+        child:
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 48,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage!,
+                        style: TextStyle(
                           color: Theme.of(context).colorScheme.error,
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _errorMessage!,
-                          style: TextStyle(color: Theme.of(context).colorScheme.error),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: _loadAvailableAuctions,
-                          child: const Text('Réessayer'),
-                        ),
-                      ],
-                    ),
-                  )
-                : _availableAuctions.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.gavel_outlined,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Aucune enchère disponible',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Revenez plus tard pour voir les nouvelles enchères',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _availableAuctions.length,
-                        itemBuilder: (context, index) {
-                          final auction = _availableAuctions[index];
-                          return _buildAuctionCard(context, auction);
-                        },
+                        textAlign: TextAlign.center,
                       ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _loadAvailableAuctions,
+                        child: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                )
+                : _availableAuctions.isEmpty
+                ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.gavel_outlined,
+                        size: 64,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Aucune enchère disponible',
+                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Revenez plus tard pour voir les nouvelles enchères',
+                        style: TextStyle(color: Colors.grey[500]),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                )
+                : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _availableAuctions.length,
+                  itemBuilder: (context, index) {
+                    final auction = _availableAuctions[index];
+                    return _buildAuctionCard(context, auction);
+                  },
+                ),
       ),
     );
   }
@@ -223,37 +235,38 @@ class _AvailableAuctionsScreenState extends State<AvailableAuctionsScreen> {
                     topLeft: Radius.circular(12),
                     bottomLeft: Radius.circular(12),
                   ),
-                  child: photoPath != null && File(photoPath).existsSync()
-                      ? Image.file(
-                          File(photoPath),
-                          width: 120,
-                          height: 120,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: 120,
-                              height: 120,
-                              color: Colors.grey[300],
-                              child: Icon(
-                                Icons.image_not_supported,
-                                size: 40,
-                                color: Colors.grey[500],
-                              ),
-                            );
-                          },
-                        )
-                      : Container(
-                          width: 120,
-                          height: 120,
-                          color: Colors.grey[300],
-                          child: Icon(
-                            Icons.image_not_supported,
-                            size: 40,
-                            color: Colors.grey[500],
+                  child:
+                      photoPath != null && File(photoPath).existsSync()
+                          ? Image.file(
+                            File(photoPath),
+                            width: 120,
+                            height: 120,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 120,
+                                height: 120,
+                                color: Colors.grey[300],
+                                child: Icon(
+                                  Icons.image_not_supported,
+                                  size: 40,
+                                  color: Colors.grey[500],
+                                ),
+                              );
+                            },
+                          )
+                          : Container(
+                            width: 120,
+                            height: 120,
+                            color: Colors.grey[300],
+                            child: Icon(
+                              Icons.image_not_supported,
+                              size: 40,
+                              color: Colors.grey[500],
+                            ),
                           ),
-                        ),
                 ),
-                
+
                 // Info
                 Expanded(
                   child: Padding(
@@ -273,7 +286,11 @@ class _AvailableAuctionsScreenState extends State<AvailableAuctionsScreen> {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(Icons.price_change, size: 16, color: Colors.green),
+                            const Icon(
+                              Icons.price_change,
+                              size: 16,
+                              color: Colors.green,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'Prix actuel: $currentPrice $devise',
@@ -287,9 +304,7 @@ class _AvailableAuctionsScreenState extends State<AvailableAuctionsScreen> {
                         const SizedBox(height: 4),
                         Text(
                           'Quantité: ${auction['quantite'] ?? 'N/A'} | Poids: ${auction['poid'] ?? 'N/A'} kg',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                          ),
+                          style: TextStyle(color: Colors.grey[600]),
                         ),
                       ],
                     ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:seatrace/services/auth_service.dart';
 import 'package:seatrace/screens/login_screen.dart';
-import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/screens/client/available_auctions_screen.dart';
 import 'package:seatrace/screens/client/search_screen.dart';
 import 'package:seatrace/screens/client/my_purchases_screen.dart';
@@ -31,22 +31,12 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
         _userName = '${user.prenom} ${user.nom}';
       });
 
-      // Load statistics
-      final availableAuctions = await DatabaseHelper.instance.queryWhere(
-        'marketplace_lots',
-        'prixinitial IS NOT NULL AND vendre = 0',
-        [],
-      );
-
-      final myPurchases = await DatabaseHelper.instance.queryWhere(
-        'marketplace_lots',
-        'user_id = ? AND vendre = 1',
-        [user.id],
-      );
+      // Load statistics from API
+      final stats = await ApiService.instance.getDashboardStats();
 
       setState(() {
-        _availableAuctions = availableAuctions.length;
-        _myPurchases = myPurchases.length;
+        _availableAuctions = stats['availableAuctions'] ?? 0;
+        _myPurchases = stats['myPurchases'] ?? 0;
       });
     }
   }

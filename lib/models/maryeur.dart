@@ -12,7 +12,6 @@ class Maryeur {
   final String? wallet;
   final String? mykeyss;
   final int? telephone;
-  final bool isValid;
   final String? signature;
 
   Maryeur({
@@ -29,7 +28,6 @@ class Maryeur {
     this.wallet,
     this.mykeyss,
     this.telephone,
-    required this.isValid,
     this.signature,
   });
 
@@ -48,7 +46,6 @@ class Maryeur {
       wallet: map['wallet'],
       mykeyss: map['mykeyss'],
       telephone: map['telephone'],
-      isValid: map['is_valid'] == 1,
       signature: map['signature'],
     );
   }
@@ -68,7 +65,6 @@ class Maryeur {
       'wallet': wallet,
       'mykeyss': mykeyss,
       'telephone': telephone,
-      'is_valid': isValid ? 1 : 0,
       'signature': signature,
     };
   }

@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:seatrace/models/espece.dart';
-import 'package:seatrace/services/database_helper.dart';
 import 'package:image/image.dart' as img;
+import 'package:seatrace/services/api_service.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 
 class FishRecognitionService {
@@ -107,31 +107,26 @@ class FishRecognitionService {
         return null;
       }
 
-      // Récupérer l'espèce correspondante depuis la base de données
-      final especes = await DatabaseHelper.instance.queryWhere(
-        'marketplace_espece',
-        'nom = ?',
-        [_labels[maxIndex]],
-      );
-
-      if (especes.isNotEmpty) {
-        return Espece.fromMap(especes.first);
-      } else {
-        // Si l'espèce n'est pas dans la base de données, créer une nouvelle entrée
-        final id = await DatabaseHelper.instance.insert('marketplace_espece', {
-          'nom': _labels[maxIndex],
-          'image_url': null,
-        });
-
-        return Espece(id: id, nom: _labels[maxIndex]);
+      // Récupérer l'espèce correspondante depuis l'API
+      try {
+        final espece = await ApiService.instance.getEspeceByNom(
+          _labels[maxIndex],
+        );
+        return Espece.fromMap(espece);
+      } catch (e) {
+        // Si l'espèce n'existe pas, la créer via l'API
+        final nouvelleEspece = await ApiService.instance.createEspece(
+          _labels[maxIndex],
+        );
+        return Espece.fromMap(nouvelleEspece);
       }
     } catch (e) {
       // Erreur lors de la reconnaissance du poisson: $e
 
-      // En cas d'erreur, essayer de récupérer une espèce aléatoire de la base de données
+      // En cas d'erreur, essayer de récupérer une espèce aléatoire via l'API
       // comme solution de secours
       try {
-        final allEspeces = await DatabaseHelper.instance.queryAllEspeces();
+        final allEspeces = await ApiService.instance.getAllEspeces();
         if (allEspeces.isNotEmpty) {
           final randomIndex = Random().nextInt(allEspeces.length);
           return Espece.fromMap(allEspeces[randomIndex]);

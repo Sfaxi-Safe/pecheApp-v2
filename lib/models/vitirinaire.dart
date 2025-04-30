@@ -12,7 +12,6 @@ class Vitirinaire {
   final String? wallet;
   final String? mykeyss;
   final int? telephone;
-  final bool isValid;
 
   Vitirinaire({
     this.id,
@@ -28,7 +27,6 @@ class Vitirinaire {
     this.wallet,
     this.mykeyss,
     this.telephone,
-    required this.isValid,
   });
 
   factory Vitirinaire.fromMap(Map<String, dynamic> map) {
@@ -46,7 +44,6 @@ class Vitirinaire {
       wallet: map['wallet'],
       mykeyss: map['mykeyss'],
       telephone: map['telephone'],
-      isValid: map['is_valid'] == 1,
     );
   }
 
@@ -65,7 +62,6 @@ class Vitirinaire {
       'wallet': wallet,
       'mykeyss': mykeyss,
       'telephone': telephone,
-      'is_valid': isValid ? 1 : 0,
     };
   }
 }

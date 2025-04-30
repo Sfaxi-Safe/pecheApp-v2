@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'utils/app_theme.dart';
-import 'services/database_helper.dart';
+import 'services/api_service.dart';
 import 'screens/video_splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize the database
-  await DatabaseHelper.instance.database;
+  // Initialize API Service
+  final apiService = ApiService.instance;
 
   runApp(const MyApp());
 }

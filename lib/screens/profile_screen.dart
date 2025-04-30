@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:seatrace/services/auth_service.dart';
-import 'package:seatrace/services/database_helper.dart';
+import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/utils/validators.dart';
 import 'package:seatrace/screens/login_screen.dart';
 import 'package:image_picker/image_picker.dart';
@@ -68,16 +68,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       Map<String, dynamic>? userData;
 
       if (user.isPecheur()) {
-        userData = await DatabaseHelper.instance.queryPecheurById(user.id!);
+        userData = await ApiService.instance.getPecheurDetails(user.id!);
         _userType = 'Pêcheur';
       } else if (user.isVeterinaire()) {
-        userData = await DatabaseHelper.instance.queryVitirinaireById(user.id!);
+        userData = await ApiService.instance.getVeterinaireDetails(user.id!);
         _userType = 'Vétérinaire';
       } else if (user.isMaryeur()) {
-        userData = await DatabaseHelper.instance.queryMaryeurById(user.id!);
+        userData = await ApiService.instance.getMaryeurDetails(user.id!);
         _userType = 'Maryeur';
       } else {
-        userData = await DatabaseHelper.instance.queryUserById(user.id!);
+        userData = await ApiService.instance.getUserById(user.id!);
         _userType = 'Client';
       }
 
@@ -136,15 +136,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         final updatedData = {'id': user.id, 'photo': savedImage.path};
 
+        String endpoint = '';
         if (user.isPecheur()) {
-          await DatabaseHelper.instance.updatePecheur(updatedData);
+          endpoint = 'pecheurs/${user.id}';
         } else if (user.isVeterinaire()) {
-          await DatabaseHelper.instance.updateVitirinaire(updatedData);
+          endpoint = 'veterinaires/${user.id}';
         } else if (user.isMaryeur()) {
-          await DatabaseHelper.instance.updateMaryeur(updatedData);
+          endpoint = 'maryeurs/${user.id}';
         } else {
-          await DatabaseHelper.instance.updateUser(updatedData);
+          endpoint = 'users/${user.id}';
         }
+        await ApiService.instance.put(endpoint, updatedData);
 
         // Rafraîchir les données utilisateur
         await _loadUserData();
@@ -282,25 +284,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
 
       // Vérifier l'ancien mot de passe
-      if (_userData!['password'] != _currentPasswordController.text) {
-        throw Exception('Mot de passe actuel incorrect');
-      }
-
-      // Mettre à jour le mot de passe
-      final updatedData = {
-        'id': user.id,
-        'password': _newPasswordController.text,
+      // Mettre à jour le mot de passe via l'API
+      final passwordData = {
+        'currentPassword': _currentPasswordController.text,
+        'newPassword': _newPasswordController.text,
       };
 
-      if (user.isPecheur()) {
-        await DatabaseHelper.instance.updatePecheur(updatedData);
-      } else if (user.isVeterinaire()) {
-        await DatabaseHelper.instance.updateVitirinaire(updatedData);
-      } else if (user.isMaryeur()) {
-        await DatabaseHelper.instance.updateMaryeur(updatedData);
-      } else {
-        await DatabaseHelper.instance.updateUser(updatedData);
-      }
+      await ApiService.instance.put('auth/change-password', passwordData);
 
       // Effacer les champs
       _currentPasswordController.clear();

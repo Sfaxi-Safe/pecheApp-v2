@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../services/database_helper.dart';
 import '../../services/auth_service.dart';
+import '../../services/api_service.dart';
 import 'package:intl/intl.dart';
 
 class MyPurchasesScreen extends StatefulWidget {
@@ -34,12 +34,8 @@ class _MyPurchasesScreenState extends State<MyPurchasesScreen> {
         throw Exception('Utilisateur non connecté');
       }
 
-      // Get lots that have been purchased by the current user
-      _myPurchases = await DatabaseHelper.instance.queryWhere(
-        'marketplace_lots',
-        'user_id = ? AND vendre = ?',
-        [user.id, 1], // 1 means sold
-      );
+      // Get purchased lots from API
+      _myPurchases = await ApiService.instance.getMyPurchases();
 
       setState(() {
         _isLoading = false;

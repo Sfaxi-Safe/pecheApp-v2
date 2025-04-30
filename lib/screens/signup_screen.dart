@@ -131,7 +131,9 @@ class _SignupScreenState extends State<SignupScreen> {
           'telephone': telephone,
           'is_verified': 0, // Nécessite vérification d'email
           'is_blocked': 0,
-          'is_valid': 1,
+          'is_verified': 0, // Nécessite vérification d'email
+          'is_blocked': 0,
+          'is_valid': 0, // Nécessite validation par admin
         });
       } else if (_selectedRole == 'ROLE_PECHEUR') {
         await DatabaseHelper.instance.insertPecheur({
@@ -146,6 +148,8 @@ class _SignupScreenState extends State<SignupScreen> {
           'bateau': _bateauController.text.trim(),
           'port': _portController.text.trim(),
           'capacite': _capaciteController.text.trim(),
+          'is_verified': 0, // Nécessite vérification d'email
+          'is_blocked': 0,
           'is_valid': 0, // Nécessite validation par admin
         });
       } else if (_selectedRole == 'ROLE_VETERINAIRE') {
@@ -159,6 +163,8 @@ class _SignupScreenState extends State<SignupScreen> {
           'cin': _cinController.text.trim(),
           'matricule': _matriculeController.text.trim(),
           'port': _portController.text.trim(),
+          'is_verified': 0, // Nécessite vérification d'email
+          'is_blocked': 0,
           'is_valid': 0, // Nécessite validation par admin
         });
       } else if (_selectedRole == 'ROLE_MARYEUR') {
@@ -172,6 +178,8 @@ class _SignupScreenState extends State<SignupScreen> {
           'cin': _cinController.text.trim(),
           'matricule': _matriculeController.text.trim(),
           'port': _portController.text.trim(),
+          'is_verified': 0, // Nécessite vérification d'email
+          'is_blocked': 0,
           'is_valid': 0, // Nécessite validation par admin
         });
       }

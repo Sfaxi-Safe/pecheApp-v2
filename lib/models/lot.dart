@@ -1,7 +1,7 @@
 class Lot {
-  final int? id;
-  final int? rfidId;
-  final int? vitirinaireId;
+  final String? id;
+  final String? rfidId;
+  final String? vitirinaireId;
   final String? identifiant;
   final String? photo;
   final String? quantite;
@@ -53,9 +53,9 @@ class Lot {
 
   factory Lot.fromMap(Map<String, dynamic> map) {
     return Lot(
-      id: map['id'],
-      rfidId: map['rfid_id'],
-      vitirinaireId: map['vitirinaire_id'],
+      id: map['_id']?.toString(),
+      rfidId: map['rfid_id']?.toString(),
+      vitirinaireId: map['vitirinaire_id']?.toString(),
       identifiant: map['identifiant'],
       photo: map['photo'],
       quantite: map['quantite'],
@@ -81,7 +81,7 @@ class Lot {
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = {
       'id': id,
       'rfid_id': rfidId,
       'vitirinaire_id': vitirinaireId,
@@ -107,5 +107,6 @@ class Lot {
       'online': online,
       'is_produit': isProduit == true ? 1 : 0,
     };
+    return map;
   }
 }

@@ -7,7 +7,7 @@ const Maryeur = require('../models/Maryeur');
 // Générer le token JWT
 const generateToken = (user) => {
   return jwt.sign(
-    { _id: user._id, roles: user.roles },
+    { _id: user._id, roles: user.roles, isValidated: user.isValidated },
     process.env.JWT_SECRET,
     { expiresIn: '24h' }
   );
@@ -35,7 +35,8 @@ const register = async (req, res) => {
       ...userData,
       email,
       password,
-      roles: [role]
+      roles: [role],
+      isValidated: role === 'ROLE_ADMIN' // Les admins sont automatiquement validés
     };
 
     switch (role) {
@@ -98,6 +99,14 @@ const login = async (req, res) => {
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
     }
 
+    if (!user.isValidated) {
+      return res.status(403).json({ error: 'Votre compte est en attente de validation par un administrateur' });
+    }
+
+    if (user.isBlocked) {
+      return res.status(403).json({ error: 'Votre compte a été bloqué. Veuillez contacter un administrateur' });
+    }
+
     const token = generateToken(user);
 
     res.json({
@@ -133,8 +142,61 @@ const getProfile = async (req, res) => {
   }
 };
 
+// Validation d'un compte utilisateur par un admin
+const validateUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    user.isValidated = true;
+    await user.save();
+
+    res.json({ message: 'Compte utilisateur validé avec succès' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Bloquer/débloquer un compte utilisateur
+const toggleUserBlock = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    user.isBlocked = !user.isBlocked;
+    await user.save();
+
+    res.json({
+      message: user.isBlocked ? 'Utilisateur bloqué' : 'Utilisateur débloqué'
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Obtenir la liste des utilisateurs en attente de validation
+const getPendingUsers = async (req, res) => {
+  try {
+    const pendingUsers = await User.find({ isValidated: false }).select('-password');
+    res.json(pendingUsers);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 module.exports = {
   register,
   login,
-  getProfile
+  getProfile,
+  validateUser,
+  toggleUserBlock,
+  getPendingUsers
 };

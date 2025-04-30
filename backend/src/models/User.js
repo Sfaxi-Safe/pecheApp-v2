@@ -11,11 +11,11 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     validate: [validator.isEmail, 'Email invalide']
   },
-  roles: [{
+  role: {
     type: String,
     required: true,
-    enum: ['ROLE_CLIENT', 'ROLE_ADMIN']
-  }],
+    enum: ['admin', 'pecheur', 'maryeur', 'vitirinaire']
+  },
   password: {
     type: String,
     required: true,
@@ -35,7 +35,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  isVerified: {
+  isValidated: {
     type: Boolean,
     default: false
   },
@@ -43,19 +43,8 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  civilite: String,
-  service: String,
-  fonction: String,
-  mobile: String,
-  linkedin: String,
-  facebook: String,
-  twitter: String,
-  photo: String,
-  isValid: {
-    type: Boolean,
-    default: false
-  },
-  adresse: String
+  adresse: String,
+  photo: String
 }, {
   timestamps: true
 });

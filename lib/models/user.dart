@@ -1,13 +1,11 @@
 class User {
-  final int? id;
+  final String? id;
   final String email;
   final String roles;
   final String password;
   final String nom;
   final String prenom;
   final int? telephone;
-  final bool isVerified;
-  final bool isBlocked;
   final String? civilite;
   final String? service;
   final String? fonction;
@@ -16,7 +14,6 @@ class User {
   final String? facebook;
   final String? tweeter;
   final String? photo;
-  final bool? isValid;
   final String? adresse;
 
   User({
@@ -27,8 +24,6 @@ class User {
     required this.nom,
     required this.prenom,
     this.telephone,
-    required this.isVerified,
-    required this.isBlocked,
     this.civilite,
     this.service,
     this.fonction,
@@ -37,21 +32,18 @@ class User {
     this.facebook,
     this.tweeter,
     this.photo,
-    this.isValid,
     this.adresse,
   });
 
   factory User.fromMap(Map<String, dynamic> map) {
     return User(
-      id: map['id'],
+      id: map['_id']?.toString(),
       email: map['email'],
       roles: map['roles'],
       password: map['password'],
       nom: map['nom'],
       prenom: map['prenom'],
       telephone: map['telephone'],
-      isVerified: map['is_verified'] == 1,
-      isBlocked: map['is_blocked'] == 1,
       civilite: map['civilite'],
       service: map['service'],
       fonction: map['fonction'],
@@ -60,22 +52,19 @@ class User {
       facebook: map['facebook'],
       tweeter: map['tweeter'],
       photo: map['photo'],
-      isValid: map['is_valid'] == 1,
       adresse: map['adresse'],
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
+      '_id': id,
       'email': email,
       'roles': roles,
       'password': password,
       'nom': nom,
       'prenom': prenom,
       'telephone': telephone,
-      'is_verified': isVerified ? 1 : 0,
-      'is_blocked': isBlocked ? 1 : 0,
       'civilite': civilite,
       'service': service,
       'fonction': fonction,
@@ -84,9 +73,8 @@ class User {
       'facebook': facebook,
       'tweeter': tweeter,
       'photo': photo,
-      'is_valid': isValid == true ? 1 : 0,
       'adresse': adresse,
-    };
+    }..removeWhere((key, value) => value == null);
   }
 
   // Helper methods to check user role
@@ -104,9 +92,5 @@ class User {
 
   bool isClient() {
     return roles.contains('ROLE_CLIENT');
-  }
-
-  bool isAdmin() {
-    return roles.contains('ROLE_ADMIN');
   }
 }
