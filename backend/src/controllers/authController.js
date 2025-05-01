@@ -6,20 +6,43 @@ const Maryeur = require('../models/Maryeur');
 const {
   NotFoundError,
   ForbiddenError,
-  BadRequestError,
-  CustomValidationError
+  BadRequestError
 } = require('../middleware/errorHandler');
 
-// Générer le token JWT
+/**
+ * Génère un token JWT pour l'authentification
+ * @param {Object} user - L'utilisateur pour lequel générer le token
+ * @returns {String} Le token JWT généré
+ */
 const generateToken = (user) => {
+  // Utiliser l'ID personnalisé s'il existe, sinon utiliser l'ID MongoDB
+  const userId = user.id || user._id.toString();
+
   return jwt.sign(
-    { _id: user._id, roles: user.roles, isValidated: user.isValidated },
+    {
+      _id: userId,
+      roles: user.roles,
+      isValidated: user.isValidated || user.isValid || false
+    },
     process.env.JWT_SECRET,
     { expiresIn: '24h' }
   );
 };
 
-// Inscription
+/**
+ * Contrôleur pour l'inscription d'un nouvel utilisateur
+ *
+ * Cette fonction effectue les opérations suivantes :
+ * 1. Valide les données d'entrée (email, mot de passe, rôle)
+ * 2. Vérifie si l'email existe déjà dans la base de données
+ * 3. Crée un nouvel utilisateur selon le rôle spécifié
+ * 4. Génère un token JWT pour l'authentification
+ * 5. Renvoie les informations de l'utilisateur et le token
+ *
+ * @param {Object} req - L'objet request Express
+ * @param {Object} res - L'objet response Express
+ * @param {Function} next - La fonction middleware suivante
+ */
 const register = async (req, res, next) => {
   try {
     const { email, password, role, ...userData } = req.body;
@@ -99,19 +122,57 @@ const register = async (req, res, next) => {
     // Journaliser le succès
     console.log(`[${new Date().toISOString()}] INFO [AUTH] Inscription réussie: ${email} (${role})`);
 
+    // Déterminer le type d'utilisateur
+    let userType = 'client';
+    if (role === 'ROLE_PECHEUR') userType = 'pecheur';
+    else if (role === 'ROLE_VETERINAIRE') userType = 'veterinaire';
+    else if (role === 'ROLE_MARYEUR') userType = 'maryeur';
+    else if (role === 'ROLE_ADMIN') userType = 'admin';
+
+    // Utiliser l'ID personnalisé s'il existe, sinon utiliser l'ID MongoDB
+    const userId = user.id || user._id.toString();
+
+    // Construire l'objet utilisateur avec tous les champs nécessaires
+    const userResponse = {
+      id: userId,
+      email: user.email,
+      roles: user.roles,
+      nom: user.nom,
+      prenom: user.prenom,
+      telephone: user.telephone,
+      photo: user.photo,
+      userType: userType,
+      isValidated: user.isValidated || user.isValid || false,
+      isBlocked: user.isBlocked || false
+    };
+
+    // Ajouter les champs spécifiques selon le type d'utilisateur
+    if (userType === 'pecheur') {
+      userResponse.cin = user.cin;
+      userResponse.matricule = user.matricule;
+      userResponse.bateau = user.bateau;
+      userResponse.pays = user.pays;
+      userResponse.port = user.port;
+    } else if (userType === 'maryeur') {
+      userResponse.cin = user.cin;
+      userResponse.matricule = user.matricule;
+      userResponse.port = user.port;
+      userResponse.pays = user.pays;
+      userResponse.signature = user.signature;
+    } else if (userType === 'veterinaire') {
+      userResponse.cin = user.cin;
+      userResponse.matricule = user.matricule;
+      userResponse.specialite = user.specialite;
+      userResponse.certification = user.certification;
+    } else if (userType === 'client') {
+      userResponse.service = user.service;
+      userResponse.fonction = user.fonction;
+    }
+
     res.status(201).json({
       success: true,
       message: 'Inscription réussie',
-      user: {
-        _id: user._id,
-        email: user.email,
-        roles: user.roles,
-        nom: user.nom,
-        prenom: user.prenom,
-        telephone: user.telephone,
-        photo: user.photo,
-        isValidated: user.isValidated
-      },
+      user: userResponse,
       token
     });
   } catch (error) {
@@ -119,7 +180,21 @@ const register = async (req, res, next) => {
   }
 };
 
-// Connexion
+/**
+ * Contrôleur pour la connexion d'un utilisateur
+ *
+ * Cette fonction effectue les opérations suivantes :
+ * 1. Valide les données d'entrée (email, mot de passe)
+ * 2. Recherche l'utilisateur dans toutes les collections
+ * 3. Vérifie le mot de passe
+ * 4. Vérifie si le compte est validé et non bloqué
+ * 5. Génère un token JWT pour l'authentification
+ * 6. Renvoie les informations de l'utilisateur et le token
+ *
+ * @param {Object} req - L'objet request Express
+ * @param {Object} res - L'objet response Express
+ * @param {Function} next - La fonction middleware suivante
+ */
 const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -182,20 +257,51 @@ const login = async (req, res, next) => {
       else if (user.roles.includes('ROLE_ADMIN')) userType = 'admin';
     }
 
+    // Préparer les données utilisateur pour le frontend
+    // Utiliser l'ID personnalisé s'il existe, sinon utiliser l'ID MongoDB
+    const userId = user.id || user._id.toString();
+
+    // Construire l'objet utilisateur avec tous les champs nécessaires
+    const userData = {
+      id: userId,
+      email: user.email,
+      roles: user.roles,
+      nom: user.nom,
+      prenom: user.prenom,
+      telephone: user.telephone,
+      photo: user.photo,
+      userType: userType,
+      isValidated: user.isValidated || user.isValid || false,
+      isBlocked: user.isBlocked || false
+    };
+
+    // Ajouter les champs spécifiques selon le type d'utilisateur
+    if (userType === 'pecheur') {
+      userData.cin = user.cin;
+      userData.matricule = user.matricule;
+      userData.bateau = user.bateau;
+      userData.pays = user.pays;
+      userData.port = user.port;
+    } else if (userType === 'maryeur') {
+      userData.cin = user.cin;
+      userData.matricule = user.matricule;
+      userData.port = user.port;
+      userData.pays = user.pays;
+      userData.signature = user.signature;
+    } else if (userType === 'veterinaire') {
+      userData.cin = user.cin;
+      userData.matricule = user.matricule;
+      userData.specialite = user.specialite;
+      userData.certification = user.certification;
+    } else if (userType === 'client') {
+      userData.service = user.service;
+      userData.fonction = user.fonction;
+    }
+
     res.json({
       success: true,
       message: 'Connexion réussie',
-      user: {
-        _id: user._id,
-        email: user.email,
-        roles: user.roles,
-        nom: user.nom,
-        prenom: user.prenom,
-        telephone: user.telephone,
-        photo: user.photo,
-        userType: userType,
-        isValidated: user.isValidated || user.isValid || false
-      },
+      user: userData,
       token
     });
   } catch (error) {
@@ -203,7 +309,20 @@ const login = async (req, res, next) => {
   }
 };
 
-// Obtenir le profil de l'utilisateur connecté
+/**
+ * Contrôleur pour obtenir le profil de l'utilisateur connecté
+ *
+ * Cette fonction effectue les opérations suivantes :
+ * 1. Récupère l'utilisateur depuis l'objet request (ajouté par le middleware auth)
+ * 2. Détermine le type d'utilisateur
+ * 3. Construit un objet de réponse avec les informations de l'utilisateur
+ * 4. Ajoute des champs spécifiques selon le type d'utilisateur
+ * 5. Renvoie les informations du profil
+ *
+ * @param {Object} req - L'objet request Express
+ * @param {Object} res - L'objet response Express
+ * @param {Function} next - La fonction middleware suivante
+ */
 const getProfile = async (req, res, next) => {
   try {
     const user = req.user;
@@ -221,9 +340,12 @@ const getProfile = async (req, res, next) => {
       else if (user.roles.includes('ROLE_ADMIN')) userType = 'admin';
     }
 
+    // Utiliser l'ID personnalisé s'il existe, sinon utiliser l'ID MongoDB
+    const userId = user.id || user._id.toString();
+
     // Construire l'objet de réponse de base
     const userProfile = {
-      _id: user._id,
+      id: userId,
       email: user.email,
       roles: user.roles,
       nom: user.nom,
@@ -231,24 +353,33 @@ const getProfile = async (req, res, next) => {
       telephone: user.telephone,
       photo: user.photo,
       userType: userType,
-      isValidated: user.isValidated || user.isValid || false
+      isValidated: user.isValidated || user.isValid || false,
+      isBlocked: user.isBlocked || false
     };
 
     // Ajouter des champs spécifiques selon le type d'utilisateur
     if (userType === 'pecheur') {
-      userProfile.bateau = user.bateau;
-      userProfile.port = user.port;
+      userProfile.cin = user.cin;
       userProfile.matricule = user.matricule;
+      userProfile.bateau = user.bateau;
+      userProfile.pays = user.pays;
+      userProfile.port = user.port;
       userProfile.capacite = user.capacite;
     } else if (userType === 'veterinaire') {
+      userProfile.cin = user.cin;
       userProfile.specialite = user.specialite;
       userProfile.certification = user.certification;
       userProfile.matricule = user.matricule;
       userProfile.port = user.port;
     } else if (userType === 'maryeur') {
+      userProfile.cin = user.cin;
       userProfile.matricule = user.matricule;
       userProfile.port = user.port;
+      userProfile.pays = user.pays;
       userProfile.signature = user.signature;
+    } else if (userType === 'client') {
+      userProfile.service = user.service;
+      userProfile.fonction = user.fonction;
     }
 
     res.json({
@@ -260,7 +391,19 @@ const getProfile = async (req, res, next) => {
   }
 };
 
-// Validation d'un compte utilisateur par un admin
+/**
+ * Contrôleur pour valider un compte utilisateur par un administrateur
+ *
+ * Cette fonction effectue les opérations suivantes :
+ * 1. Récupère l'ID de l'utilisateur à valider
+ * 2. Recherche l'utilisateur dans la base de données
+ * 3. Définit le champ isValidated à true
+ * 4. Sauvegarde les modifications
+ * 5. Renvoie un message de succès
+ *
+ * @param {Object} req - L'objet request Express
+ * @param {Object} res - L'objet response Express
+ */
 const validateUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -279,7 +422,19 @@ const validateUser = async (req, res) => {
   }
 };
 
-// Bloquer/débloquer un compte utilisateur
+/**
+ * Contrôleur pour bloquer ou débloquer un compte utilisateur
+ *
+ * Cette fonction effectue les opérations suivantes :
+ * 1. Récupère l'ID de l'utilisateur à bloquer/débloquer
+ * 2. Recherche l'utilisateur dans la base de données
+ * 3. Inverse la valeur du champ isBlocked
+ * 4. Sauvegarde les modifications
+ * 5. Renvoie un message de succès
+ *
+ * @param {Object} req - L'objet request Express
+ * @param {Object} res - L'objet response Express
+ */
 const toggleUserBlock = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -300,13 +455,133 @@ const toggleUserBlock = async (req, res) => {
   }
 };
 
-// Obtenir la liste des utilisateurs en attente de validation
-const getPendingUsers = async (req, res) => {
+/**
+ * Contrôleur pour obtenir la liste des utilisateurs en attente de validation
+ *
+ * Cette fonction effectue les opérations suivantes :
+ * 1. Recherche tous les utilisateurs dont le champ isValidated est false
+ * 2. Exclut le mot de passe des résultats
+ * 3. Renvoie la liste des utilisateurs en attente
+ *
+ * @param {Object} _ - L'objet request Express (non utilisé)
+ * @param {Object} res - L'objet response Express
+ */
+const getPendingUsers = async (_, res) => {
   try {
     const pendingUsers = await User.find({ isValidated: false }).select('-password');
     res.json(pendingUsers);
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+};
+
+/**
+ * Contrôleur pour demander une réinitialisation de mot de passe
+ *
+ * Cette fonction effectue les opérations suivantes :
+ * 1. Récupère l'email de l'utilisateur
+ * 2. Vérifie si l'utilisateur existe
+ * 3. Simule l'envoi d'un email de réinitialisation
+ * 4. Renvoie un message de succès
+ *
+ * @param {Object} req - L'objet request Express
+ * @param {Object} res - L'objet response Express
+ * @param {Function} next - La fonction middleware suivante
+ */
+const requestPasswordReset = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      throw new BadRequestError('Email requis');
+    }
+
+    // Chercher l'utilisateur dans toutes les collections
+    const userPromises = [
+      User.findOne({ email }),
+      Pecheur.findOne({ email }),
+      Veterinaire.findOne({ email }),
+      Maryeur.findOne({ email })
+    ];
+
+    const users = await Promise.all(userPromises);
+    const user = users.find(u => u !== null);
+
+    if (!user) {
+      // Pour des raisons de sécurité, ne pas indiquer si l'email existe ou non
+      return res.success(null, 'Si votre email est enregistré, vous recevrez un lien de réinitialisation');
+    }
+
+    // Dans une application réelle, générer un token et envoyer un email
+    // Pour ce projet, on simule simplement l'envoi d'un email
+    console.log(`[${new Date().toISOString()}] INFO [AUTH] Demande de réinitialisation de mot de passe: ${email}`);
+
+    res.success(null, 'Si votre email est enregistré, vous recevrez un lien de réinitialisation');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Contrôleur pour réinitialiser le mot de passe
+ *
+ * Cette fonction effectue les opérations suivantes :
+ * 1. Récupère l'email et le nouveau mot de passe
+ * 2. Vérifie si l'utilisateur existe
+ * 3. Met à jour le mot de passe
+ * 4. Renvoie un message de succès
+ *
+ * @param {Object} req - L'objet request Express
+ * @param {Object} res - L'objet response Express
+ * @param {Function} next - La fonction middleware suivante
+ */
+const resetPassword = async (req, res, next) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      throw new BadRequestError('Email et nouveau mot de passe requis');
+    }
+
+    if (newPassword.length < 6) {
+      throw new BadRequestError('Le mot de passe doit contenir au moins 6 caractères');
+    }
+
+    // Chercher l'utilisateur dans toutes les collections
+    let user;
+
+    // Chercher dans User
+    user = await User.findOne({ email });
+
+    // Chercher dans Pecheur
+    if (!user) {
+      user = await Pecheur.findOne({ email });
+    }
+
+    // Chercher dans Veterinaire
+    if (!user) {
+      user = await Veterinaire.findOne({ email });
+    }
+
+    // Chercher dans Maryeur
+    if (!user) {
+      user = await Maryeur.findOne({ email });
+    }
+
+    if (!user) {
+      // Pour des raisons de sécurité, ne pas indiquer si l'email existe ou non
+      return res.success(null, 'Mot de passe réinitialisé avec succès');
+    }
+
+    // Mettre à jour le mot de passe
+    user.password = newPassword;
+    await user.save();
+
+    console.log(`[${new Date().toISOString()}] INFO [AUTH] Mot de passe réinitialisé: ${email}`);
+
+    res.success(null, 'Mot de passe réinitialisé avec succès');
+  } catch (error) {
+    next(error);
   }
 };
 
@@ -316,5 +591,7 @@ module.exports = {
   getProfile,
   validateUser,
   toggleUserBlock,
-  getPendingUsers
+  getPendingUsers,
+  requestPasswordReset,
+  resetPassword
 };

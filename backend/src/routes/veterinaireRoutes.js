@@ -3,6 +3,7 @@
  */
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Veterinaire = require('../models/Veterinaire');
 const { auth, checkRole } = require('../middleware/auth');
 
@@ -32,9 +33,23 @@ router.post('/', auth, checkRole('ROLE_ADMIN'), async (req, res, next) => {
       req.body.roles = 'ROLE_VETERINAIRE';
     }
 
-    const veterinaire = new Veterinaire(req.body);
-    const newVeterinaire = await veterinaire.save();
-    res.created(newVeterinaire, 'Vétérinaire créé avec succès');
+    // Si un ID personnalisé est fourni, le stocker dans un champ 'id'
+    if (req.body.id) {
+      // Créer une copie du corps de la requête pour éviter de modifier l'original
+      const bodyWithCustomId = { ...req.body };
+      // Supprimer l'ID du corps principal pour éviter les conflits avec MongoDB
+      delete bodyWithCustomId._id;
+
+      // Créer le vétérinaire avec l'ID personnalisé stocké dans un champ 'id'
+      const veterinaire = new Veterinaire(bodyWithCustomId);
+      const newVeterinaire = await veterinaire.save();
+      res.created(newVeterinaire, 'Vétérinaire créé avec succès');
+    } else {
+      // Création normale sans ID personnalisé
+      const veterinaire = new Veterinaire(req.body);
+      const newVeterinaire = await veterinaire.save();
+      res.created(newVeterinaire, 'Vétérinaire créé avec succès');
+    }
   } catch (error) {
     next(error);
   }
@@ -47,10 +62,26 @@ router.post('/', auth, checkRole('ROLE_ADMIN'), async (req, res, next) => {
  */
 router.get('/:id', async (req, res, next) => {
   try {
-    const veterinaire = await Veterinaire.findById(req.params.id);
+    let veterinaire;
+
+    // Essayer de trouver par ObjectId (MongoDB ID)
+    try {
+      if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+        veterinaire = await Veterinaire.findById(req.params.id);
+      }
+    } catch (idError) {
+      console.log('Erreur lors de la recherche par ObjectId:', idError);
+    }
+
+    // Si non trouvé, essayer de trouver par ID personnalisé
+    if (!veterinaire) {
+      veterinaire = await Veterinaire.findOne({ id: req.params.id });
+    }
+
     if (!veterinaire) {
       return res.error('Vétérinaire non trouvé', 404);
     }
+
     res.success(veterinaire, 'Vétérinaire récupéré avec succès');
   } catch (error) {
     next(error);
@@ -74,16 +105,65 @@ router.patch('/:id', auth, async (req, res, next) => {
       delete req.body.roles;
     }
 
-    const veterinaire = await Veterinaire.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true
-    });
+    let veterinaire;
+
+    // Essayer de mettre à jour par ObjectId (MongoDB ID)
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      veterinaire = await Veterinaire.findByIdAndUpdate(req.params.id, req.body, {
+        new: true,
+        runValidators: true
+      });
+    }
+
+    // Si non trouvé, essayer de mettre à jour par ID personnalisé
+    if (!veterinaire) {
+      veterinaire = await Veterinaire.findOneAndUpdate({ id: req.params.id }, req.body, {
+        new: true,
+        runValidators: true
+      });
+    }
 
     if (!veterinaire) {
       return res.error('Vétérinaire non trouvé', 404);
     }
 
     res.success(veterinaire, 'Vétérinaire mis à jour avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route DELETE /api/veterinaires/:id
+ * @desc Supprimer un vétérinaire
+ * @access Private (Admin uniquement)
+ */
+router.delete('/:id', auth, checkRole('ROLE_ADMIN'), async (req, res, next) => {
+  try {
+    let veterinaire;
+    let deleteResult;
+
+    // Essayer de supprimer par ObjectId (MongoDB ID)
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      deleteResult = await Veterinaire.findByIdAndDelete(req.params.id);
+      if (deleteResult) {
+        veterinaire = deleteResult;
+      }
+    }
+
+    // Si non trouvé, essayer de supprimer par ID personnalisé
+    if (!veterinaire) {
+      deleteResult = await Veterinaire.findOneAndDelete({ id: req.params.id });
+      if (deleteResult) {
+        veterinaire = deleteResult;
+      }
+    }
+
+    if (!veterinaire) {
+      return res.error('Vétérinaire non trouvé', 404);
+    }
+
+    res.success(null, 'Vétérinaire supprimé avec succès');
   } catch (error) {
     next(error);
   }

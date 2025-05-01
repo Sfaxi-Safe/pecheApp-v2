@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Pecheur = require('../models/Pecheur');
 const Veterinaire = require('../models/Veterinaire');
@@ -7,6 +8,17 @@ const Maryeur = require('../models/Maryeur');
 /**
  * Middleware d'authentification
  * Vérifie le token JWT et charge l'utilisateur correspondant
+ *
+ * Ce middleware effectue les opérations suivantes :
+ * 1. Récupère le token JWT depuis l'en-tête Authorization
+ * 2. Vérifie la validité du token
+ * 3. Recherche l'utilisateur correspondant dans la base de données
+ * 4. Vérifie si l'utilisateur est validé et non bloqué
+ * 5. Ajoute l'utilisateur et le token à l'objet request
+ *
+ * @param {Object} req - L'objet request Express
+ * @param {Object} res - L'objet response Express
+ * @param {Function} next - La fonction middleware suivante
  */
 const auth = async (req, res, next) => {
   try {
@@ -34,14 +46,31 @@ const auth = async (req, res, next) => {
     // Adapter pour fonctionner avec roles en tant que string
     const roles = typeof decoded.roles === 'string' ? decoded.roles : '';
 
+    // Essayer de trouver l'utilisateur par ID MongoDB ou ID personnalisé
+    const findUserById = async (Model, id) => {
+      let foundUser = null;
+
+      // Essayer d'abord avec l'ID MongoDB
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        foundUser = await Model.findById(id);
+      }
+
+      // Si non trouvé, essayer avec l'ID personnalisé
+      if (!foundUser) {
+        foundUser = await Model.findOne({ id: id });
+      }
+
+      return foundUser;
+    };
+
     if (roles.includes('ROLE_CLIENT') || roles.includes('ROLE_ADMIN')) {
-      user = await User.findById(decoded._id);
+      user = await findUserById(User, decoded._id);
     } else if (roles.includes('ROLE_PECHEUR')) {
-      user = await Pecheur.findById(decoded._id);
+      user = await findUserById(Pecheur, decoded._id);
     } else if (roles.includes('ROLE_VETERINAIRE')) {
-      user = await Veterinaire.findById(decoded._id);
+      user = await findUserById(Veterinaire, decoded._id);
     } else if (roles.includes('ROLE_MARYEUR')) {
-      user = await Maryeur.findById(decoded._id);
+      user = await findUserById(Maryeur, decoded._id);
     }
 
     // Vérifier si l'utilisateur existe
@@ -72,6 +101,13 @@ const auth = async (req, res, next) => {
 
 /**
  * Middleware pour vérifier les rôles
+ * Vérifie si l'utilisateur authentifié possède au moins un des rôles requis
+ *
+ * Ce middleware effectue les opérations suivantes :
+ * 1. Vérifie si l'utilisateur est authentifié
+ * 2. Vérifie si l'utilisateur possède au moins un des rôles requis
+ * 3. Renvoie une erreur 403 si l'utilisateur n'a pas les autorisations nécessaires
+ *
  * @param {Array|String} roles - Rôle(s) autorisé(s)
  * @returns {Function} Middleware Express
  */

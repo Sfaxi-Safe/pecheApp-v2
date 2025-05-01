@@ -3,6 +3,7 @@
  */
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Maryeur = require('../models/Maryeur');
 const { auth, checkRole } = require('../middleware/auth');
 
@@ -32,9 +33,23 @@ router.post('/', auth, checkRole('ROLE_ADMIN'), async (req, res, next) => {
       req.body.roles = 'ROLE_MARYEUR';
     }
 
-    const maryeur = new Maryeur(req.body);
-    const newMaryeur = await maryeur.save();
-    res.created(newMaryeur, 'Mareyeur créé avec succès');
+    // Si un ID personnalisé est fourni, le stocker dans un champ 'id'
+    if (req.body.id) {
+      // Créer une copie du corps de la requête pour éviter de modifier l'original
+      const bodyWithCustomId = { ...req.body };
+      // Supprimer l'ID du corps principal pour éviter les conflits avec MongoDB
+      delete bodyWithCustomId._id;
+
+      // Créer le mareyeur avec l'ID personnalisé stocké dans un champ 'id'
+      const maryeur = new Maryeur(bodyWithCustomId);
+      const newMaryeur = await maryeur.save();
+      res.created(newMaryeur, 'Mareyeur créé avec succès');
+    } else {
+      // Création normale sans ID personnalisé
+      const maryeur = new Maryeur(req.body);
+      const newMaryeur = await maryeur.save();
+      res.created(newMaryeur, 'Mareyeur créé avec succès');
+    }
   } catch (error) {
     next(error);
   }
@@ -47,10 +62,26 @@ router.post('/', auth, checkRole('ROLE_ADMIN'), async (req, res, next) => {
  */
 router.get('/:id', async (req, res, next) => {
   try {
-    const maryeur = await Maryeur.findById(req.params.id);
+    let maryeur;
+
+    // Essayer de trouver par ObjectId (MongoDB ID)
+    try {
+      if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+        maryeur = await Maryeur.findById(req.params.id);
+      }
+    } catch (idError) {
+      console.log('Erreur lors de la recherche par ObjectId:', idError);
+    }
+
+    // Si non trouvé, essayer de trouver par ID personnalisé
+    if (!maryeur) {
+      maryeur = await Maryeur.findOne({ id: req.params.id });
+    }
+
     if (!maryeur) {
       return res.error('Mareyeur non trouvé', 404);
     }
+
     res.success(maryeur, 'Mareyeur récupéré avec succès');
   } catch (error) {
     next(error);
@@ -74,16 +105,65 @@ router.patch('/:id', auth, async (req, res, next) => {
       delete req.body.roles;
     }
 
-    const maryeur = await Maryeur.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true
-    });
+    let maryeur;
+
+    // Essayer de mettre à jour par ObjectId (MongoDB ID)
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      maryeur = await Maryeur.findByIdAndUpdate(req.params.id, req.body, {
+        new: true,
+        runValidators: true
+      });
+    }
+
+    // Si non trouvé, essayer de mettre à jour par ID personnalisé
+    if (!maryeur) {
+      maryeur = await Maryeur.findOneAndUpdate({ id: req.params.id }, req.body, {
+        new: true,
+        runValidators: true
+      });
+    }
 
     if (!maryeur) {
       return res.error('Mareyeur non trouvé', 404);
     }
 
     res.success(maryeur, 'Mareyeur mis à jour avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route DELETE /api/maryeurs/:id
+ * @desc Supprimer un mareyeur
+ * @access Private (Admin uniquement)
+ */
+router.delete('/:id', auth, checkRole('ROLE_ADMIN'), async (req, res, next) => {
+  try {
+    let maryeur;
+    let deleteResult;
+
+    // Essayer de supprimer par ObjectId (MongoDB ID)
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      deleteResult = await Maryeur.findByIdAndDelete(req.params.id);
+      if (deleteResult) {
+        maryeur = deleteResult;
+      }
+    }
+
+    // Si non trouvé, essayer de supprimer par ID personnalisé
+    if (!maryeur) {
+      deleteResult = await Maryeur.findOneAndDelete({ id: req.params.id });
+      if (deleteResult) {
+        maryeur = deleteResult;
+      }
+    }
+
+    if (!maryeur) {
+      return res.error('Mareyeur non trouvé', 404);
+    }
+
+    res.success(null, 'Mareyeur supprimé avec succès');
   } catch (error) {
     next(error);
   }

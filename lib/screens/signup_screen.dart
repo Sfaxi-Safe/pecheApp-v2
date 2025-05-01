@@ -101,11 +101,7 @@ class SignupScreenState extends State<SignupScreen> {
       final password = _passwordController.text;
       final nom = _nomController.text.trim();
       final prenom = _prenomController.text.trim();
-      int? telephone;
-
-      if (_telephoneController.text.isNotEmpty) {
-        telephone = int.tryParse(_telephoneController.text);
-      }
+      final telephone = _telephoneController.text.trim();
 
       // Préparer les données utilisateur de base
       final userData = {
@@ -161,11 +157,26 @@ class SignupScreenState extends State<SignupScreen> {
         context,
       ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
     } catch (e) {
+      // Journaliser l'erreur pour le débogage
+      debugPrint('Erreur lors de l\'inscription: ${e.toString()}');
+
       setState(() {
         // Vérifier si l'erreur concerne un email déjà utilisé
         if (e.toString().contains('email') &&
             e.toString().contains('utilisé')) {
           _errorMessage = 'Cet email est déjà utilisé';
+        }
+        // Vérifier si c'est une erreur de timeout
+        else if (e.toString().contains('timeout') ||
+            e.toString().contains('trop de temps')) {
+          _errorMessage =
+              'Le serveur met trop de temps à répondre. Veuillez vérifier votre connexion internet et réessayer.';
+        }
+        // Vérifier si c'est une erreur de connexion
+        else if (e.toString().contains('SocketException') ||
+            e.toString().contains('connexion')) {
+          _errorMessage =
+              'Impossible de se connecter au serveur. Vérifiez votre connexion internet.';
         } else {
           _errorMessage = 'Une erreur est survenue: ${e.toString()}';
         }

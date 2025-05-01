@@ -1,5 +1,9 @@
+/**
+ * Modèle représentant un mareyeur dans l'application
+ * Correspond au modèle Maryeur côté backend
+ */
 class Maryeur {
-  final int? id;
+  final String? id; // ID peut être null lors de la création
   final String email;
   final String roles;
   final String password;
@@ -9,7 +13,8 @@ class Maryeur {
   final String? matricule;
   final String? port;
   final String? pays;
-  final int? telephone;
+  final String?
+  telephone; // Changé de int? à String? pour correspondre au backend
   final String? signature;
 
   Maryeur({

@@ -14,7 +14,7 @@ class ApiService {
   static final ApiService instance = ApiService._init();
   // Utilisez l'adresse IP de votre ordinateur au lieu de localhost pour les appareils physiques
   // Pour les émulateurs Android, utilisez 10.0.2.2 au lieu de localhost
-  final String baseUrl = 'http://10.0.2.2:5000/api';
+  final String baseUrl = 'http://10.0.2.2:3005/api';
   String? _authToken;
 
   ApiService._init();
@@ -112,7 +112,9 @@ class ApiService {
             body: json.encode(data),
           )
           .timeout(
-            const Duration(seconds: 30),
+            const Duration(
+              seconds: 60,
+            ), // Augmenter le délai d'attente à 60 secondes
             onTimeout: () {
               throw TimeoutException(
                 'La requête a pris trop de temps à s\'exécuter',

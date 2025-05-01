@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -47,8 +47,7 @@ const { connectDB } = require('./config/database');
 connectDB();
 
 // Servir les fichiers statiques
-const path = require('path');
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(require('path').join(__dirname, '../uploads')));
 
 // Routes API
 app.use('/api/users', userRoutes);
@@ -75,7 +74,7 @@ app.get('/api/health', (req, res) => {
 app.use(errorHandler);
 
 // Utiliser le port configuré dans .env ou 3005 par défaut
-const PORT = process.env.PORT || 3005;
+const PORT = 3005; // Fixer le port à 3005 pour éviter les changements
 console.log('Port utilisé pour le serveur:', PORT);
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);

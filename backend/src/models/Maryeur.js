@@ -3,6 +3,11 @@ const validator = require('validator');
 const bcrypt = require('bcryptjs');
 
 const maryeurSchema = new mongoose.Schema({
+  id: {
+    type: String,
+    unique: true,
+    sparse: true // Permet que certains documents n'aient pas ce champ
+  },
   email: {
     type: String,
     required: true,
@@ -72,7 +77,10 @@ const maryeurSchema = new mongoose.Schema({
   toJSON: {
     virtuals: true,
     transform: function(doc, ret) {
-      ret.id = ret._id;
+      // Si un ID personnalisé existe, l'utiliser, sinon utiliser l'ID MongoDB
+      if (!ret.id) {
+        ret.id = ret._id;
+      }
       delete ret._id;
       delete ret.__v;
       delete ret.password;
@@ -85,6 +93,18 @@ const maryeurSchema = new mongoose.Schema({
 maryeurSchema.pre('save', async function(next) {
   if (this.isModified('password')) {
     this.password = await bcrypt.hash(this.password, 8);
+  }
+  next();
+});
+
+// Middleware pour gérer l'ID personnalisé
+maryeurSchema.pre('save', function(next) {
+  // Si un ID personnalisé est fourni dans la requête, l'utiliser
+  if (this.id) {
+    // L'ID personnalisé est déjà défini, ne rien faire
+  } else if (this._id) {
+    // Sinon, utiliser l'ID MongoDB comme ID personnalisé
+    this.id = this._id.toString();
   }
   next();
 });
