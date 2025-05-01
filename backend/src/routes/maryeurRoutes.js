@@ -1,49 +1,91 @@
+/**
+ * Routes pour les maryeurs (mareyeurs)
+ */
 const express = require('express');
 const router = express.Router();
 const Maryeur = require('../models/Maryeur');
+const { auth, checkRole } = require('../middleware/auth');
 
-// Route pour obtenir tous les mareyeurs
-router.get('/', async (req, res) => {
+/**
+ * @route GET /api/maryeurs
+ * @desc Récupérer tous les mareyeurs
+ * @access Public
+ */
+router.get('/', async (req, res, next) => {
   try {
     const maryeurs = await Maryeur.find();
-    res.json(maryeurs);
+    res.success(maryeurs, 'Liste des mareyeurs récupérée avec succès');
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-// Route pour créer un nouveau mareyeur
-router.post('/', async (req, res) => {
-  const maryeur = new Maryeur(req.body);
+/**
+ * @route POST /api/maryeurs
+ * @desc Créer un nouveau mareyeur
+ * @access Private (Admin)
+ */
+router.post('/', auth, checkRole('ROLE_ADMIN'), async (req, res, next) => {
   try {
+    // Assurer que le rôle est correctement défini
+    if (!req.body.roles) {
+      req.body.roles = 'ROLE_MARYEUR';
+    }
+
+    const maryeur = new Maryeur(req.body);
     const newMaryeur = await maryeur.save();
-    res.status(201).json(newMaryeur);
+    res.created(newMaryeur, 'Mareyeur créé avec succès');
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    next(error);
   }
 });
 
-// Route pour obtenir un mareyeur spécifique
-router.get('/:id', async (req, res) => {
+/**
+ * @route GET /api/maryeurs/:id
+ * @desc Récupérer un mareyeur spécifique
+ * @access Public
+ */
+router.get('/:id', async (req, res, next) => {
   try {
     const maryeur = await Maryeur.findById(req.params.id);
-    if (maryeur) {
-      res.json(maryeur);
-    } else {
-      res.status(404).json({ message: 'Mareyeur non trouvé' });
+    if (!maryeur) {
+      return res.error('Mareyeur non trouvé', 404);
     }
+    res.success(maryeur, 'Mareyeur récupéré avec succès');
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-// Route pour mettre à jour un mareyeur
-router.patch('/:id', async (req, res) => {
+/**
+ * @route PATCH /api/maryeurs/:id
+ * @desc Mettre à jour un mareyeur
+ * @access Private (Admin ou le mareyeur lui-même)
+ */
+router.patch('/:id', auth, async (req, res, next) => {
   try {
-    const maryeur = await Maryeur.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json(maryeur);
+    // Vérifier si l'utilisateur est autorisé à modifier ce mareyeur
+    if (!req.user.isAdmin() && req.user._id.toString() !== req.params.id) {
+      return res.error('Non autorisé à modifier ce mareyeur', 403);
+    }
+
+    // Empêcher la modification du rôle par un non-admin
+    if (!req.user.isAdmin() && req.body.roles) {
+      delete req.body.roles;
+    }
+
+    const maryeur = await Maryeur.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true
+    });
+
+    if (!maryeur) {
+      return res.error('Mareyeur non trouvé', 404);
+    }
+
+    res.success(maryeur, 'Mareyeur mis à jour avec succès');
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    next(error);
   }
 });
 

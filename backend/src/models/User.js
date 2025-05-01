@@ -11,16 +11,11 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     validate: [validator.isEmail, 'Email invalide']
   },
+  // Changé pour correspondre au frontend où roles est une chaîne
   roles: {
-    type: [String],
+    type: String,
     required: true,
-    validate: {
-      validator: function(v) {
-        return v.every(role => ['ROLE_ADMIN', 'ROLE_CLIENT', 'ROLE_PECHEUR', 'ROLE_MARYEUR', 'ROLE_VETERINAIRE'].includes(role));
-      },
-      message: props => `${props.value} contient un rôle invalide`
-    },
-    default: ['ROLE_CLIENT']
+    default: 'ROLE_CLIENT'
   },
   password: {
     type: String,
@@ -39,13 +34,9 @@ const userSchema = new mongoose.Schema({
   },
   telephone: {
     type: String,
-    required: true
+    required: false
   },
   isValidated: {
-    type: Boolean,
-    default: false
-  },
-  isValid: {
     type: Boolean,
     default: false
   },
@@ -53,16 +44,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  adresse: String,
   photo: String,
   // Champs supplémentaires pour correspondre au frontend
   service: String,
-  fonction: String,
-  userType: {
-    type: String,
-    enum: ['client', 'pecheur', 'veterinaire', 'maryeur', 'admin'],
-    default: 'client'
-  }
+  fonction: String
 }, {
   timestamps: true,
   toJSON: {
@@ -90,7 +75,7 @@ userSchema.methods.comparePassword = async function(password) {
   return bcrypt.compare(password, this.password);
 };
 
-// Méthodes pour vérifier les rôles
+// Méthodes pour vérifier les rôles (adaptées pour roles en tant que string)
 userSchema.methods.hasRole = function(role) {
   return this.roles.includes(role);
 };

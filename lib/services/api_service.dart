@@ -14,7 +14,7 @@ class ApiService {
   static final ApiService instance = ApiService._init();
   // Utilisez l'adresse IP de votre ordinateur au lieu de localhost pour les appareils physiques
   // Pour les émulateurs Android, utilisez 10.0.2.2 au lieu de localhost
-  final String baseUrl = 'http://10.0.2.2:3002/api';
+  final String baseUrl = 'http://10.0.2.2:5000/api';
   String? _authToken;
 
   ApiService._init();

@@ -74,7 +74,9 @@ app.get('/api/health', (req, res) => {
 // Gestion des erreurs
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3001;
+// Utiliser le port configuré dans .env ou 3005 par défaut
+const PORT = process.env.PORT || 3005;
+console.log('Port utilisé pour le serveur:', PORT);
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);
 });

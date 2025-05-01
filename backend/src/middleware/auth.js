@@ -31,13 +31,16 @@ const auth = async (req, res, next) => {
     let user;
 
     // Vérifier dans chaque collection selon le rôle
-    if (decoded.roles.includes('ROLE_CLIENT') || decoded.roles.includes('ROLE_ADMIN')) {
+    // Adapter pour fonctionner avec roles en tant que string
+    const roles = typeof decoded.roles === 'string' ? decoded.roles : '';
+
+    if (roles.includes('ROLE_CLIENT') || roles.includes('ROLE_ADMIN')) {
       user = await User.findById(decoded._id);
-    } else if (decoded.roles.includes('ROLE_PECHEUR')) {
+    } else if (roles.includes('ROLE_PECHEUR')) {
       user = await Pecheur.findById(decoded._id);
-    } else if (decoded.roles.includes('ROLE_VETERINAIRE')) {
+    } else if (roles.includes('ROLE_VETERINAIRE')) {
       user = await Veterinaire.findById(decoded._id);
-    } else if (decoded.roles.includes('ROLE_MARYEUR')) {
+    } else if (roles.includes('ROLE_MARYEUR')) {
       user = await Maryeur.findById(decoded._id);
     }
 
@@ -47,7 +50,8 @@ const auth = async (req, res, next) => {
     }
 
     // Vérifier si l'utilisateur est validé
-    if (!(user.isValidated || user.isValid) && !decoded.roles.includes('ROLE_ADMIN')) {
+    const isAdmin = typeof decoded.roles === 'string' ? decoded.roles.includes('ROLE_ADMIN') : false;
+    if (!(user.isValidated || user.isValid) && !isAdmin) {
       return res.error('Votre compte est en attente de validation', 403);
     }
 
@@ -82,8 +86,16 @@ const checkRole = (roles) => {
     }
 
     // Vérifier si l'utilisateur a au moins un des rôles requis
-    if (!req.user.roles.some(role => roleArray.includes(role))) {
-      return res.error(`Accès réservé aux rôles: ${roleArray.join(', ')}`, 403);
+    // Adapter pour fonctionner avec roles en tant que string
+    const userRoles = req.user.roles || '';
+
+    if (typeof userRoles === 'string') {
+      // Si roles est une chaîne, vérifier si elle contient l'un des rôles requis
+      if (!roleArray.some(role => userRoles.includes(role))) {
+        return res.error(`Accès réservé aux rôles: ${roleArray.join(', ')}`, 403);
+      }
+    } else {
+      return res.error('Format de rôle invalide', 403);
     }
 
     next();

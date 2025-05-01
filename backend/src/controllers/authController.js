@@ -66,7 +66,7 @@ const register = async (req, res, next) => {
       ...userData,
       email,
       password,
-      roles: [role],
+      roles: role, // Changé de [role] à role pour correspondre au frontend
       isValidated: role === 'ROLE_ADMIN' // Les admins sont automatiquement validés
     };
 
@@ -175,10 +175,12 @@ const login = async (req, res, next) => {
 
     // Déterminer le type d'utilisateur
     let userType = 'client';
-    if (user.roles.includes('ROLE_PECHEUR')) userType = 'pecheur';
-    else if (user.roles.includes('ROLE_VETERINAIRE')) userType = 'veterinaire';
-    else if (user.roles.includes('ROLE_MARYEUR')) userType = 'maryeur';
-    else if (user.roles.includes('ROLE_ADMIN')) userType = 'admin';
+    if (user.roles && typeof user.roles === 'string') {
+      if (user.roles.includes('ROLE_PECHEUR')) userType = 'pecheur';
+      else if (user.roles.includes('ROLE_VETERINAIRE')) userType = 'veterinaire';
+      else if (user.roles.includes('ROLE_MARYEUR')) userType = 'maryeur';
+      else if (user.roles.includes('ROLE_ADMIN')) userType = 'admin';
+    }
 
     res.json({
       success: true,
@@ -212,10 +214,12 @@ const getProfile = async (req, res, next) => {
 
     // Déterminer le type d'utilisateur
     let userType = 'client';
-    if (user.roles.includes('ROLE_PECHEUR')) userType = 'pecheur';
-    else if (user.roles.includes('ROLE_VETERINAIRE')) userType = 'veterinaire';
-    else if (user.roles.includes('ROLE_MARYEUR')) userType = 'maryeur';
-    else if (user.roles.includes('ROLE_ADMIN')) userType = 'admin';
+    if (user.roles && typeof user.roles === 'string') {
+      if (user.roles.includes('ROLE_PECHEUR')) userType = 'pecheur';
+      else if (user.roles.includes('ROLE_VETERINAIRE')) userType = 'veterinaire';
+      else if (user.roles.includes('ROLE_MARYEUR')) userType = 'maryeur';
+      else if (user.roles.includes('ROLE_ADMIN')) userType = 'admin';
+    }
 
     // Construire l'objet de réponse de base
     const userProfile = {

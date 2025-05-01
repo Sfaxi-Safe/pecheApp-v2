@@ -12,15 +12,9 @@ const maryeurSchema = new mongoose.Schema({
     validate: [validator.isEmail, 'Email invalide']
   },
   roles: {
-    type: [String],
+    type: String,
     required: true,
-    validate: {
-      validator: function(v) {
-        return v.includes('ROLE_MARYEUR');
-      },
-      message: 'Le rôle ROLE_MARYEUR est requis'
-    },
-    default: ['ROLE_MARYEUR']
+    default: 'ROLE_MARYEUR'
   },
   password: {
     type: String,
@@ -100,7 +94,7 @@ maryeurSchema.methods.comparePassword = async function(password) {
   return bcrypt.compare(password, this.password);
 };
 
-// Méthodes pour vérifier les rôles
+// Méthodes pour vérifier les rôles (adaptées pour roles en tant que string)
 maryeurSchema.methods.hasRole = function(role) {
   return this.roles.includes(role);
 };

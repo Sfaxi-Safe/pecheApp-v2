@@ -16,15 +16,9 @@ const pecheurSchema = new mongoose.Schema({
     validate: [validator.isEmail, 'Email invalide']
   },
   roles: {
-    type: [String],
+    type: String,
     required: true,
-    validate: {
-      validator: function(v) {
-        return v.includes('ROLE_PECHEUR');
-      },
-      message: 'Le rôle ROLE_PECHEUR est requis'
-    },
-    default: ['ROLE_PECHEUR']
+    default: 'ROLE_PECHEUR'
   },
   password: {
     type: String,
@@ -111,7 +105,7 @@ pecheurSchema.methods.comparePassword = async function(password) {
   return bcrypt.compare(password, this.password);
 };
 
-// Méthodes pour vérifier les rôles
+// Méthodes pour vérifier les rôles (adaptées pour roles en tant que string)
 pecheurSchema.methods.hasRole = function(role) {
   return this.roles.includes(role);
 };
