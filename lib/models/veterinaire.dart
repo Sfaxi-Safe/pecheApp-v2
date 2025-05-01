@@ -6,9 +6,6 @@ class Veterinaire {
   final String nom;
   final String prenom;
   final String? cin;
-  final String? matricule;
-  final String? specialite;
-  final String? certification;
   final String? telephone;
   final String? photo;
   final bool isValidated;
@@ -22,9 +19,6 @@ class Veterinaire {
     required this.nom,
     required this.prenom,
     this.cin,
-    this.matricule,
-    this.specialite,
-    this.certification,
     this.telephone,
     this.photo,
     this.isValidated = false,
@@ -40,9 +34,6 @@ class Veterinaire {
       nom: map['nom'] ?? '',
       prenom: map['prenom'] ?? '',
       cin: map['cin'],
-      matricule: map['matricule'],
-      specialite: map['specialite'],
-      certification: map['certification'],
       telephone: map['telephone']?.toString(),
       photo: map['photo'],
       isValidated: map['isValidated'] ?? map['isValid'] ?? false,
@@ -59,9 +50,6 @@ class Veterinaire {
       'nom': nom,
       'prenom': prenom,
       'cin': cin,
-      'matricule': matricule,
-      'specialite': specialite,
-      'certification': certification,
       'telephone': telephone,
       'photo': photo,
       'isValidated': isValidated,

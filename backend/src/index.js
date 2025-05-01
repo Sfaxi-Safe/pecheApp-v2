@@ -21,9 +21,15 @@ const app = express();
 // Import du middleware de transformation
 const { standardizeRequest, standardizeResponse, standardizeBooleans } = require('./middleware/dataTransformer');
 
+// Import des middlewares personnalisés
+const corsMiddleware = require('./middleware/corsMiddleware');
+const responseFormatter = require('./middleware/responseFormatter');
+
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(corsMiddleware);
+app.use(express.json({ limit: '50mb' })); // Augmenter la limite pour les uploads d'images
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(responseFormatter); // Formater les réponses API
 
 // Ajouter un identifiant unique à chaque requête pour faciliter le débogage
 app.use((req, res, next) => {
@@ -37,11 +43,14 @@ app.use(standardizeResponse);
 app.use(standardizeBooleans);
 
 // Configuration de la connexion MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/peche_marketplace')
-  .then(() => console.log('Connecté à MongoDB'))
-  .catch((err) => console.error('Erreur de connexion à MongoDB:', err));
+const { connectDB } = require('./config/database');
+connectDB();
 
-// Routes
+// Servir les fichiers statiques
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Routes API
 app.use('/api/users', userRoutes);
 app.use('/api/pecheurs', pecheurRoutes);
 app.use('/api/veterinaires', veterinaireRoutes);
@@ -51,6 +60,16 @@ app.use('/api/prises', priseRoutes);
 app.use('/api/lots', lotRoutes);
 app.use('/api/images', imageRoutes);
 app.use('/api/auth', authRoutes);
+
+// Route de test pour vérifier que le serveur fonctionne
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'Le serveur fonctionne correctement',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
 // Gestion des erreurs
 app.use(errorHandler);

@@ -20,9 +20,18 @@ const generateToken = (user) => {
 };
 
 // Inscription
-const register = async (req, res) => {
+const register = async (req, res, next) => {
   try {
     const { email, password, role, ...userData } = req.body;
+
+    // Validation des données
+    if (!email || !password || !role) {
+      throw new BadRequestError('Email, mot de passe et rôle sont requis');
+    }
+
+    if (!['ROLE_CLIENT', 'ROLE_PECHEUR', 'ROLE_VETERINAIRE', 'ROLE_MARYEUR', 'ROLE_ADMIN'].includes(role)) {
+      throw new BadRequestError('Rôle invalide');
+    }
 
     // Vérifier si l'email existe déjà
     const emailExists = await Promise.all([
@@ -33,7 +42,23 @@ const register = async (req, res) => {
     ]);
 
     if (emailExists.some(user => user !== null)) {
-      return res.status(400).json({ error: 'Cet email est déjà utilisé' });
+      throw new BadRequestError('Cet email est déjà utilisé');
+    }
+
+    // Validation des champs obligatoires selon le rôle
+    if ((role === 'ROLE_PECHEUR' || role === 'ROLE_VETERINAIRE' || role === 'ROLE_MARYEUR') &&
+        (!userData.nom || !userData.prenom || !userData.telephone)) {
+      throw new BadRequestError('Nom, prénom et téléphone sont requis');
+    }
+
+    // Validation des champs spécifiques pour les pêcheurs
+    if (role === 'ROLE_PECHEUR' && (!userData.matricule || !userData.bateau || !userData.port)) {
+      throw new BadRequestError('Matricule, bateau et port sont requis pour les pêcheurs');
+    }
+
+    // Validation des champs spécifiques pour les vétérinaires et maryeurs
+    if ((role === 'ROLE_VETERINAIRE' || role === 'ROLE_MARYEUR') && (!userData.matricule || !userData.port)) {
+      throw new BadRequestError(`Matricule et port sont requis pour les ${role === 'ROLE_VETERINAIRE' ? 'vétérinaires' : 'maryeurs'}`);
     }
 
     let user;
@@ -44,6 +69,9 @@ const register = async (req, res) => {
       roles: [role],
       isValidated: role === 'ROLE_ADMIN' // Les admins sont automatiquement validés
     };
+
+    // Journaliser l'action
+    console.log(`[${new Date().toISOString()}] INFO [AUTH] Tentative d'inscription: ${email} (${role})`);
 
     switch (role) {
       case 'ROLE_CLIENT':
@@ -58,25 +86,36 @@ const register = async (req, res) => {
       case 'ROLE_MARYEUR':
         user = new Maryeur(userDataWithRole);
         break;
+      case 'ROLE_ADMIN':
+        user = new User(userDataWithRole);
+        break;
       default:
-        return res.status(400).json({ error: 'Rôle invalide' });
+        throw new BadRequestError('Rôle invalide');
     }
 
     await user.save();
     const token = generateToken(user);
 
+    // Journaliser le succès
+    console.log(`[${new Date().toISOString()}] INFO [AUTH] Inscription réussie: ${email} (${role})`);
+
     res.status(201).json({
+      success: true,
+      message: 'Inscription réussie',
       user: {
         _id: user._id,
         email: user.email,
         roles: user.roles,
         nom: user.nom,
-        prenom: user.prenom
+        prenom: user.prenom,
+        telephone: user.telephone,
+        photo: user.photo,
+        isValidated: user.isValidated
       },
       token
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 };
 
@@ -90,6 +129,9 @@ const login = async (req, res, next) => {
       throw new BadRequestError('Email et mot de passe requis');
     }
 
+    // Journaliser la tentative de connexion
+    console.log(`[${new Date().toISOString()}] INFO [AUTH] Tentative de connexion: ${email}`);
+
     // Chercher l'utilisateur dans toutes les collections
     const userPromises = [
       User.findOne({ email }),
@@ -102,19 +144,27 @@ const login = async (req, res, next) => {
     const user = users.find(u => u !== null);
 
     if (!user) {
+      // Journaliser l'échec
+      console.log(`[${new Date().toISOString()}] WARN [AUTH] Échec de connexion (utilisateur non trouvé): ${email}`);
       throw new BadRequestError('Email ou mot de passe incorrect');
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      // Journaliser l'échec
+      console.log(`[${new Date().toISOString()}] WARN [AUTH] Échec de connexion (mot de passe incorrect): ${email}`);
       throw new BadRequestError('Email ou mot de passe incorrect');
     }
 
-    if (!user.isValidated) {
+    if (!user.isValidated && !user.isValid) {
+      // Journaliser l'échec
+      console.log(`[${new Date().toISOString()}] WARN [AUTH] Échec de connexion (compte non validé): ${email}`);
       throw new ForbiddenError('Votre compte est en attente de validation par un administrateur');
     }
 
     if (user.isBlocked) {
+      // Journaliser l'échec
+      console.log(`[${new Date().toISOString()}] WARN [AUTH] Échec de connexion (compte bloqué): ${email}`);
       throw new ForbiddenError('Votre compte a été bloqué. Veuillez contacter un administrateur');
     }
 
@@ -123,13 +173,26 @@ const login = async (req, res, next) => {
     // Journaliser la connexion réussie
     console.log(`[${new Date().toISOString()}] INFO [AUTH] Connexion réussie: ${email}`);
 
+    // Déterminer le type d'utilisateur
+    let userType = 'client';
+    if (user.roles.includes('ROLE_PECHEUR')) userType = 'pecheur';
+    else if (user.roles.includes('ROLE_VETERINAIRE')) userType = 'veterinaire';
+    else if (user.roles.includes('ROLE_MARYEUR')) userType = 'maryeur';
+    else if (user.roles.includes('ROLE_ADMIN')) userType = 'admin';
+
     res.json({
+      success: true,
+      message: 'Connexion réussie',
       user: {
         _id: user._id,
         email: user.email,
         roles: user.roles,
         nom: user.nom,
-        prenom: user.prenom
+        prenom: user.prenom,
+        telephone: user.telephone,
+        photo: user.photo,
+        userType: userType,
+        isValidated: user.isValidated || user.isValid || false
       },
       token
     });
@@ -147,17 +210,46 @@ const getProfile = async (req, res, next) => {
       throw new NotFoundError('Utilisateur non trouvé');
     }
 
+    // Déterminer le type d'utilisateur
+    let userType = 'client';
+    if (user.roles.includes('ROLE_PECHEUR')) userType = 'pecheur';
+    else if (user.roles.includes('ROLE_VETERINAIRE')) userType = 'veterinaire';
+    else if (user.roles.includes('ROLE_MARYEUR')) userType = 'maryeur';
+    else if (user.roles.includes('ROLE_ADMIN')) userType = 'admin';
+
+    // Construire l'objet de réponse de base
+    const userProfile = {
+      _id: user._id,
+      email: user.email,
+      roles: user.roles,
+      nom: user.nom,
+      prenom: user.prenom,
+      telephone: user.telephone,
+      photo: user.photo,
+      userType: userType,
+      isValidated: user.isValidated || user.isValid || false
+    };
+
+    // Ajouter des champs spécifiques selon le type d'utilisateur
+    if (userType === 'pecheur') {
+      userProfile.bateau = user.bateau;
+      userProfile.port = user.port;
+      userProfile.matricule = user.matricule;
+      userProfile.capacite = user.capacite;
+    } else if (userType === 'veterinaire') {
+      userProfile.specialite = user.specialite;
+      userProfile.certification = user.certification;
+      userProfile.matricule = user.matricule;
+      userProfile.port = user.port;
+    } else if (userType === 'maryeur') {
+      userProfile.matricule = user.matricule;
+      userProfile.port = user.port;
+      userProfile.signature = user.signature;
+    }
+
     res.json({
-      user: {
-        _id: user._id,
-        email: user.email,
-        roles: user.roles,
-        nom: user.nom,
-        prenom: user.prenom,
-        telephone: user.telephone,
-        photo: user.photo,
-        // Ajouter d'autres champs selon le type d'utilisateur
-      }
+      success: true,
+      user: userProfile
     });
   } catch (error) {
     next(error);

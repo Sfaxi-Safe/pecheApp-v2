@@ -4,14 +4,30 @@ const Pecheur = require('../models/Pecheur');
 const Veterinaire = require('../models/Veterinaire');
 const Maryeur = require('../models/Maryeur');
 
+/**
+ * Middleware d'authentification
+ * Vérifie le token JWT et charge l'utilisateur correspondant
+ */
 const auth = async (req, res, next) => {
   try {
+    // Récupérer le token depuis l'en-tête Authorization
     const token = req.header('Authorization')?.replace('Bearer ', '');
     if (!token) {
-      throw new Error();
+      return res.error('Token d\'authentification manquant', 401);
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Vérifier et décoder le token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      if (err.name === 'TokenExpiredError') {
+        return res.error('Session expirée, veuillez vous reconnecter', 401);
+      }
+      return res.error('Token d\'authentification invalide', 401);
+    }
+
+    // Rechercher l'utilisateur dans la base de données
     let user;
 
     // Vérifier dans chaque collection selon le rôle
@@ -25,24 +41,51 @@ const auth = async (req, res, next) => {
       user = await Maryeur.findById(decoded._id);
     }
 
+    // Vérifier si l'utilisateur existe
     if (!user) {
-      throw new Error();
+      return res.error('Utilisateur non trouvé', 401);
     }
 
+    // Vérifier si l'utilisateur est validé
+    if (!(user.isValidated || user.isValid) && !decoded.roles.includes('ROLE_ADMIN')) {
+      return res.error('Votre compte est en attente de validation', 403);
+    }
+
+    // Vérifier si l'utilisateur est bloqué
+    if (user.isBlocked) {
+      return res.error('Votre compte a été bloqué', 403);
+    }
+
+    // Ajouter l'utilisateur et le token à la requête
     req.token = token;
     req.user = user;
     next();
   } catch (error) {
-    res.status(401).send({ error: 'Veuillez vous authentifier.' });
+    console.error('Erreur d\'authentification:', error);
+    res.error('Erreur d\'authentification', 401);
   }
 };
 
-// Middleware pour vérifier les rôles
+/**
+ * Middleware pour vérifier les rôles
+ * @param {Array|String} roles - Rôle(s) autorisé(s)
+ * @returns {Function} Middleware Express
+ */
 const checkRole = (roles) => {
+  // Convertir en tableau si c'est une chaîne
+  const roleArray = Array.isArray(roles) ? roles : [roles];
+
   return (req, res, next) => {
-    if (!req.user.roles.some(role => roles.includes(role))) {
-      return res.status(403).send({ error: 'Accès non autorisé' });
+    // Vérifier si l'utilisateur existe
+    if (!req.user) {
+      return res.error('Utilisateur non authentifié', 401);
     }
+
+    // Vérifier si l'utilisateur a au moins un des rôles requis
+    if (!req.user.roles.some(role => roleArray.includes(role))) {
+      return res.error(`Accès réservé aux rôles: ${roleArray.join(', ')}`, 403);
+    }
+
     next();
   };
 };

@@ -11,11 +11,17 @@ const maryeurSchema = new mongoose.Schema({
     lowercase: true,
     validate: [validator.isEmail, 'Email invalide']
   },
-  roles: [{
-    type: String,
+  roles: {
+    type: [String],
     required: true,
-    enum: ['ROLE_MARYEUR']
-  }],
+    validate: {
+      validator: function(v) {
+        return v.includes('ROLE_MARYEUR');
+      },
+      message: 'Le rôle ROLE_MARYEUR est requis'
+    },
+    default: ['ROLE_MARYEUR']
+  },
   password: {
     type: String,
     required: true,
@@ -45,14 +51,40 @@ const maryeurSchema = new mongoose.Schema({
   pays: String,
   wallet: String,
   mykeyss: String,
-  telephone: String,
+  telephone: {
+    type: String,
+    required: true
+  },
+  isValidated: {
+    type: Boolean,
+    default: false
+  },
   isValid: {
     type: Boolean,
     default: false
   },
-  signature: String
+  isBlocked: {
+    type: Boolean,
+    default: false
+  },
+  photo: String,
+  signature: String,
+  userType: {
+    type: String,
+    default: 'maryeur'
+  }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: {
+    virtuals: true,
+    transform: function(doc, ret) {
+      ret.id = ret._id;
+      delete ret._id;
+      delete ret.__v;
+      delete ret.password;
+      return ret;
+    }
+  }
 });
 
 // Hash du mot de passe avant sauvegarde
@@ -66,6 +98,36 @@ maryeurSchema.pre('save', async function(next) {
 // Méthode pour vérifier le mot de passe
 maryeurSchema.methods.comparePassword = async function(password) {
   return bcrypt.compare(password, this.password);
+};
+
+// Méthodes pour vérifier les rôles
+maryeurSchema.methods.hasRole = function(role) {
+  return this.roles.includes(role);
+};
+
+maryeurSchema.methods.isPecheur = function() {
+  return this.hasRole('ROLE_PECHEUR');
+};
+
+maryeurSchema.methods.isVeterinaire = function() {
+  return this.hasRole('ROLE_VETERINAIRE');
+};
+
+maryeurSchema.methods.isMaryeur = function() {
+  return this.hasRole('ROLE_MARYEUR');
+};
+
+maryeurSchema.methods.isClient = function() {
+  return this.hasRole('ROLE_CLIENT');
+};
+
+maryeurSchema.methods.isAdmin = function() {
+  return this.hasRole('ROLE_ADMIN');
+};
+
+// Méthode pour déterminer le type d'utilisateur
+maryeurSchema.methods.getUserType = function() {
+  return 'maryeur';
 };
 
 const Maryeur = mongoose.model('Maryeur', maryeurSchema);

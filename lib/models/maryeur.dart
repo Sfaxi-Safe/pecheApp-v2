@@ -9,8 +9,6 @@ class Maryeur {
   final String? matricule;
   final String? port;
   final String? pays;
-  final String? wallet;
-  final String? mykeyss;
   final int? telephone;
   final String? signature;
 
@@ -25,8 +23,6 @@ class Maryeur {
     this.matricule,
     this.port,
     this.pays,
-    this.wallet,
-    this.mykeyss,
     this.telephone,
     this.signature,
   });
@@ -43,8 +39,6 @@ class Maryeur {
       matricule: map['matricule'],
       port: map['port'],
       pays: map['pays'],
-      wallet: map['wallet'],
-      mykeyss: map['mykeyss'],
       telephone: map['telephone'],
       signature: map['signature'],
     );
@@ -62,8 +56,6 @@ class Maryeur {
       'matricule': matricule,
       'port': port,
       'pays': pays,
-      'wallet': wallet,
-      'mykeyss': mykeyss,
       'telephone': telephone,
       'signature': signature,
     };

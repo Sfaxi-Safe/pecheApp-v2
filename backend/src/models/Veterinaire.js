@@ -12,8 +12,35 @@ const veterinaireSchema = new mongoose.Schema({
     type: String,
     required: false
   },
-  // Autres champs spécifiques aux vétérinaires
-}, { timestamps: true });
+  matricule: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  cin: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  port: String,
+  pays: String,
+  userType: {
+    type: String,
+    default: 'veterinaire'
+  }
+}, {
+  timestamps: true,
+  toJSON: {
+    virtuals: true,
+    transform: function(doc, ret) {
+      ret.id = ret._id;
+      delete ret._id;
+      delete ret.__v;
+      delete ret.password;
+      return ret;
+    }
+  }
+});
 
 // Méthode pour comparer les mots de passe
 veterinaireSchema.methods.comparePassword = async function(candidatePassword) {
@@ -35,6 +62,36 @@ veterinaireSchema.pre('save', function(next) {
   }
   next();
 });
+
+// Méthodes pour vérifier les rôles
+veterinaireSchema.methods.hasRole = function(role) {
+  return this.roles.includes(role);
+};
+
+veterinaireSchema.methods.isPecheur = function() {
+  return this.hasRole('ROLE_PECHEUR');
+};
+
+veterinaireSchema.methods.isVeterinaire = function() {
+  return this.hasRole('ROLE_VETERINAIRE');
+};
+
+veterinaireSchema.methods.isMaryeur = function() {
+  return this.hasRole('ROLE_MARYEUR');
+};
+
+veterinaireSchema.methods.isClient = function() {
+  return this.hasRole('ROLE_CLIENT');
+};
+
+veterinaireSchema.methods.isAdmin = function() {
+  return this.hasRole('ROLE_ADMIN');
+};
+
+// Méthode pour déterminer le type d'utilisateur
+veterinaireSchema.methods.getUserType = function() {
+  return 'veterinaire';
+};
 
 const Veterinaire = User.discriminator('Veterinaire', veterinaireSchema);
 
