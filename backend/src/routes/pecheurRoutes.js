@@ -5,23 +5,42 @@ const Pecheur = require('../models/Pecheur');
 // Route pour obtenir tous les pêcheurs
 router.get('/', async (req, res) => {
   try {
-    const pecheurs = await Pecheur.find().populate('prises');
+    const pecheurs = await Pecheur.find();
     res.json(pecheurs);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-// Route pour créer un nouveau pêcheur
+// Route POST pour ajouter un pêcheur
 router.post('/', async (req, res) => {
-  const pecheur = new Pecheur(req.body);
   try {
-    const newPecheur = await pecheur.save();
-    res.status(201).json(newPecheur);
+    // Validation des données envoyées par le client
+    const {mail, password, nom, prenom } = req.body;
+
+    if (!nom || !prenom || !mail || !password) {
+      return res.status(400).json({ message: 'Le nom, le prénom, le mail et le password sont obligatoires.' });
+    }
+
+    // Création d'une nouvelle instance de Pecheur
+    const newPecheur = new Pecheur({
+      mail,
+      password,
+      nom, 
+      prenom
+    });
+
+    // Enregistrer le pêcheur dans la base de données
+    const savedPecheur = await newPecheur.save();
+
+    // Répondre avec les détails du pêcheur ajouté
+    res.status(201).json(savedPecheur);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error(error.message);
+    res.status(500).json({ message: 'Erreur lors de l\'ajout du pêcheur.' });
   }
 });
+
 
 // Route pour obtenir un pêcheur spécifique
 router.get('/:id', async (req, res) => {

@@ -44,7 +44,7 @@ class ApiService {
       final response = await http
           .get(Uri.parse('$baseUrl/$endpoint'), headers: _headers)
           .timeout(
-            const Duration(seconds: 30),
+            const Duration(seconds: 10),
             onTimeout: () {
               throw TimeoutException(
                 'La requête a pris trop de temps à s\'exécuter',
@@ -112,7 +112,7 @@ class ApiService {
             body: json.encode(data),
           )
           .timeout(
-            const Duration(seconds: 30),
+            const Duration(seconds: 10),
             onTimeout: () {
               throw TimeoutException(
                 'La requête a pris trop de temps à s\'exécuter',
@@ -180,7 +180,7 @@ class ApiService {
             body: json.encode(data),
           )
           .timeout(
-            const Duration(seconds: 30),
+            const Duration(seconds: 10),
             onTimeout: () {
               throw TimeoutException(
                 'La requête a pris trop de temps à s\'exécuter',
@@ -241,7 +241,7 @@ class ApiService {
       final response = await http
           .delete(Uri.parse('$baseUrl/$endpoint'), headers: _headers)
           .timeout(
-            const Duration(seconds: 30),
+            const Duration(seconds: 10),
             onTimeout: () {
               throw TimeoutException(
                 'La requête a pris trop de temps à s\'exécuter',
