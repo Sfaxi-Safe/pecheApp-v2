@@ -8,7 +8,8 @@
     "dev": "nodemon ./src/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "migrate-users": "node ./src/scripts/migrateUsers.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

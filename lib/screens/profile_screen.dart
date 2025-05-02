@@ -76,8 +76,11 @@ class ProfileScreenState extends State<ProfileScreen> {
       } else if (user.isMaryeur()) {
         userData = await ApiService.instance.getMaryeurDetails(user.id!);
         _userType = 'Maryeur';
+      } else if (user.roles.contains('ROLE_ADMIN')) {
+        userData = await ApiService.instance.getAdminById(user.id);
+        _userType = 'Administrateur';
       } else {
-        userData = await ApiService.instance.getUserById(user.id!);
+        userData = await ApiService.instance.get('clients/${user.id}');
         _userType = 'Client';
       }
 
@@ -144,8 +147,10 @@ class ProfileScreenState extends State<ProfileScreen> {
           endpoint = 'veterinaires/${user.id}';
         } else if (user.isMaryeur()) {
           endpoint = 'maryeurs/${user.id}';
+        } else if (user.roles.contains('ROLE_ADMIN')) {
+          endpoint = 'admins/${user.id}';
         } else {
-          endpoint = 'users/${user.id}';
+          endpoint = 'clients/${user.id}';
         }
         await ApiService.instance.put(endpoint, updatedData);
 
@@ -237,8 +242,10 @@ class ProfileScreenState extends State<ProfileScreen> {
         endpoint = 'veterinaires/${user.id}';
       } else if (user.isMaryeur()) {
         endpoint = 'maryeurs/${user.id}';
+      } else if (user.roles.contains('ROLE_ADMIN')) {
+        endpoint = 'admins/${user.id}';
       } else {
-        endpoint = 'users/${user.id}';
+        endpoint = 'clients/${user.id}';
       }
 
       await ApiService.instance.put(endpoint, updatedData);

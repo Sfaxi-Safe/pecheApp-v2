@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { isAdmin } = require('../middleware/adminAuth');
+const { auth, checkRole } = require('../middleware/auth');
 const { validateUser, toggleUserBlock, getPendingUsers } = require('../controllers/authController');
 
-// Routes protégées par le middleware isAdmin
-router.use(isAdmin);
+// Routes protégées par le middleware auth et checkRole
+router.use(auth, checkRole('ROLE_ADMIN'));
 
 // Obtenir la liste des utilisateurs en attente de validation
 router.get('/pending-users', getPendingUsers);

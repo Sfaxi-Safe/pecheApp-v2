@@ -345,25 +345,25 @@ class ApiService {
     }
   }
 
-  // Méthodes spécifiques pour les utilisateurs
-  Future<List<Map<String, dynamic>>> getUsers(String role) async {
-    final response = await get('users?role=$role');
+  // Méthodes spécifiques pour les administrateurs
+  Future<List<Map<String, dynamic>>> getAdmins() async {
+    final response = await get('admins');
     return List<Map<String, dynamic>>.from(response['data'] ?? []);
   }
 
-  Future<Map<String, dynamic>> getUserById(dynamic id) async {
-    return await get('users/$id');
+  Future<Map<String, dynamic>> getAdminById(dynamic id) async {
+    return await get('admins/$id');
   }
 
   // Méthodes pour obtenir des DTOs (pour une transition progressive)
-  Future<List<UserDto>> getUserDtos(String role) async {
-    final response = await get('users?role=$role');
+  Future<List<UserDto>> getAdminDtos() async {
+    final response = await get('admins');
     final List<dynamic> data = response['data'] ?? [];
     return data.map((json) => UserDto.fromJson(json)).toList();
   }
 
-  Future<UserDto> getUserDtoById(String id) async {
-    final response = await get('users/$id');
+  Future<UserDto> getAdminDtoById(String id) async {
+    final response = await get('admins/$id');
     return UserDto.fromJson(response);
   }
 

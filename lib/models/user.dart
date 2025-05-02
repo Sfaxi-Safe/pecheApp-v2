@@ -77,4 +77,8 @@ class User {
   bool isClient() {
     return roles.contains('ROLE_CLIENT');
   }
+
+  bool isAdmin() {
+    return roles.contains('ROLE_ADMIN');
+  }
 }

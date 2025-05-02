@@ -1,16 +1,16 @@
 /**
- * Modèle User
- * Représente un utilisateur standard (client ou admin) dans l'application SeaTrace
- * Stocke les informations personnelles et d'authentification de l'utilisateur
+ * Modèle Admin
+ * Représente un administrateur dans l'application SeaTrace
+ * Stocke les informations personnelles et d'authentification de l'administrateur
  */
 
 const mongoose = require('mongoose');
 const validator = require('validator');
 const bcrypt = require('bcryptjs');
 
-const userSchema = new mongoose.Schema({
+const adminSchema = new mongoose.Schema({
   /**
-   * ID personnalisé pour l'utilisateur
+   * ID personnalisé pour l'administrateur
    * Utilisé pour les requêtes API et la cohérence avec le frontend
    */
   id: {
@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema({
   },
 
   /**
-   * Adresse email de l'utilisateur
+   * Adresse email de l'administrateur
    * Utilisée pour l'authentification et les communications
    */
   email: {
@@ -33,18 +33,17 @@ const userSchema = new mongoose.Schema({
   },
 
   /**
-   * Rôles de l'utilisateur
+   * Rôles de l'administrateur
    * Stockés sous forme de chaîne de caractères pour correspondre au frontend
-   * Utilisés pour la gestion des autorisations
    */
   roles: {
     type: String,
     required: true,
-    default: 'ROLE_CLIENT'
+    default: 'ROLE_ADMIN'
   },
 
   /**
-   * Mot de passe de l'utilisateur
+   * Mot de passe de l'administrateur
    * Stocké sous forme hachée pour la sécurité
    */
   password: {
@@ -54,7 +53,7 @@ const userSchema = new mongoose.Schema({
   },
 
   /**
-   * Nom de famille de l'utilisateur
+   * Nom de famille de l'administrateur
    */
   nom: {
     type: String,
@@ -63,7 +62,7 @@ const userSchema = new mongoose.Schema({
   },
 
   /**
-   * Prénom de l'utilisateur
+   * Prénom de l'administrateur
    */
   prenom: {
     type: String,
@@ -72,7 +71,7 @@ const userSchema = new mongoose.Schema({
   },
 
   /**
-   * Numéro de téléphone de l'utilisateur
+   * Numéro de téléphone de l'administrateur
    */
   telephone: {
     type: String,
@@ -80,11 +79,12 @@ const userSchema = new mongoose.Schema({
   },
 
   /**
-   * Indique si le compte a été validé par un administrateur
+   * Indique si le compte a été validé
+   * Les administrateurs sont toujours validés par défaut
    */
   isValidated: {
     type: Boolean,
-    default: false
+    default: true
   },
 
   /**
@@ -101,14 +101,12 @@ const userSchema = new mongoose.Schema({
   photo: String,
 
   /**
-   * Service auquel appartient l'utilisateur (pour les clients professionnels)
+   * Type d'utilisateur (toujours 'admin' pour ce modèle)
    */
-  service: String,
-
-  /**
-   * Fonction de l'utilisateur dans son service
-   */
-  fonction: String
+  userType: {
+    type: String,
+    default: 'admin'
+  }
 }, {
   timestamps: true,
   toJSON: {
@@ -131,7 +129,7 @@ const userSchema = new mongoose.Schema({
  * Exécuté automatiquement avant chaque sauvegarde du document
  * Hache le mot de passe uniquement s'il a été modifié
  */
-userSchema.pre('save', async function(next) {
+adminSchema.pre('save', async function(next) {
   if (this.isModified('password')) {
     this.password = await bcrypt.hash(this.password, 8);
   }
@@ -143,7 +141,7 @@ userSchema.pre('save', async function(next) {
  * Exécuté automatiquement avant chaque sauvegarde du document
  * Si aucun ID personnalisé n'est fourni, utilise l'ID MongoDB
  */
-userSchema.pre('save', function(next) {
+adminSchema.pre('save', function(next) {
   // Si un ID personnalisé est fourni dans la requête, l'utiliser
   if (this.id) {
     // L'ID personnalisé est déjà défini, ne rien faire
@@ -160,73 +158,68 @@ userSchema.pre('save', function(next) {
  * @param {string} password - Mot de passe en clair à vérifier
  * @returns {Promise<boolean>} - True si le mot de passe correspond, false sinon
  */
-userSchema.methods.comparePassword = async function(password) {
+adminSchema.methods.comparePassword = async function(password) {
   return bcrypt.compare(password, this.password);
 };
 
 /**
  * Méthode: Vérification de rôle
- * Vérifie si l'utilisateur possède un rôle spécifique
+ * Vérifie si l'administrateur possède un rôle spécifique
  * @param {string} role - Le rôle à vérifier
- * @returns {boolean} - True si l'utilisateur possède le rôle, false sinon
+ * @returns {boolean} - True si l'administrateur possède le rôle, false sinon
  */
-userSchema.methods.hasRole = function(role) {
+adminSchema.methods.hasRole = function(role) {
   return this.roles.includes(role);
 };
 
 /**
  * Méthode: Vérification du rôle Pêcheur
- * @returns {boolean} - True si l'utilisateur est un pêcheur
+ * @returns {boolean} - Toujours false pour un administrateur
  */
-userSchema.methods.isPecheur = function() {
-  return this.hasRole('ROLE_PECHEUR');
+adminSchema.methods.isPecheur = function() {
+  return false;
 };
 
 /**
  * Méthode: Vérification du rôle Vétérinaire
- * @returns {boolean} - True si l'utilisateur est un vétérinaire
+ * @returns {boolean} - Toujours false pour un administrateur
  */
-userSchema.methods.isVeterinaire = function() {
-  return this.hasRole('ROLE_VETERINAIRE');
+adminSchema.methods.isVeterinaire = function() {
+  return false;
 };
 
 /**
  * Méthode: Vérification du rôle Mareyeur
- * @returns {boolean} - True si l'utilisateur est un mareyeur
+ * @returns {boolean} - Toujours false pour un administrateur
  */
-userSchema.methods.isMaryeur = function() {
-  return this.hasRole('ROLE_MARYEUR');
+adminSchema.methods.isMaryeur = function() {
+  return false;
 };
 
 /**
  * Méthode: Vérification du rôle Client
- * @returns {boolean} - True si l'utilisateur est un client
+ * @returns {boolean} - Toujours false pour un administrateur
  */
-userSchema.methods.isClient = function() {
-  return this.hasRole('ROLE_CLIENT');
+adminSchema.methods.isClient = function() {
+  return false;
 };
 
 /**
  * Méthode: Vérification du rôle Administrateur
- * @returns {boolean} - True si l'utilisateur est un administrateur
+ * @returns {boolean} - Toujours true pour un administrateur
  */
-userSchema.methods.isAdmin = function() {
-  return this.hasRole('ROLE_ADMIN');
+adminSchema.methods.isAdmin = function() {
+  return true;
 };
 
 /**
  * Méthode: Obtention du type d'utilisateur
- * Détermine le type d'utilisateur en fonction de son rôle
- * @returns {string} - Le type d'utilisateur ('pecheur', 'veterinaire', 'maryeur', 'admin' ou 'client')
+ * @returns {string} - Toujours 'admin' pour ce modèle
  */
-userSchema.methods.getUserType = function() {
-  if (this.isPecheur()) return 'pecheur';
-  if (this.isVeterinaire()) return 'veterinaire';
-  if (this.isMaryeur()) return 'maryeur';
-  if (this.isAdmin()) return 'admin';
-  return 'client';
+adminSchema.methods.getUserType = function() {
+  return 'admin';
 };
 
-const User = mongoose.model('User', userSchema);
+const Admin = mongoose.model('Admin', adminSchema);
 
-module.exports = User;
+module.exports = Admin;

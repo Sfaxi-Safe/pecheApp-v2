@@ -46,7 +46,7 @@ const lotSchema = new mongoose.Schema({
   },
   acheteur: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'Client'
   },
   dateSoumission: Date,
   poidsEstimatif: Number,

@@ -77,6 +77,24 @@ router.post('/', auth, checkRole(['ROLE_PECHEUR', 'ROLE_MARYEUR', 'ROLE_ADMIN'])
       throw new BadRequestError('Dates de début et de fin requises');
     }
 
+    // Définir les dates d'affectation et de débarquement si non fournies
+    if (!req.body.affectationDate) {
+      req.body.affectationDate = new Date();
+    }
+
+    if (!req.body.dateDebarquement) {
+      req.body.dateDebarquement = new Date();
+    }
+
+    // Convertir les coordonnées en nombres si elles sont fournies
+    if (req.body.latitude) {
+      req.body.latitude = parseFloat(req.body.latitude);
+    }
+
+    if (req.body.longitude) {
+      req.body.longitude = parseFloat(req.body.longitude);
+    }
+
     const prise = new Prise(req.body);
     const newPrise = await prise.save();
 

@@ -27,10 +27,26 @@ class _UsersScreenState extends State<UsersScreen>
   Future<void> _loadUsers() async {
     try {
       final api = ApiService.instance;
-      final clients = await api.getUsers('ROLE_CLIENT');
-      final pecheurs = await api.getUsers('ROLE_PECHEUR');
-      final maryeurs = await api.getUsers('ROLE_MARYEUR');
-      final vitirinaires = await api.getUsers('ROLE_VITIRINAIRE');
+
+      // Récupérer les utilisateurs par type
+      final clientsResponse = await api.get('clients');
+      final pecheursResponse = await api.get('pecheurs');
+      final maryeursResponse = await api.get('maryeurs');
+      final veterinairesResponse = await api.get('veterinaires');
+
+      // Extraire les données
+      final clients = List<Map<String, dynamic>>.from(
+        clientsResponse['data'] ?? [],
+      );
+      final pecheurs = List<Map<String, dynamic>>.from(
+        pecheursResponse['data'] ?? [],
+      );
+      final maryeurs = List<Map<String, dynamic>>.from(
+        maryeursResponse['data'] ?? [],
+      );
+      final vitirinaires = List<Map<String, dynamic>>.from(
+        veterinairesResponse['data'] ?? [],
+      );
 
       setState(() {
         _clients = clients;

@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const mongoose = require('mongoose');
+const Admin = require('../models/Admin');
+const Client = require('../models/Client');
 const Pecheur = require('../models/Pecheur');
 const Veterinaire = require('../models/Veterinaire');
 const Maryeur = require('../models/Maryeur');
@@ -57,14 +59,16 @@ const register = async (req, res, next) => {
     }
 
     // Vérifier si l'email existe déjà
-    const emailExists = await Promise.all([
-      User.findOne({ email }),
-      Pecheur.findOne({ email }),
-      Veterinaire.findOne({ email }),
-      Maryeur.findOne({ email })
-    ]);
+    let emailExists = false;
 
-    if (emailExists.some(user => user !== null)) {
+    // Vérifier dans chaque collection
+    if (await Client.findOne({ email })) emailExists = true;
+    if (!emailExists && await Pecheur.findOne({ email })) emailExists = true;
+    if (!emailExists && await Veterinaire.findOne({ email })) emailExists = true;
+    if (!emailExists && await Maryeur.findOne({ email })) emailExists = true;
+    if (!emailExists && await Admin.findOne({ email })) emailExists = true;
+
+    if (emailExists) {
       throw new BadRequestError('Cet email est déjà utilisé');
     }
 
@@ -98,7 +102,7 @@ const register = async (req, res, next) => {
 
     switch (role) {
       case 'ROLE_CLIENT':
-        user = new User(userDataWithRole);
+        user = new Client(userDataWithRole);
         break;
       case 'ROLE_PECHEUR':
         user = new Pecheur(userDataWithRole);
@@ -110,7 +114,7 @@ const register = async (req, res, next) => {
         user = new Maryeur(userDataWithRole);
         break;
       case 'ROLE_ADMIN':
-        user = new User(userDataWithRole);
+        user = new Admin(userDataWithRole);
         break;
       default:
         throw new BadRequestError('Rôle invalide');
@@ -208,15 +212,14 @@ const login = async (req, res, next) => {
     console.log(`[${new Date().toISOString()}] INFO [AUTH] Tentative de connexion: ${email}`);
 
     // Chercher l'utilisateur dans toutes les collections
-    const userPromises = [
-      User.findOne({ email }),
-      Pecheur.findOne({ email }),
-      Veterinaire.findOne({ email }),
-      Maryeur.findOne({ email })
-    ];
+    let user = null;
 
-    const users = await Promise.all(userPromises);
-    const user = users.find(u => u !== null);
+    // Essayer de trouver l'utilisateur dans les collections spécifiques
+    user = await Client.findOne({ email });
+    if (!user) user = await Pecheur.findOne({ email });
+    if (!user) user = await Veterinaire.findOne({ email });
+    if (!user) user = await Maryeur.findOne({ email });
+    if (!user) user = await Admin.findOne({ email });
 
     if (!user) {
       // Journaliser l'échec
@@ -404,21 +407,41 @@ const getProfile = async (req, res, next) => {
  * @param {Object} req - L'objet request Express
  * @param {Object} res - L'objet response Express
  */
-const validateUser = async (req, res) => {
+const validateUser = async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const user = await User.findById(userId);
+
+    // Chercher l'utilisateur dans toutes les collections
+    let user = null;
+
+    // Essayer de trouver l'utilisateur dans les collections spécifiques
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      user = await Client.findById(userId);
+      if (!user) user = await Pecheur.findById(userId);
+      if (!user) user = await Veterinaire.findById(userId);
+      if (!user) user = await Maryeur.findById(userId);
+      if (!user) user = await Admin.findById(userId);
+    }
+
+    // Si non trouvé par ID, essayer par ID personnalisé
+    if (!user) {
+      user = await Client.findOne({ id: userId });
+      if (!user) user = await Pecheur.findOne({ id: userId });
+      if (!user) user = await Veterinaire.findOne({ id: userId });
+      if (!user) user = await Maryeur.findOne({ id: userId });
+      if (!user) user = await Admin.findOne({ id: userId });
+    }
 
     if (!user) {
-      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+      throw new NotFoundError('Utilisateur non trouvé');
     }
 
     user.isValidated = true;
     await user.save();
 
-    res.json({ message: 'Compte utilisateur validé avec succès' });
+    res.success(null, 'Compte utilisateur validé avec succès');
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 };
 
@@ -435,23 +458,41 @@ const validateUser = async (req, res) => {
  * @param {Object} req - L'objet request Express
  * @param {Object} res - L'objet response Express
  */
-const toggleUserBlock = async (req, res) => {
+const toggleUserBlock = async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const user = await User.findById(userId);
+
+    // Chercher l'utilisateur dans toutes les collections
+    let user = null;
+
+    // Essayer de trouver l'utilisateur dans les collections spécifiques
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      user = await Client.findById(userId);
+      if (!user) user = await Pecheur.findById(userId);
+      if (!user) user = await Veterinaire.findById(userId);
+      if (!user) user = await Maryeur.findById(userId);
+      if (!user) user = await Admin.findById(userId);
+    }
+
+    // Si non trouvé par ID, essayer par ID personnalisé
+    if (!user) {
+      user = await Client.findOne({ id: userId });
+      if (!user) user = await Pecheur.findOne({ id: userId });
+      if (!user) user = await Veterinaire.findOne({ id: userId });
+      if (!user) user = await Maryeur.findOne({ id: userId });
+      if (!user) user = await Admin.findOne({ id: userId });
+    }
 
     if (!user) {
-      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+      throw new NotFoundError('Utilisateur non trouvé');
     }
 
     user.isBlocked = !user.isBlocked;
     await user.save();
 
-    res.json({
-      message: user.isBlocked ? 'Utilisateur bloqué' : 'Utilisateur débloqué'
-    });
+    res.success(null, user.isBlocked ? 'Utilisateur bloqué' : 'Utilisateur débloqué');
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 };
 
@@ -466,12 +507,25 @@ const toggleUserBlock = async (req, res) => {
  * @param {Object} _ - L'objet request Express (non utilisé)
  * @param {Object} res - L'objet response Express
  */
-const getPendingUsers = async (_, res) => {
+const getPendingUsers = async (_, res, next) => {
   try {
-    const pendingUsers = await User.find({ isValidated: false }).select('-password');
-    res.json(pendingUsers);
+    // Récupérer les utilisateurs en attente de validation dans toutes les collections
+    const pendingClients = await Client.find({ isValidated: false }).select('-password');
+    const pendingPecheurs = await Pecheur.find({ isValidated: false }).select('-password');
+    const pendingVeterinaires = await Veterinaire.find({ isValidated: false }).select('-password');
+    const pendingMaryeurs = await Maryeur.find({ isValidated: false }).select('-password');
+
+    // Combiner tous les utilisateurs en attente
+    const pendingUsers = [
+      ...pendingClients,
+      ...pendingPecheurs,
+      ...pendingVeterinaires,
+      ...pendingMaryeurs
+    ];
+
+    res.success(pendingUsers, 'Liste des utilisateurs en attente récupérée avec succès');
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 };
 
@@ -548,29 +602,18 @@ const resetPassword = async (req, res, next) => {
     }
 
     // Chercher l'utilisateur dans toutes les collections
-    let user;
+    let user = null;
 
-    // Chercher dans User
-    user = await User.findOne({ email });
-
-    // Chercher dans Pecheur
-    if (!user) {
-      user = await Pecheur.findOne({ email });
-    }
-
-    // Chercher dans Veterinaire
-    if (!user) {
-      user = await Veterinaire.findOne({ email });
-    }
-
-    // Chercher dans Maryeur
-    if (!user) {
-      user = await Maryeur.findOne({ email });
-    }
+    // Essayer de trouver l'utilisateur dans les collections spécifiques
+    user = await Client.findOne({ email });
+    if (!user) user = await Pecheur.findOne({ email });
+    if (!user) user = await Veterinaire.findOne({ email });
+    if (!user) user = await Maryeur.findOne({ email });
+    if (!user) user = await Admin.findOne({ email });
 
     if (!user) {
       // Pour des raisons de sécurité, ne pas indiquer si l'email existe ou non
-      return res.success(null, 'Mot de passe réinitialisé avec succès');
+      return res.success(null, 'Instructions de réinitialisation envoyées si l\'email existe');
     }
 
     // Mettre à jour le mot de passe

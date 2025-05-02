@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
-const User = require('../models/User');
+const Admin = require('../models/Admin');
+const Client = require('../models/Client');
 const Pecheur = require('../models/Pecheur');
 const Veterinaire = require('../models/Veterinaire');
 const Maryeur = require('../models/Maryeur');
@@ -63,14 +64,37 @@ const auth = async (req, res, next) => {
       return foundUser;
     };
 
-    if (roles.includes('ROLE_CLIENT') || roles.includes('ROLE_ADMIN')) {
-      user = await findUserById(User, decoded._id);
-    } else if (roles.includes('ROLE_PECHEUR')) {
+    // Rechercher l'utilisateur en fonction de son rôle
+    if (roles.includes('ROLE_CLIENT')) {
+      user = await findUserById(Client, decoded._id);
+    }
+
+    // Si l'utilisateur n'est pas trouvé ou a un autre rôle, continuer la recherche
+    if (!user && roles.includes('ROLE_PECHEUR')) {
       user = await findUserById(Pecheur, decoded._id);
-    } else if (roles.includes('ROLE_VETERINAIRE')) {
+    }
+
+    if (!user && roles.includes('ROLE_VETERINAIRE')) {
       user = await findUserById(Veterinaire, decoded._id);
-    } else if (roles.includes('ROLE_MARYEUR')) {
+    }
+
+    if (!user && roles.includes('ROLE_MARYEUR')) {
       user = await findUserById(Maryeur, decoded._id);
+    }
+
+    // Pour les administrateurs
+    if (!user && roles.includes('ROLE_ADMIN')) {
+      user = await findUserById(Admin, decoded._id);
+    }
+
+    // Pour la compatibilité avec les données existantes, chercher également dans User si disponible
+    if (!user) {
+      try {
+        const User = require('../models/User');
+        user = await findUserById(User, decoded._id);
+      } catch (error) {
+        // Ignorer l'erreur si le modèle User n'existe pas
+      }
     }
 
     // Vérifier si l'utilisateur existe

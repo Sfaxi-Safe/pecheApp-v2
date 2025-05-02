@@ -6,8 +6,10 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const Lot = require('../models/Lot');
+const Client = require('../models/Client');
 const { auth, checkRole } = require('../middleware/auth');
 const { NotFoundError, BadRequestError } = require('../middleware/errorHandler');
+const notificationService = require('../services/notificationService');
 
 /**
  * @route GET /api/lots
@@ -71,7 +73,28 @@ router.post('/', auth, checkRole(['ROLE_MARYEUR', 'ROLE_ADMIN']), async (req, re
       .populate('espece', 'nom imageUrl')
       .populate('veterinaire', 'nom prenom')
       .populate('prise', 'nom debut fin')
-      .populate('acheteur', 'nom prenom');
+      .populate('acheteur', 'nom prenom')
+      .populate({
+        path: 'prise',
+        populate: { path: 'pecheur', select: 'nom prenom' }
+      });
+
+    // Notifier tous les vétérinaires qu'un nouveau lot est disponible pour validation
+    try {
+      await notificationService.notifierTousVeterinaires(
+        'Nouveau lot à valider',
+        `Un nouveau lot de ${populatedLot.espece ? populatedLot.espece.nom : 'poisson'} est disponible pour validation.`,
+        'info',
+        {
+          reference: newLot._id,
+          referenceModel: 'Lot',
+          urlAction: `/veterinaire/lots/${newLot._id}`
+        }
+      );
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi des notifications:', error);
+      // Ne pas bloquer la création du lot si les notifications échouent
+    }
 
     res.created(populatedLot, 'Lot créé avec succès');
   } catch (error) {
@@ -256,8 +279,55 @@ router.patch('/:id/test', auth, checkRole(['ROLE_VETERINAIRE', 'ROLE_ADMIN']), a
     const populatedLot = await Lot.findById(lot._id)
       .populate('espece', 'nom imageUrl')
       .populate('veterinaire', 'nom prenom')
-      .populate('prise', 'nom debut fin')
-      .populate('acheteur', 'nom prenom');
+      .populate('prise', 'nom debut fin pecheur maryeur')
+      .populate('acheteur', 'nom prenom')
+      .populate({
+        path: 'prise',
+        populate: [
+          { path: 'pecheur', select: 'nom prenom' },
+          { path: 'maryeur', select: 'nom prenom' }
+        ]
+      });
+
+    // Notifier le mareyeur du résultat du test
+    if (populatedLot.prise && populatedLot.prise.maryeur) {
+      try {
+        const resultat = req.body.test ? 'validé' : 'refusé';
+        await notificationService.notifierMaryeur(
+          populatedLot.prise.maryeur._id,
+          `Lot ${resultat} par le vétérinaire`,
+          `Le lot ${populatedLot.identifiant} de ${populatedLot.espece ? populatedLot.espece.nom : 'poisson'} a été ${resultat} par le vétérinaire.`,
+          req.body.test ? 'success' : 'warning',
+          {
+            reference: lot._id,
+            referenceModel: 'Lot',
+            urlAction: `/maryeur/lots/${lot._id}`
+          }
+        );
+      } catch (error) {
+        console.error('Erreur lors de l\'envoi de la notification au mareyeur:', error);
+      }
+    }
+
+    // Notifier le pêcheur du résultat du test
+    if (populatedLot.prise && populatedLot.prise.pecheur) {
+      try {
+        const resultat = req.body.test ? 'validé' : 'refusé';
+        await notificationService.notifierPecheur(
+          populatedLot.prise.pecheur._id,
+          `Lot ${resultat} par le vétérinaire`,
+          `Le lot ${populatedLot.identifiant} de ${populatedLot.espece ? populatedLot.espece.nom : 'poisson'} a été ${resultat} par le vétérinaire.`,
+          req.body.test ? 'success' : 'warning',
+          {
+            reference: lot._id,
+            referenceModel: 'Lot',
+            urlAction: `/pecheur/lots/${lot._id}`
+          }
+        );
+      } catch (error) {
+        console.error('Erreur lors de l\'envoi de la notification au pêcheur:', error);
+      }
+    }
 
     res.success(populatedLot, 'Test du lot effectué avec succès');
   } catch (error) {
@@ -275,6 +345,21 @@ router.patch('/:id/vente', auth, checkRole(['ROLE_MARYEUR', 'ROLE_ADMIN']), asyn
     // Vérifier que les données nécessaires sont présentes
     if (!req.body.acheteur || !req.body.prixFinal) {
       throw new BadRequestError('Acheteur et prix final sont requis');
+    }
+
+    // Vérifier que l'acheteur existe dans la collection Client
+    let acheteur;
+    if (mongoose.Types.ObjectId.isValid(req.body.acheteur)) {
+      acheteur = await Client.findById(req.body.acheteur);
+    }
+
+    // Si non trouvé dans Client, essayer de trouver dans User (pour compatibilité)
+    if (!acheteur) {
+      const User = require('../models/User');
+      acheteur = await User.findById(req.body.acheteur);
+      if (!acheteur) {
+        throw new NotFoundError('Acheteur non trouvé');
+      }
     }
 
     // Mettre à jour les données de vente
@@ -311,8 +396,50 @@ router.patch('/:id/vente', auth, checkRole(['ROLE_MARYEUR', 'ROLE_ADMIN']), asyn
     const populatedLot = await Lot.findById(lot._id)
       .populate('espece', 'nom imageUrl')
       .populate('veterinaire', 'nom prenom')
-      .populate('prise', 'nom debut fin')
-      .populate('acheteur', 'nom prenom');
+      .populate('prise', 'nom debut fin pecheur')
+      .populate('acheteur', 'nom prenom')
+      .populate({
+        path: 'prise',
+        populate: { path: 'pecheur', select: 'nom prenom' }
+      });
+
+    // Notifier le client de l'achat
+    if (populatedLot.acheteur) {
+      try {
+        await notificationService.notifierClient(
+          populatedLot.acheteur._id,
+          'Achat confirmé',
+          `Votre achat du lot ${populatedLot.identifiant} de ${populatedLot.espece ? populatedLot.espece.nom : 'poisson'} a été confirmé pour ${populatedLot.prixFinal} dinars.`,
+          'success',
+          {
+            reference: lot._id,
+            referenceModel: 'Lot',
+            urlAction: `/client/achats/${lot._id}`
+          }
+        );
+      } catch (error) {
+        console.error('Erreur lors de l\'envoi de la notification au client:', error);
+      }
+    }
+
+    // Notifier le pêcheur de la vente
+    if (populatedLot.prise && populatedLot.prise.pecheur) {
+      try {
+        await notificationService.notifierPecheur(
+          populatedLot.prise.pecheur._id,
+          'Lot vendu',
+          `Votre lot ${populatedLot.identifiant} de ${populatedLot.espece ? populatedLot.espece.nom : 'poisson'} a été vendu pour ${populatedLot.prixFinal} dinars.`,
+          'success',
+          {
+            reference: lot._id,
+            referenceModel: 'Lot',
+            urlAction: `/pecheur/lots/${lot._id}`
+          }
+        );
+      } catch (error) {
+        console.error('Erreur lors de l\'envoi de la notification au pêcheur:', error);
+      }
+    }
 
     res.success(populatedLot, 'Lot marqué comme vendu avec succès');
   } catch (error) {

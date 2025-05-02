@@ -6,7 +6,8 @@ const { errorHandler } = require('./middleware/errorHandler');
 const { v4: uuidv4 } = require('uuid');
 
 // Import des routes
-const userRoutes = require('./routes/userRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const clientRoutes = require('./routes/clientRoutes');
 const pecheurRoutes = require('./routes/pecheurRoutes');
 const veterinaireRoutes = require('./routes/veterinaireRoutes');
 const maryeurRoutes = require('./routes/maryeurRoutes');
@@ -15,6 +16,7 @@ const priseRoutes = require('./routes/priseRoutes');
 const lotRoutes = require('./routes/lotRoutes');
 const imageRoutes = require('./routes/imageRoutes');
 const authRoutes = require('./routes/authRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 
@@ -50,7 +52,8 @@ connectDB();
 app.use('/uploads', express.static(require('path').join(__dirname, '../uploads')));
 
 // Routes API
-app.use('/api/users', userRoutes);
+app.use('/api/admins', adminRoutes);
+app.use('/api/clients', clientRoutes);
 app.use('/api/pecheurs', pecheurRoutes);
 app.use('/api/veterinaires', veterinaireRoutes);
 app.use('/api/maryeurs', maryeurRoutes);
@@ -59,6 +62,7 @@ app.use('/api/prises', priseRoutes);
 app.use('/api/lots', lotRoutes);
 app.use('/api/images', imageRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Route de test pour vérifier que le serveur fonctionne
 app.get('/api/health', (req, res) => {

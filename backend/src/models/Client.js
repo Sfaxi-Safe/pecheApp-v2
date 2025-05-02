@@ -1,16 +1,16 @@
 /**
- * Modèle Veterinaire
- * Représente un vétérinaire dans l'application SeaTrace
- * Stocke les informations personnelles et d'authentification du vétérinaire
+ * Modèle Client
+ * Représente un client dans l'application SeaTrace
+ * Stocke les informations personnelles et d'authentification du client
  */
 
 const mongoose = require('mongoose');
 const validator = require('validator');
 const bcrypt = require('bcryptjs');
 
-const veterinaireSchema = new mongoose.Schema({
+const clientSchema = new mongoose.Schema({
   /**
-   * ID personnalisé pour le vétérinaire
+   * ID personnalisé pour le client
    * Utilisé pour les requêtes API et la cohérence avec le frontend
    */
   id: {
@@ -20,7 +20,7 @@ const veterinaireSchema = new mongoose.Schema({
   },
 
   /**
-   * Adresse email du vétérinaire
+   * Adresse email du client
    * Utilisée pour l'authentification et les communications
    */
   email: {
@@ -33,17 +33,17 @@ const veterinaireSchema = new mongoose.Schema({
   },
 
   /**
-   * Rôles du vétérinaire
+   * Rôles du client
    * Stockés sous forme de chaîne de caractères pour correspondre au frontend
    */
   roles: {
     type: String,
     required: true,
-    default: 'ROLE_VETERINAIRE'
+    default: 'ROLE_CLIENT'
   },
 
   /**
-   * Mot de passe du vétérinaire
+   * Mot de passe du client
    * Stocké sous forme hachée pour la sécurité
    */
   password: {
@@ -53,7 +53,7 @@ const veterinaireSchema = new mongoose.Schema({
   },
 
   /**
-   * Nom de famille du vétérinaire
+   * Nom de famille du client
    */
   nom: {
     type: String,
@@ -62,7 +62,7 @@ const veterinaireSchema = new mongoose.Schema({
   },
 
   /**
-   * Prénom du vétérinaire
+   * Prénom du client
    */
   prenom: {
     type: String,
@@ -71,7 +71,7 @@ const veterinaireSchema = new mongoose.Schema({
   },
 
   /**
-   * Numéro de téléphone du vétérinaire
+   * Numéro de téléphone du client
    */
   telephone: {
     type: String,
@@ -79,55 +79,43 @@ const veterinaireSchema = new mongoose.Schema({
   },
 
   /**
-   * Spécialité du vétérinaire
+   * Adresse du client
    */
-  specialite: {
+  adresse: {
     type: String,
     required: false
   },
 
   /**
-   * Certification du vétérinaire
+   * Ville du client
    */
-  certification: {
+  ville: {
     type: String,
     required: false
   },
 
   /**
-   * Matricule du vétérinaire
+   * Code postal du client
    */
-  matricule: {
+  codePostal: {
     type: String,
-    required: true,
-    unique: true
+    required: false
   },
 
   /**
-   * Numéro de CIN du vétérinaire
+   * Pays du client
    */
-  cin: {
+  pays: {
     type: String,
-    required: true,
-    unique: true
+    required: false
   },
-
-  /**
-   * Port d'affectation du vétérinaire
-   */
-  port: String,
-
-  /**
-   * Pays du vétérinaire
-   */
-  pays: String,
 
   /**
    * Indique si le compte a été validé par un administrateur
    */
   isValidated: {
     type: Boolean,
-    default: false
+    default: true // Les clients sont validés par défaut
   },
 
   /**
@@ -144,17 +132,21 @@ const veterinaireSchema = new mongoose.Schema({
   photo: String,
 
   /**
-   * URL ou chemin vers la signature du vétérinaire
-   */
-  signature: String,
-
-  /**
-   * Type d'utilisateur (toujours 'veterinaire' pour ce modèle)
+   * Type d'utilisateur (toujours 'client' pour ce modèle)
    */
   userType: {
     type: String,
-    default: 'veterinaire'
-  }
+    default: 'client'
+  },
+
+  /**
+   * Historique des achats du client
+   * Référence aux lots achetés
+   */
+  achats: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Lot'
+  }]
 }, {
   timestamps: true,
   toJSON: {
@@ -177,7 +169,7 @@ const veterinaireSchema = new mongoose.Schema({
  * Exécuté automatiquement avant chaque sauvegarde du document
  * Hache le mot de passe uniquement s'il a été modifié
  */
-veterinaireSchema.pre('save', async function(next) {
+clientSchema.pre('save', async function(next) {
   if (this.isModified('password')) {
     this.password = await bcrypt.hash(this.password, 8);
   }
@@ -189,7 +181,7 @@ veterinaireSchema.pre('save', async function(next) {
  * Exécuté automatiquement avant chaque sauvegarde du document
  * Si aucun ID personnalisé n'est fourni, utilise l'ID MongoDB
  */
-veterinaireSchema.pre('save', function(next) {
+clientSchema.pre('save', function(next) {
   // Si un ID personnalisé est fourni dans la requête, l'utiliser
   if (this.id) {
     // L'ID personnalisé est déjà défini, ne rien faire
@@ -206,28 +198,18 @@ veterinaireSchema.pre('save', function(next) {
  * @param {string} password - Mot de passe en clair à vérifier
  * @returns {Promise<boolean>} - True si le mot de passe correspond, false sinon
  */
-veterinaireSchema.methods.comparePassword = async function(password) {
+clientSchema.methods.comparePassword = async function(password) {
   return bcrypt.compare(password, this.password);
 };
 
 /**
- * Méthode: Vérification de rôle
- * Vérifie si le vétérinaire possède un rôle spécifique
- * @param {string} role - Le rôle à vérifier
- * @returns {boolean} - True si le vétérinaire possède le rôle, false sinon
- */
-veterinaireSchema.methods.hasRole = function(role) {
-  return this.roles.includes(role);
-};
-
-/**
  * Méthode: Obtention du type d'utilisateur
- * @returns {string} - Toujours 'veterinaire' pour ce modèle
+ * @returns {string} - Toujours 'client' pour ce modèle
  */
-veterinaireSchema.methods.getUserType = function() {
-  return 'veterinaire';
+clientSchema.methods.getUserType = function() {
+  return 'client';
 };
 
-const Veterinaire = mongoose.model('Veterinaire', veterinaireSchema);
+const Client = mongoose.model('Client', clientSchema);
 
-module.exports = Veterinaire;
+module.exports = Client;
