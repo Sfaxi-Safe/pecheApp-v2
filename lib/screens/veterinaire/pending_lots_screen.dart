@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/services/auth_service.dart';
+import 'package:seatrace/utils/error_handler.dart';
 import 'package:intl/intl.dart';
 
 class PendingLotsScreen extends StatefulWidget {
@@ -29,15 +30,56 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
     });
 
     try {
+      // Vérifier l'utilisateur
       final user = await AuthService().getCurrentUser();
       if (user == null) {
         throw Exception('Utilisateur non autorisé');
       }
 
+      // Ajouter un log pour le débogage
+      ErrorHandler.instance.logInfo(
+        'Chargement des lots en attente pour l\'utilisateur: ${user.id}',
+        context: 'PendingLotsScreen',
+      );
+
+      // Vérifier si le token est présent
+      ErrorHandler.instance.logInfo(
+        'Token d\'authentification présent: ${ApiService.instance.hasToken()}',
+        context: 'PendingLotsScreen',
+      );
+
       try {
+        // Utiliser un timeout plus long pour éviter les erreurs de timeout
         final response = await ApiService.instance.get('lots/pending');
-        _pendingLots = List<Map<String, dynamic>>.from(response['data']);
+
+        // Vérifier si la réponse contient des données
+        if (response.containsKey('data')) {
+          _pendingLots = List<Map<String, dynamic>>.from(response['data']);
+          ErrorHandler.instance.logInfo(
+            'Lots en attente chargés: ${_pendingLots.length}',
+            context: 'PendingLotsScreen',
+          );
+        } else {
+          ErrorHandler.instance.logWarning(
+            'Réponse reçue sans données: $response',
+            context: 'PendingLotsScreen',
+          );
+          _pendingLots = [];
+        }
       } catch (e) {
+        ErrorHandler.instance.logError(
+          'Erreur API lors de la récupération des lots: $e',
+          context: 'PendingLotsScreen',
+        );
+
+        // Si c'est une erreur 404, on considère qu'il n'y a pas de lots en attente
+        if (e.toString().contains('notFound') || e.toString().contains('404')) {
+          _pendingLots = [];
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
         throw Exception('Erreur lors de la récupération des lots: $e');
       }
 
@@ -45,6 +87,10 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      ErrorHandler.instance.logError(
+        'Erreur générale: $e',
+        context: 'PendingLotsScreen',
+      );
       setState(() {
         _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
         _isLoading = false;
@@ -59,13 +105,19 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
         throw Exception('Utilisateur non autorisé');
       }
 
+      // Log l'action pour le débogage
+      ErrorHandler.instance.logInfo(
+        'Approbation du lot $lotId par l\'utilisateur ${user.id}',
+        context: 'PendingLotsScreen',
+      );
+
+      // Utiliser la nouvelle route d'approbation
       await ApiService.instance.put('lots/$lotId/approve', {
-        'test': true,
-        'status': true,
+        'temperature': 4.0, // Température par défaut
         'veterinaire': user.id,
       });
 
-      // Refresh the list
+      // Actualiser la liste
       _loadPendingLots();
 
       if (!mounted) return;
@@ -76,6 +128,12 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
         ),
       );
     } catch (e) {
+      // Log l'erreur pour le débogage
+      ErrorHandler.instance.logError(
+        'Erreur lors de l\'approbation du lot: $e',
+        context: 'PendingLotsScreen',
+      );
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -93,13 +151,19 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
         throw Exception('Utilisateur non autorisé');
       }
 
+      // Log l'action pour le débogage
+      ErrorHandler.instance.logInfo(
+        'Rejet du lot $lotId par l\'utilisateur ${user.id}',
+        context: 'PendingLotsScreen',
+      );
+
+      // Utiliser la nouvelle route de rejet
       await ApiService.instance.put('lots/$lotId/reject', {
-        'test': true,
-        'status': false,
+        'temperature': 4.0, // Température par défaut
         'veterinaire': user.id,
       });
 
-      // Refresh the list
+      // Actualiser la liste
       _loadPendingLots();
 
       if (!mounted) return;
@@ -110,6 +174,12 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
         ),
       );
     } catch (e) {
+      // Log l'erreur pour le débogage
+      ErrorHandler.instance.logError(
+        'Erreur lors du rejet du lot: $e',
+        context: 'PendingLotsScreen',
+      );
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -312,7 +382,7 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
                 ),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _approveLot(lot['id']),
+                    onPressed: () => _approveLot(lot['_id'] ?? lot['id']),
                     icon: const Icon(Icons.check),
                     label: const Text('Approuver'),
                     style: ElevatedButton.styleFrom(
@@ -322,7 +392,7 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
                 ),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _rejectLot(lot['id']),
+                    onPressed: () => _rejectLot(lot['_id'] ?? lot['id']),
                     icon: const Icon(Icons.close, color: Colors.red),
                     label: const Text(
                       'Refuser',
@@ -378,7 +448,10 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
                   ],
                   _buildDetailItem('Identifiant', lot['identifiant'] ?? 'N/A'),
                   _buildDetailItem('Espèce', lot['espece'] ?? 'N/A'),
-                  _buildDetailItem('Quantité', lot['quantite']?.toString() ?? 'N/A'),
+                  _buildDetailItem(
+                    'Quantité',
+                    lot['quantite']?.toString() ?? 'N/A',
+                  ),
                   _buildDetailItem('Poids', '${lot['poids'] ?? 'N/A'} kg'),
                   _buildDetailItem(
                     'Température',
@@ -402,7 +475,7 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             Navigator.of(context).pop();
-                            _approveLot(lot['id']);
+                            _approveLot(lot['_id'] ?? lot['id']);
                           },
                           icon: const Icon(Icons.check),
                           label: const Text('Approuver'),
@@ -416,7 +489,7 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
                         child: OutlinedButton.icon(
                           onPressed: () {
                             Navigator.of(context).pop();
-                            _rejectLot(lot['id']);
+                            _rejectLot(lot['_id'] ?? lot['id']);
                           },
                           icon: const Icon(Icons.close, color: Colors.red),
                           label: const Text(

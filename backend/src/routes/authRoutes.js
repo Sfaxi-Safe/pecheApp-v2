@@ -9,7 +9,8 @@ const {
   login,
   getProfile,
   requestPasswordReset,
-  resetPassword
+  resetPassword,
+  changePassword
 } = require('../controllers/authController');
 
 /**
@@ -76,5 +77,19 @@ router.post('/request-reset', requestPasswordReset);
  * @access Public
  */
 router.post('/reset-password', resetPassword);
+
+/**
+ * @route PUT /api/auth/change-password
+ * @desc Changer le mot de passe de l'utilisateur connecté
+ * @access Private
+ */
+router.put('/change-password', auth, changePassword);
+
+/**
+ * @route PATCH /api/auth/change-password
+ * @desc Changer le mot de passe de l'utilisateur connecté (alias pour PUT)
+ * @access Private
+ */
+router.patch('/change-password', auth, changePassword);
 
 module.exports = router;

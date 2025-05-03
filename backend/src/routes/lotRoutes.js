@@ -162,6 +162,67 @@ router.get('/available', async (req, res, next) => {
 });
 
 /**
+ * @route GET /api/lots/pending
+ * @desc Récupérer tous les lots en attente de validation par un vétérinaire
+ * @access Private (Vétérinaire ou Admin)
+ */
+router.get('/pending', auth, checkRole(['ROLE_VETERINAIRE', 'ROLE_ADMIN']), async (req, res, next) => {
+  try {
+    // Récupérer les lots qui n'ont pas encore été testés par un vétérinaire
+    const filter = {
+      test: false
+    };
+
+    // Trier par date de soumission (les plus récents d'abord)
+    const lots = await Lot.find(filter)
+      .sort({ dateSoumission: -1 })
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin lieu')
+      .populate({
+        path: 'prise',
+        populate: { path: 'pecheur', select: 'nom prenom' }
+      });
+
+    res.success(lots, 'Liste des lots en attente récupérée avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route GET /api/lots/pending-price
+ * @desc Récupérer tous les lots validés par un vétérinaire mais sans prix initial
+ * @access Private (Maryeur ou Admin)
+ */
+router.get('/pending-price', auth, checkRole(['ROLE_MARYEUR', 'ROLE_ADMIN']), async (req, res, next) => {
+  try {
+    // Récupérer les lots qui ont été validés par un vétérinaire mais qui n'ont pas encore de prix initial
+    const filter = {
+      test: true,
+      status: true,
+      prixInitial: { $exists: false },
+      vendu: false
+    };
+
+    // Trier par date de soumission (les plus récents d'abord)
+    const lots = await Lot.find(filter)
+      .sort({ dateSoumission: -1 })
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin lieu')
+      .populate({
+        path: 'prise',
+        populate: { path: 'pecheur', select: 'nom prenom' }
+      });
+
+    res.success(lots, 'Liste des lots en attente de prix récupérée avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * @route GET /api/lots/maryeur/:id
  * @desc Récupérer tous les lots associés à un maryeur
  * @access Private (Maryeur ou Admin)
@@ -201,8 +262,41 @@ router.get('/maryeur/:id', auth, checkRole(['ROLE_MARYEUR', 'ROLE_ADMIN']), asyn
       filter.prise = { $in: priseIds };
     }
 
-    // Récupérer tous les lots associés à ce maryeur
+    // Ajouter des filtres supplémentaires si fournis
+
+    // Filtrer par statut de vente si spécifié
+    if (req.query.vendu !== undefined) {
+      filter.vendu = req.query.vendu === 'true';
+    }
+
+    // Filtrer par statut de test si spécifié
+    if (req.query.status !== undefined) {
+      filter.status = req.query.status === 'true';
+    }
+
+    // Filtrer par prix initial si spécifié
+    if (req.query.hasPrixInitial !== undefined) {
+      if (req.query.hasPrixInitial === 'true') {
+        filter.prixInitial = { $exists: true, $ne: null };
+      } else {
+        filter.prixInitial = { $exists: false };
+      }
+    }
+
+    // Filtrer par date de soumission
+    if (req.query.dateDebut) {
+      if (!filter.dateSoumission) filter.dateSoumission = {};
+      filter.dateSoumission.$gte = new Date(req.query.dateDebut);
+    }
+
+    if (req.query.dateFin) {
+      if (!filter.dateSoumission) filter.dateSoumission = {};
+      filter.dateSoumission.$lte = new Date(req.query.dateFin);
+    }
+
+    // Récupérer tous les lots associés à ce maryeur avec les filtres appliqués
     const lots = await Lot.find(filter)
+      .sort({ dateSoumission: -1 }) // Trier par date de soumission (les plus récents d'abord)
       .populate('espece', 'nom imageUrl')
       .populate('veterinaire', 'nom prenom')
       .populate('prise', 'nom debut fin')
@@ -400,8 +494,27 @@ router.get('/veterinaire/:id', auth, checkRole(['ROLE_VETERINAIRE', 'ROLE_ADMIN'
       filter.veterinaire = veterinaire._id;
     }
 
-    // Récupérer tous les lots associés à ce vétérinaire
+    // Ajouter des filtres supplémentaires si fournis
+
+    // Filtrer par statut de test si spécifié
+    if (req.query.status !== undefined) {
+      filter.status = req.query.status === 'true';
+    }
+
+    // Filtrer par date de test
+    if (req.query.dateDebut) {
+      if (!filter.dateTest) filter.dateTest = {};
+      filter.dateTest.$gte = new Date(req.query.dateDebut);
+    }
+
+    if (req.query.dateFin) {
+      if (!filter.dateTest) filter.dateTest = {};
+      filter.dateTest.$lte = new Date(req.query.dateFin);
+    }
+
+    // Récupérer tous les lots associés à ce vétérinaire avec les filtres appliqués
     const lots = await Lot.find(filter)
+      .sort({ dateTest: -1 }) // Trier par date de test (les plus récents d'abord)
       .populate('espece', 'nom imageUrl')
       .populate('veterinaire', 'nom prenom')
       .populate('prise', 'nom debut fin')
@@ -607,6 +720,186 @@ router.delete('/:id', auth, checkRole('ROLE_ADMIN'), async (req, res, next) => {
 });
 
 /**
+ * @route PUT /api/lots/:id/approve
+ * @desc Approuver un lot par un vétérinaire
+ * @access Private (Vétérinaire ou Admin)
+ */
+router.put('/:id/approve', auth, checkRole(['ROLE_VETERINAIRE', 'ROLE_ADMIN']), async (req, res, next) => {
+  try {
+    // Mettre à jour les données du test
+    const updateData = {
+      test: true,
+      dateTest: new Date(),
+      veterinaire: req.user._id,
+      status: true
+    };
+
+    // Ajouter la température si fournie
+    if (req.body.temperature) {
+      updateData.temperature = req.body.temperature;
+    }
+
+    // Mettre à jour le lot
+    let lot = await Lot.findById(req.params.id);
+
+    if (!lot) {
+      // Si non trouvé par ID, essayer par identifiant
+      lot = await Lot.findOne({ identifiant: req.params.id });
+    }
+
+    if (!lot) {
+      throw new NotFoundError('Lot non trouvé');
+    }
+
+    // Appliquer les mises à jour
+    Object.assign(lot, updateData);
+    await lot.save();
+
+    // Récupérer le lot mis à jour avec les relations peuplées
+    const populatedLot = await Lot.findById(lot._id)
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin')
+      .populate({
+        path: 'prise',
+        populate: { path: 'pecheur maryeur', select: 'nom prenom' }
+      });
+
+    // Notifier le mareyeur du résultat du test
+    if (populatedLot.prise && populatedLot.prise.maryeur) {
+      try {
+        await notificationService.notifierMaryeur(
+          populatedLot.prise.maryeur._id,
+          `Lot validé par le vétérinaire`,
+          `Le lot ${populatedLot.identifiant} de ${populatedLot.espece ? populatedLot.espece.nom : 'poisson'} a été validé par le vétérinaire.`,
+          'success',
+          {
+            reference: lot._id,
+            referenceModel: 'Lot',
+            urlAction: `/maryeur/lots/${lot._id}`
+          }
+        );
+      } catch (error) {
+        console.error('Erreur lors de l\'envoi de la notification au mareyeur:', error);
+      }
+    }
+
+    // Notifier le pêcheur du résultat du test
+    if (populatedLot.prise && populatedLot.prise.pecheur) {
+      try {
+        await notificationService.notifierPecheur(
+          populatedLot.prise.pecheur._id,
+          `Lot validé par le vétérinaire`,
+          `Le lot ${populatedLot.identifiant} de ${populatedLot.espece ? populatedLot.espece.nom : 'poisson'} a été validé par le vétérinaire.`,
+          'success',
+          {
+            reference: lot._id,
+            referenceModel: 'Lot',
+            urlAction: `/pecheur/lots/${lot._id}`
+          }
+        );
+      } catch (error) {
+        console.error('Erreur lors de l\'envoi de la notification au pêcheur:', error);
+      }
+    }
+
+    res.success(populatedLot, 'Lot approuvé avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route PUT /api/lots/:id/reject
+ * @desc Rejeter un lot par un vétérinaire
+ * @access Private (Vétérinaire ou Admin)
+ */
+router.put('/:id/reject', auth, checkRole(['ROLE_VETERINAIRE', 'ROLE_ADMIN']), async (req, res, next) => {
+  try {
+    // Mettre à jour les données du test
+    const updateData = {
+      test: true,
+      dateTest: new Date(),
+      veterinaire: req.user._id,
+      status: false
+    };
+
+    // Ajouter la température si fournie
+    if (req.body.temperature) {
+      updateData.temperature = req.body.temperature;
+    }
+
+    // Mettre à jour le lot
+    let lot = await Lot.findById(req.params.id);
+
+    if (!lot) {
+      // Si non trouvé par ID, essayer par identifiant
+      lot = await Lot.findOne({ identifiant: req.params.id });
+    }
+
+    if (!lot) {
+      throw new NotFoundError('Lot non trouvé');
+    }
+
+    // Appliquer les mises à jour
+    Object.assign(lot, updateData);
+    await lot.save();
+
+    // Récupérer le lot mis à jour avec les relations peuplées
+    const populatedLot = await Lot.findById(lot._id)
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin')
+      .populate({
+        path: 'prise',
+        populate: { path: 'pecheur maryeur', select: 'nom prenom' }
+      });
+
+    // Notifier le mareyeur du résultat du test
+    if (populatedLot.prise && populatedLot.prise.maryeur) {
+      try {
+        await notificationService.notifierMaryeur(
+          populatedLot.prise.maryeur._id,
+          `Lot refusé par le vétérinaire`,
+          `Le lot ${populatedLot.identifiant} de ${populatedLot.espece ? populatedLot.espece.nom : 'poisson'} a été refusé par le vétérinaire.`,
+          'warning',
+          {
+            reference: lot._id,
+            referenceModel: 'Lot',
+            urlAction: `/maryeur/lots/${lot._id}`
+          }
+        );
+      } catch (error) {
+        console.error('Erreur lors de l\'envoi de la notification au mareyeur:', error);
+      }
+    }
+
+    // Notifier le pêcheur du résultat du test
+    if (populatedLot.prise && populatedLot.prise.pecheur) {
+      try {
+        await notificationService.notifierPecheur(
+          populatedLot.prise.pecheur._id,
+          `Lot refusé par le vétérinaire`,
+          `Le lot ${populatedLot.identifiant} de ${populatedLot.espece ? populatedLot.espece.nom : 'poisson'} a été refusé par le vétérinaire.`,
+          'warning',
+          {
+            reference: lot._id,
+            referenceModel: 'Lot',
+            urlAction: `/pecheur/lots/${lot._id}`
+          }
+        );
+      } catch (error) {
+        console.error('Erreur lors de l\'envoi de la notification au pêcheur:', error);
+      }
+    }
+
+    res.success(populatedLot, 'Lot refusé avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * @route PATCH /api/lots/:id/test
  * @desc Valider un lot par un vétérinaire
  * @access Private (Vétérinaire ou Admin)
@@ -704,6 +997,67 @@ router.patch('/:id/test', auth, checkRole(['ROLE_VETERINAIRE', 'ROLE_ADMIN']), a
     }
 
     res.success(populatedLot, 'Test du lot effectué avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route PUT /api/lots/:id/set-price
+ * @desc Définir le prix initial et minimal d'un lot
+ * @access Private (Mareyeur ou Admin)
+ */
+router.put('/:id/set-price', auth, checkRole(['ROLE_MARYEUR', 'ROLE_ADMIN']), async (req, res, next) => {
+  try {
+    // Vérifier que les données nécessaires sont présentes
+    if (!req.body.prixMinimal) {
+      throw new BadRequestError('Prix minimal requis');
+    }
+
+    // Convertir les prix en nombres
+    const prixMinimal = parseFloat(req.body.prixMinimal);
+    const prixInitial = parseFloat(req.body.prixInitial || req.body.prixMinimal);
+
+    if (isNaN(prixMinimal) || prixMinimal <= 0) {
+      throw new BadRequestError('Prix minimal invalide');
+    }
+
+    // Mettre à jour le lot
+    let lot = await Lot.findById(req.params.id);
+
+    if (!lot) {
+      // Si non trouvé par ID, essayer par identifiant
+      lot = await Lot.findOne({ identifiant: req.params.id });
+    }
+
+    if (!lot) {
+      throw new NotFoundError('Lot non trouvé');
+    }
+
+    // Vérifier que le lot a été validé par un vétérinaire
+    if (!lot.test || !lot.status) {
+      throw new BadRequestError('Le lot doit être validé par un vétérinaire avant de définir un prix');
+    }
+
+    // Mettre à jour les prix
+    lot.prixMinimal = prixMinimal;
+    lot.prixInitial = prixInitial;
+    lot.current = prixMinimal; // Prix courant initial = prix minimal
+
+    // Ajouter d'autres champs si fournis
+    if (req.body.typeEnchere) lot.typeEnchere = req.body.typeEnchere;
+    if (req.body.online !== undefined) lot.online = req.body.online;
+
+    await lot.save();
+
+    // Récupérer le lot mis à jour avec les relations peuplées
+    const populatedLot = await Lot.findById(lot._id)
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin')
+      .populate('acheteur', 'nom prenom');
+
+    res.success(populatedLot, 'Prix du lot défini avec succès');
   } catch (error) {
     next(error);
   }

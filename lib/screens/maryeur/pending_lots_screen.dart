@@ -1,7 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../utils/error_handler.dart';
 import 'package:intl/intl.dart';
 
 class PendingLotsMaryeurScreen extends StatefulWidget {
@@ -30,27 +30,67 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
     });
 
     try {
+      // Vérifier l'utilisateur
       final user = await AuthService().getCurrentUser();
       if (user == null || !user.isMaryeur()) {
         throw Exception('Utilisateur non autorisé');
       }
 
-      if (user.id != null) {
-        try {
-          // Get lots that have been approved by veterinarian but don't have initial price
-          final response = await ApiService.instance.get('lots/pending-price');
+      // Ajouter un log pour le débogage
+      ErrorHandler.instance.logInfo(
+        'Chargement des lots en attente de prix pour l\'utilisateur: ${user.id}',
+        context: 'PendingLotsMaryeurScreen',
+      );
+
+      // Vérifier si le token est présent
+      ErrorHandler.instance.logInfo(
+        'Token d\'authentification présent: ${ApiService.instance.hasToken()}',
+        context: 'PendingLotsMaryeurScreen',
+      );
+
+      try {
+        // Utiliser un timeout plus long pour éviter les erreurs de timeout
+        final response = await ApiService.instance.get('lots/pending-price');
+
+        // Vérifier si la réponse contient des données
+        if (response.containsKey('data')) {
           _pendingLots = List<Map<String, dynamic>>.from(response['data']);
-        } catch (e) {
-          throw Exception('Erreur lors de la récupération des lots: $e');
+          ErrorHandler.instance.logInfo(
+            'Lots en attente de prix chargés: ${_pendingLots.length}',
+            context: 'PendingLotsMaryeurScreen',
+          );
+        } else {
+          ErrorHandler.instance.logWarning(
+            'Réponse reçue sans données: $response',
+            context: 'PendingLotsMaryeurScreen',
+          );
+          _pendingLots = [];
         }
-      } else {
-        _pendingLots = [];
+      } catch (e) {
+        ErrorHandler.instance.logError(
+          'Erreur API lors de la récupération des lots: $e',
+          context: 'PendingLotsMaryeurScreen',
+        );
+
+        // Si c'est une erreur 404, on considère qu'il n'y a pas de lots en attente
+        if (e.toString().contains('notFound') || e.toString().contains('404')) {
+          _pendingLots = [];
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+        throw Exception('Erreur lors de la récupération des lots: $e');
       }
 
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
+      ErrorHandler.instance.logError(
+        'Erreur générale: $e',
+        context: 'PendingLotsMaryeurScreen',
+      );
       setState(() {
         _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
         _isLoading = false;
@@ -59,26 +99,35 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
   }
 
   // Mise à jour pour définir uniquement le prix minimal
-  Future<void> _setMinPrice(int lotId, String minPrice) async {
+  Future<void> _setMinPrice(String lotId, String minPrice) async {
     try {
       final user = await AuthService().getCurrentUser();
-      if (user == null || !user.isMaryeur() || user.id == null) {
+      if (user == null || !user.isMaryeur()) {
         throw Exception('Utilisateur non autorisé');
+      }
+
+      // Log l'action pour le débogage
+      ErrorHandler.instance.logInfo(
+        'Définition du prix pour le lot $lotId: $minPrice TND',
+        context: 'PendingLotsMaryeurScreen',
+      );
+
+      // Convertir le prix en nombre
+      final double prixMinimal = double.tryParse(minPrice) ?? 0.0;
+      if (prixMinimal <= 0) {
+        throw Exception('Le prix doit être supérieur à 0');
       }
 
       // Mise à jour du lot avec le prix minimal via l'API
       await ApiService.instance.put('lots/$lotId/set-price', {
-        'prixMinimal': minPrice,
+        'prixMinimal': prixMinimal,
         'prixInitial':
-            minPrice, // Le prix initial est égal au prix minimal au début
+            prixMinimal, // Le prix initial est égal au prix minimal au début
         'typeEnchere': 'standard',
-        'current': minPrice, // Le prix courant commence au prix minimal
         'online': true,
-        'devise': 'TND', // Utilisation du Dinar Tunisien
-        'maryeur_id': user.id,
       });
 
-      // Refresh the list
+      // Actualiser la liste
       _loadPendingLots();
 
       if (!mounted) return;
@@ -89,6 +138,12 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
         ),
       );
     } catch (e) {
+      // Log l'erreur pour le débogage
+      ErrorHandler.instance.logError(
+        'Erreur lors de la définition du prix: $e',
+        context: 'PendingLotsMaryeurScreen',
+      );
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -148,7 +203,10 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
                 onPressed: () {
                   if (formKey.currentState!.validate()) {
                     Navigator.of(context).pop();
-                    _setMinPrice(lot['id'], minPriceController.text);
+                    _setMinPrice(
+                      lot['_id'] ?? lot['id'],
+                      minPriceController.text,
+                    );
                   }
                 },
                 child: const Text('Confirmer'),
@@ -260,9 +318,9 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
                   bottomLeft: Radius.circular(12),
                 ),
                 child:
-                    photoPath != null && File(photoPath).existsSync()
-                        ? Image.file(
-                          File(photoPath),
+                    photoPath != null && photoPath.isNotEmpty
+                        ? Image.network(
+                          ApiService.instance.getImageUrl(photoPath),
                           width: 120,
                           height: 120,
                           fit: BoxFit.cover,
@@ -377,12 +435,11 @@ class _PendingLotsMaryeurScreenState extends State<PendingLotsMaryeurScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (lot['photo'] != null &&
-                      File(lot['photo']).existsSync()) ...[
+                  if (lot['photo'] != null && lot['photo'].isNotEmpty) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(lot['photo']),
+                      child: Image.network(
+                        ApiService.instance.getImageUrl(lot['photo']),
                         width: double.infinity,
                         height: 200,
                         fit: BoxFit.cover,

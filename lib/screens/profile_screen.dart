@@ -154,7 +154,7 @@ class ProfileScreenState extends State<ProfileScreen> {
         } else {
           endpoint = 'clients/${user.id}';
         }
-        await ApiService.instance.put(endpoint, updatedData);
+        await ApiService.instance.patch(endpoint, updatedData);
 
         // Rafraîchir les données utilisateur
         await _loadUserData();
@@ -232,10 +232,7 @@ class ProfileScreenState extends State<ProfileScreen> {
         'id': user.id,
         'nom': _nomController.text.trim(),
         'prenom': _prenomController.text.trim(),
-        'telephone':
-            _telephoneController.text.isEmpty
-                ? null
-                : int.tryParse(_telephoneController.text),
+        'telephone': _telephoneController.text.trim(),
       };
 
       String endpoint = '';
@@ -251,7 +248,7 @@ class ProfileScreenState extends State<ProfileScreen> {
         endpoint = 'clients/${user.id}';
       }
 
-      await ApiService.instance.put(endpoint, updatedData);
+      await ApiService.instance.patch(endpoint, updatedData);
 
       // Mettre à jour les données de l'utilisateur en session
       await AuthService().refreshCurrentUser();
@@ -304,7 +301,7 @@ class ProfileScreenState extends State<ProfileScreen> {
         'newPassword': _newPasswordController.text,
       };
 
-      await ApiService.instance.put('auth/change-password', passwordData);
+      await ApiService.instance.patch('auth/change-password', passwordData);
 
       // Effacer les champs
       _currentPasswordController.clear();

@@ -628,6 +628,79 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
+/**
+ * Contrôleur pour changer le mot de passe de l'utilisateur connecté
+ *
+ * Cette fonction effectue les opérations suivantes :
+ * 1. Vérifie que l'utilisateur est connecté
+ * 2. Vérifie que l'ancien mot de passe est correct
+ * 3. Met à jour le mot de passe
+ * 4. Renvoie un message de succès
+ *
+ * @param {Object} req - L'objet request Express
+ * @param {Object} res - L'objet response Express
+ * @param {Function} next - La fonction middleware suivante
+ */
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user._id;
+
+    if (!currentPassword || !newPassword) {
+      throw new BadRequestError('Mot de passe actuel et nouveau mot de passe requis');
+    }
+
+    if (newPassword.length < 6) {
+      throw new BadRequestError('Le nouveau mot de passe doit contenir au moins 6 caractères');
+    }
+
+    // Récupérer l'utilisateur depuis la base de données
+    let user = null;
+    const userType = req.user.getUserType();
+
+    // Trouver l'utilisateur dans la collection appropriée
+    switch (userType) {
+      case 'client':
+        user = await Client.findById(userId);
+        break;
+      case 'pecheur':
+        user = await Pecheur.findById(userId);
+        break;
+      case 'veterinaire':
+        user = await Veterinaire.findById(userId);
+        break;
+      case 'maryeur':
+        user = await Maryeur.findById(userId);
+        break;
+      case 'admin':
+        user = await Admin.findById(userId);
+        break;
+      default:
+        throw new BadRequestError('Type d\'utilisateur non reconnu');
+    }
+
+    if (!user) {
+      throw new NotFoundError('Utilisateur non trouvé');
+    }
+
+    // Vérifier que l'ancien mot de passe est correct
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      throw new BadRequestError('Mot de passe actuel incorrect');
+    }
+
+    // Mettre à jour le mot de passe
+    user.password = newPassword;
+    await user.save();
+
+    console.log(`[${new Date().toISOString()}] INFO [AUTH] Mot de passe changé pour l'utilisateur: ${user.email}`);
+
+    res.success(null, 'Mot de passe mis à jour avec succès');
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -636,5 +709,6 @@ module.exports = {
   toggleUserBlock,
   getPendingUsers,
   requestPasswordReset,
-  resetPassword
+  resetPassword,
+  changePassword
 };

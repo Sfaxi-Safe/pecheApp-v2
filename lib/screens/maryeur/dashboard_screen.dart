@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:seatrace/utils/color_extensions.dart';
 import 'package:seatrace/services/auth_service.dart';
 import 'package:seatrace/screens/login_screen.dart';
 import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/screens/maryeur/pending_lots_screen.dart';
 import 'package:seatrace/screens/maryeur/active_auctions_screen.dart';
 import 'package:seatrace/screens/profile_screen.dart';
+import 'package:seatrace/screens/lot_details_screen.dart';
 import 'package:seatrace/utils/animation_service.dart';
 import 'package:seatrace/utils/responsive_service.dart';
 import 'package:seatrace/utils/navigation_service.dart';
 import 'package:seatrace/widgets/sea_widgets.dart';
+import 'package:seatrace/widgets/sea_filter_bar.dart';
+import 'package:intl/intl.dart';
 
 class MaryeurDashboardScreen extends StatefulWidget {
   const MaryeurDashboardScreen({super.key});
@@ -30,6 +32,12 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
   int _completedAuctions = 0;
   bool _isLoading = true;
   String? _errorMessage;
+  List<Map<String, dynamic>> _filteredActivities = [];
+
+  // Filtres
+  String? _selectedStatusFilter;
+  DateFilter _dateFilter = DateFilter.all();
+  bool _showFilters = false;
 
   final _animationService = AnimationService();
   final _responsiveService = ResponsiveService();
@@ -39,6 +47,76 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
   void initState() {
     super.initState();
     _loadUserData();
+  }
+
+  Future<void> _applyFilters() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final user = await AuthService().getCurrentUser();
+      if (user == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      // Préparer les paramètres de filtrage
+      bool? venduFilter;
+      bool? hasPrixInitialFilter;
+      DateTime? dateDebut;
+      DateTime? dateFin;
+
+      // Convertir le filtre de statut en paramètres appropriés
+      if (_selectedStatusFilter != null) {
+        if (_selectedStatusFilter == 'Vendu') {
+          venduFilter = true;
+        } else if (_selectedStatusFilter == 'En enchère') {
+          venduFilter = false;
+          hasPrixInitialFilter = true;
+        } else if (_selectedStatusFilter == 'Prix défini') {
+          venduFilter = false;
+          hasPrixInitialFilter = false;
+        }
+      }
+
+      // Préparer les dates de début et de fin selon le filtre de date
+      if (_dateFilter.type != DateFilterType.all) {
+        dateDebut = _dateFilter.startDate;
+        dateFin = _dateFilter.endDate;
+      }
+
+      // Appeler l'API avec les filtres
+      final lots = await ApiService.instance.getLotsByMaryeurId(
+        user.id,
+        vendu: venduFilter,
+        hasPrixInitial: hasPrixInitialFilter,
+        dateDebut: dateDebut,
+        dateFin: dateFin,
+      );
+
+      // Trier par date (plus récent en premier)
+      lots.sort((a, b) {
+        final dateA =
+            a['dateSoumission'] != null
+                ? DateTime.parse(a['dateSoumission'])
+                : DateTime(1900);
+        final dateB =
+            b['dateSoumission'] != null
+                ? DateTime.parse(b['dateSoumission'])
+                : DateTime(1900);
+        return dateB.compareTo(dateA);
+      });
+
+      setState(() {
+        _filteredActivities = lots;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Erreur lors du filtrage: ${e.toString()}';
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -68,10 +146,29 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
       // Charger les statistiques
       final stats = await ApiService.instance.getMaryeurStats(user.id);
 
+      // Charger les activités récentes (lots récemment traités)
+      final lots = await ApiService.instance.getLotsByMaryeurId(user.id);
+
+      // Trier par date (plus récent en premier) et prendre les 5 premiers
+      lots.sort((a, b) {
+        final dateA =
+            a['dateSoumission'] != null
+                ? DateTime.parse(a['dateSoumission'])
+                : DateTime(1900);
+        final dateB =
+            b['dateSoumission'] != null
+                ? DateTime.parse(b['dateSoumission'])
+                : DateTime(1900);
+        return dateB.compareTo(dateA);
+      });
+
+      final recentActivities = lots.take(5).toList();
+
       setState(() {
         _pendingLots = stats['pendingLots'] ?? 0;
         _activeAuctions = stats['activeAuctions'] ?? 0;
         _completedAuctions = stats['completedAuctions'] ?? 0;
+        _filteredActivities = recentActivities;
         _isLoading = false;
       });
     } catch (e) {
@@ -107,8 +204,6 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
     final isPhone = _responsiveService.isPhone(context);
 
     return Scaffold(
@@ -171,11 +266,15 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
                         SeaSectionHeader(
                           title: 'Activité récente',
                           icon: Icons.history,
-                          actionText: 'Voir tout',
+                          actionText:
+                              _showFilters ? 'Masquer filtres' : 'Filtrer',
                           onActionPressed: () {
-                            // Naviguer vers l'historique complet
+                            setState(() {
+                              _showFilters = !_showFilters;
+                            });
                           },
                         ),
+                        if (_showFilters) _buildFilterBar(),
                         _buildRecentActivityList(),
                       ]),
                     ),
@@ -575,40 +674,117 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
     );
   }
 
+  Widget _buildFilterBar() {
+    return SeaFilterBar(
+      statusFilters: const ['Vendu', 'En enchère', 'Prix défini'],
+      selectedStatusFilter: _selectedStatusFilter,
+      dateFilter: _dateFilter,
+      onStatusFilterChanged: (value) {
+        setState(() {
+          _selectedStatusFilter = value;
+        });
+        _applyFilters();
+      },
+      onDateFilterChanged: (value) {
+        setState(() {
+          _dateFilter = value;
+        });
+        _applyFilters();
+      },
+    );
+  }
+
   Widget _buildRecentActivityList() {
     final theme = Theme.of(context);
 
-    // Données d'exemple - dans une application réelle, cela viendrait de la base de données
-    final activities = [
-      {
-        'title': 'Thon rouge',
-        'status': 'Vendu',
-        'price': '120 TND',
-        'date': '23/04/2023',
-        'icon': Icons.check_circle,
-        'color': theme.colorScheme.secondary,
-      },
-      {
-        'title': 'Dorade',
-        'status': 'En enchère',
-        'price': '45 TND',
-        'date': '22/04/2023',
-        'icon': Icons.gavel,
-        'color': Colors.blue,
-      },
-      {
-        'title': 'Sardine',
-        'status': 'Prix défini',
-        'price': '30 TND',
-        'date': '21/04/2023',
-        'icon': Icons.price_check,
-        'color': Colors.orange,
-      },
-    ];
+    // Si aucune donnée n'est disponible, afficher un message
+    if (_filteredActivities.isEmpty) {
+      return _animationService.fadeIn(
+        SeaCard(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              children: [
+                Icon(Icons.history_outlined, size: 48, color: theme.hintColor),
+                const SizedBox(height: 16),
+                Text(
+                  'Aucune activité récente',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Les lots que vous traitez apparaîtront ici',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.hintColor,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                SeaButton.primary(
+                  text: 'Voir les lots en attente',
+                  icon: Icons.pending_actions,
+                  onPressed: () {
+                    _navigationService.navigateToWithSlideLeft(
+                      context,
+                      const PendingLotsMaryeurScreen(),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Column(
       children:
-          activities.map((activity) {
+          _filteredActivities.map((lot) {
+            // Déterminer le statut et l'icône
+            IconData icon;
+            Color color;
+            String status;
+
+            if (lot['vendu'] == true) {
+              icon = Icons.check_circle;
+              color = theme.colorScheme.secondary;
+              status = 'Vendu';
+            } else if (lot['prixInitial'] != null) {
+              icon = Icons.gavel;
+              color = Colors.blue;
+              status = 'En enchère';
+            } else {
+              icon = Icons.price_check;
+              color = Colors.orange;
+              status = 'Prix défini';
+            }
+
+            // Formater la date
+            final date =
+                lot['dateSoumission'] != null
+                    ? DateFormat(
+                      'dd/MM/yyyy',
+                    ).format(DateTime.parse(lot['dateSoumission']))
+                    : 'Date inconnue';
+
+            // Obtenir le titre (nom de l'espèce)
+            final title =
+                lot['espece'] != null
+                    ? (lot['espece'] is Map
+                        ? lot['espece']['nom']
+                        : lot['espece'].toString())
+                    : 'Lot inconnu';
+
+            // Formater le prix
+            final price =
+                lot['prixInitial'] != null
+                    ? '${lot['prixInitial']} TND'
+                    : (lot['prixFinal'] != null
+                        ? '${lot['prixFinal']} TND'
+                        : 'N/A');
+
             return _animationService.fadeIn(
               SeaCard(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -616,29 +792,24 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: (activity['color'] as Color).withValues(
-                        alpha: 0.1,
-                      ),
+                      color: color.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      activity['icon'] as IconData,
-                      color: activity['color'] as Color,
-                    ),
+                    child: Icon(icon, color: color),
                   ),
                   title: Text(
-                    activity['title'] as String,
+                    title,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  subtitle: Text(activity['date'] as String),
+                  subtitle: Text(date),
                   trailing: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        activity['price'] as String,
+                        price,
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Container(
@@ -647,15 +818,13 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: (activity['color'] as Color).withValues(
-                            alpha: 0.1,
-                          ),
+                          color: color.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
-                          activity['status'] as String,
+                          status,
                           style: TextStyle(
-                            color: activity['color'] as Color,
+                            color: color,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -664,7 +833,14 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
                     ],
                   ),
                   onTap: () {
-                    // Naviguer vers les détails du lot
+                    // Naviguer vers les détails du lot si un ID est disponible
+                    if (lot['_id'] != null || lot['id'] != null) {
+                      final lotId = lot['_id'] ?? lot['id'];
+                      _navigationService.navigateToWithSlideLeft(
+                        context,
+                        LotDetailsScreen(lotId: lotId.toString()),
+                      );
+                    }
                   },
                 ),
               ),

@@ -23,6 +23,10 @@ class ApiService {
     _authToken = token;
   }
 
+  bool hasToken() {
+    return _authToken != null && _authToken!.isNotEmpty;
+  }
+
   Map<String, String> get _headers {
     final headers = {'Content-Type': 'application/json'};
     if (_authToken != null) {
@@ -247,6 +251,74 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> patch(
+    String endpoint,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      // Journaliser la requête
+      ErrorHandler.instance.logInfo(
+        'PATCH request: $endpoint',
+        context: 'ApiService',
+      );
+
+      // Ajouter un timeout pour éviter les attentes infinies
+      final response = await http
+          .patch(
+            Uri.parse('$baseUrl/$endpoint'),
+            headers: _headers,
+            body: json.encode(data),
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw TimeoutException(
+                'La requête a pris trop de temps à s\'exécuter',
+              );
+            },
+          );
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        return responseData;
+      }
+
+      throw _createAppError(response, 'PATCH', endpoint);
+    } on SocketException catch (e) {
+      ErrorHandler.instance.logError(e, context: 'ApiService.patch($endpoint)');
+      throw AppError(
+        message:
+            'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+        type: ErrorType.network,
+        originalError: e,
+      );
+    } on TimeoutException catch (e) {
+      ErrorHandler.instance.logError(e, context: 'ApiService.patch($endpoint)');
+      throw AppError(
+        message: 'La requête a pris trop de temps. Veuillez réessayer.',
+        type: ErrorType.network,
+        originalError: e,
+      );
+    } on FormatException catch (e) {
+      ErrorHandler.instance.logError(e, context: 'ApiService.patch($endpoint)');
+      throw AppError(
+        message: 'Erreur de format de données reçues du serveur.',
+        type: ErrorType.server,
+        originalError: e,
+      );
+    } catch (e) {
+      ErrorHandler.instance.logError(e, context: 'ApiService.patch($endpoint)');
+      if (e is AppError) {
+        rethrow;
+      }
+      throw AppError(
+        message: 'Erreur lors de la requête PATCH: ${e.toString()}',
+        type: ErrorType.unknown,
+        originalError: e,
+      );
+    }
+  }
+
   Future<void> delete(String endpoint) async {
     try {
       // Journaliser la requête
@@ -433,9 +505,7 @@ class ApiService {
   Future<Map<String, dynamic>> getPecheurDetails(dynamic pecheurId) async {
     try {
       final response = await get('pecheurs/$pecheurId');
-      // Vérifier que les champs essentiels ne sont pas null
-      if (response['nom'] == null) response['nom'] = 'Utilisateur';
-      if (response['prenom'] == null) response['prenom'] = 'Inconnu';
+      // Conserver les valeurs réelles même si elles sont null
       if (response['photo'] == null) response['photo'] = '';
       if (response['email'] == null) response['email'] = '';
       if (response['telephone'] == null) response['telephone'] = '';
@@ -470,9 +540,7 @@ class ApiService {
   ) async {
     try {
       final response = await get('veterinaires/$veterinaireId');
-      // Vérifier que les champs essentiels ne sont pas null
-      if (response['nom'] == null) response['nom'] = 'Utilisateur';
-      if (response['prenom'] == null) response['prenom'] = 'Inconnu';
+      // Conserver les valeurs réelles même si elles sont null
       if (response['photo'] == null) response['photo'] = '';
       if (response['email'] == null) response['email'] = '';
       if (response['telephone'] == null) response['telephone'] = '';
@@ -503,9 +571,7 @@ class ApiService {
   Future<Map<String, dynamic>> getMaryeurDetails(dynamic maryeurId) async {
     try {
       final response = await get('maryeurs/$maryeurId');
-      // Vérifier que les champs essentiels ne sont pas null
-      if (response['nom'] == null) response['nom'] = 'Utilisateur';
-      if (response['prenom'] == null) response['prenom'] = 'Inconnu';
+      // Conserver les valeurs réelles même si elles sont null
       if (response['photo'] == null) response['photo'] = '';
       if (response['email'] == null) response['email'] = '';
       if (response['telephone'] == null) response['telephone'] = '';
@@ -675,10 +741,39 @@ class ApiService {
 
   // Méthode pour récupérer les lots d'un vétérinaire
   Future<List<Map<String, dynamic>>> getLotsByVeterinaireId(
-    dynamic veterinaireId,
-  ) async {
+    dynamic veterinaireId, {
+    bool? status,
+    DateTime? dateDebut,
+    DateTime? dateFin,
+  }) async {
     try {
-      final response = await get('lots/veterinaire/$veterinaireId');
+      // Construire les paramètres de requête
+      final Map<String, dynamic> queryParams = {};
+
+      // Ajouter les filtres si fournis
+      if (status != null) {
+        queryParams['status'] = status.toString();
+      }
+
+      if (dateDebut != null) {
+        queryParams['dateDebut'] = dateDebut.toIso8601String();
+      }
+
+      if (dateFin != null) {
+        queryParams['dateFin'] = dateFin.toIso8601String();
+      }
+
+      // Construire l'URL avec les paramètres de requête
+      String url = 'lots/veterinaire/$veterinaireId';
+      if (queryParams.isNotEmpty) {
+        url += '?';
+        queryParams.forEach((key, value) {
+          url += '$key=$value&';
+        });
+        url = url.substring(0, url.length - 1); // Supprimer le dernier &
+      }
+
+      final response = await get(url);
       return List<Map<String, dynamic>>.from(response['data'] ?? []);
     } catch (e) {
       ErrorHandler.instance.logError(
@@ -706,13 +801,67 @@ class ApiService {
     }
   }
 
+  // Méthode pour récupérer les lots d'un maryeur
+  Future<List<Map<String, dynamic>>> getLotsByMaryeurId(
+    dynamic maryeurId, {
+    bool? vendu,
+    bool? status,
+    bool? hasPrixInitial,
+    DateTime? dateDebut,
+    DateTime? dateFin,
+  }) async {
+    try {
+      // Construire les paramètres de requête
+      final Map<String, dynamic> queryParams = {};
+
+      // Ajouter les filtres si fournis
+      if (vendu != null) {
+        queryParams['vendu'] = vendu.toString();
+      }
+
+      if (status != null) {
+        queryParams['status'] = status.toString();
+      }
+
+      if (hasPrixInitial != null) {
+        queryParams['hasPrixInitial'] = hasPrixInitial.toString();
+      }
+
+      if (dateDebut != null) {
+        queryParams['dateDebut'] = dateDebut.toIso8601String();
+      }
+
+      if (dateFin != null) {
+        queryParams['dateFin'] = dateFin.toIso8601String();
+      }
+
+      // Construire l'URL avec les paramètres de requête
+      String url = 'lots/maryeur/$maryeurId';
+      if (queryParams.isNotEmpty) {
+        url += '?';
+        queryParams.forEach((key, value) {
+          url += '$key=$value&';
+        });
+        url = url.substring(0, url.length - 1); // Supprimer le dernier &
+      }
+
+      final response = await get(url);
+      return List<Map<String, dynamic>>.from(response['data'] ?? []);
+    } catch (e) {
+      ErrorHandler.instance.logError(
+        e,
+        context: 'ApiService.getLotsByMaryeurId',
+      );
+      // Retourner une liste vide en cas d'erreur
+      return [];
+    }
+  }
+
   // Méthode pour récupérer les détails d'un client
   Future<Map<String, dynamic>> getClientDetails(dynamic clientId) async {
     try {
       final response = await get('clients/$clientId');
-      // Vérifier que les champs essentiels ne sont pas null
-      if (response['nom'] == null) response['nom'] = 'Utilisateur';
-      if (response['prenom'] == null) response['prenom'] = 'Inconnu';
+      // Conserver les valeurs réelles même si elles sont null
       if (response['photo'] == null) response['photo'] = '';
       if (response['email'] == null) response['email'] = '';
       if (response['telephone'] == null) response['telephone'] = '';

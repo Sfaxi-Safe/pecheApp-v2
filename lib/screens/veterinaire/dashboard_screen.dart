@@ -4,11 +4,13 @@ import 'package:seatrace/screens/login_screen.dart';
 import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/screens/veterinaire/pending_lots_screen.dart';
 import 'package:seatrace/screens/profile_screen.dart';
+import 'package:seatrace/screens/lot_details_screen.dart';
 import 'package:seatrace/utils/animation_service.dart';
 import 'package:seatrace/utils/responsive_service.dart';
 import 'package:seatrace/utils/navigation_service.dart';
-import 'package:seatrace/utils/color_extensions.dart';
 import 'package:seatrace/widgets/sea_widgets.dart';
+import 'package:seatrace/widgets/sea_filter_bar.dart';
+import 'package:intl/intl.dart';
 
 class VeterinaireDashboardScreen extends StatefulWidget {
   const VeterinaireDashboardScreen({Key? key}) : super(key: key);
@@ -31,6 +33,12 @@ class _VeterinaireDashboardScreenState
   int _rejectedLots = 0;
   bool _isLoading = true;
   String? _errorMessage;
+  List<Map<String, dynamic>> _filteredActivities = [];
+
+  // Filtres
+  String? _selectedStatusFilter;
+  DateFilter _dateFilter = DateFilter.all();
+  bool _showFilters = false;
 
   final _animationService = AnimationService();
   final _responsiveService = ResponsiveService();
@@ -40,6 +48,69 @@ class _VeterinaireDashboardScreenState
   void initState() {
     super.initState();
     _loadUserData();
+  }
+
+  Future<void> _applyFilters() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final user = await AuthService().getCurrentUser();
+      if (user == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      // Préparer les paramètres de filtrage
+      bool? statusFilter;
+      DateTime? dateDebut;
+      DateTime? dateFin;
+
+      // Convertir le filtre de statut en booléen
+      if (_selectedStatusFilter != null) {
+        statusFilter = _selectedStatusFilter == 'Approuvé';
+      }
+
+      // Préparer les dates de début et de fin selon le filtre de date
+      if (_dateFilter.type != DateFilterType.all) {
+        dateDebut = _dateFilter.startDate;
+        dateFin = _dateFilter.endDate;
+      }
+
+      // Appeler l'API avec les filtres
+      final lots = await ApiService.instance.getLotsByVeterinaireId(
+        user.id,
+        status: statusFilter,
+        dateDebut: dateDebut,
+        dateFin: dateFin,
+      );
+
+      // Filtrer les lots qui ont été testés
+      final testedLots = lots.where((lot) => lot['test'] == true).toList();
+
+      // Trier par date (plus récent en premier)
+      testedLots.sort((a, b) {
+        final dateA =
+            a['dateTest'] != null
+                ? DateTime.parse(a['dateTest'])
+                : DateTime(1900);
+        final dateB =
+            b['dateTest'] != null
+                ? DateTime.parse(b['dateTest'])
+                : DateTime(1900);
+        return dateB.compareTo(dateA);
+      });
+
+      setState(() {
+        _filteredActivities = testedLots;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Erreur lors du filtrage: ${e.toString()}';
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -66,19 +137,43 @@ class _VeterinaireDashboardScreenState
         _userEtablissement = userData['etablissement'] ?? '';
       });
 
-      // Charger les statistiques
+      // Charger les statistiques et les activités récentes
       final lots = await ApiService.instance.getLotsByVeterinaireId(user.id);
 
+      // Filtrer les lots pour les statistiques
+      final pendingLots = lots.where((lot) => lot['test'] == false).toList();
+      final approvedLots =
+          lots
+              .where((lot) => lot['test'] == true && lot['status'] == true)
+              .toList();
+      final rejectedLots =
+          lots
+              .where((lot) => lot['test'] == true && lot['status'] == false)
+              .toList();
+
+      // Préparer les activités récentes (lots validés ou refusés)
+      final recentLots = [...approvedLots, ...rejectedLots];
+
+      // Trier par date (plus récent en premier) et prendre les 5 premiers
+      recentLots.sort((a, b) {
+        final dateA =
+            a['dateTest'] != null
+                ? DateTime.parse(a['dateTest'])
+                : DateTime(1900);
+        final dateB =
+            b['dateTest'] != null
+                ? DateTime.parse(b['dateTest'])
+                : DateTime(1900);
+        return dateB.compareTo(dateA);
+      });
+
+      final recentActivities = recentLots.take(5).toList();
+
       setState(() {
-        _pendingLots = lots.where((lot) => lot['test'] == false).length;
-        _approvedLots =
-            lots
-                .where((lot) => lot['test'] == true && lot['status'] == true)
-                .length;
-        _rejectedLots =
-            lots
-                .where((lot) => lot['test'] == true && lot['status'] == false)
-                .length;
+        _pendingLots = pendingLots.length;
+        _approvedLots = approvedLots.length;
+        _rejectedLots = rejectedLots.length;
+        _filteredActivities = recentActivities;
         _isLoading = false;
       });
     } catch (e) {
@@ -114,9 +209,6 @@ class _VeterinaireDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tableau de bord Vétérinaire'),
@@ -174,7 +266,15 @@ class _VeterinaireDashboardScreenState
                           title: 'Activité récente',
                           icon: Icons.history,
                           subtitle: 'Historique des validations récentes',
+                          actionText:
+                              _showFilters ? 'Masquer filtres' : 'Filtrer',
+                          onActionPressed: () {
+                            setState(() {
+                              _showFilters = !_showFilters;
+                            });
+                          },
                         ),
+                        if (_showFilters) _buildFilterBar(),
                         _buildRecentActivityList(),
                       ]),
                     ),
@@ -495,37 +595,95 @@ class _VeterinaireDashboardScreenState
     );
   }
 
+  Widget _buildFilterBar() {
+    return SeaFilterBar(
+      statusFilters: const ['Approuvé', 'Refusé'],
+      selectedStatusFilter: _selectedStatusFilter,
+      dateFilter: _dateFilter,
+      onStatusFilterChanged: (value) {
+        setState(() {
+          _selectedStatusFilter = value;
+        });
+        _applyFilters();
+      },
+      onDateFilterChanged: (value) {
+        setState(() {
+          _dateFilter = value;
+        });
+        _applyFilters();
+      },
+    );
+  }
+
   Widget _buildRecentActivityList() {
     final theme = Theme.of(context);
 
-    // Données d'exemple - dans une application réelle, cela viendrait de la base de données
-    final activities = [
-      {
-        'title': 'Thon rouge',
-        'status': 'Approuvé',
-        'date': '23/04/2023',
-        'icon': Icons.check_circle,
-        'color': theme.colorScheme.secondary,
-      },
-      {
-        'title': 'Dorade',
-        'status': 'Refusé',
-        'date': '22/04/2023',
-        'icon': Icons.cancel,
-        'color': theme.colorScheme.error,
-      },
-      {
-        'title': 'Sardine',
-        'status': 'Approuvé',
-        'date': '21/04/2023',
-        'icon': Icons.check_circle,
-        'color': theme.colorScheme.secondary,
-      },
-    ];
+    // Si aucune donnée n'est disponible, afficher un message
+    if (_filteredActivities.isEmpty) {
+      return _animationService.fadeIn(
+        SeaCard(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              children: [
+                Icon(Icons.history_outlined, size: 48, color: theme.hintColor),
+                const SizedBox(height: 16),
+                Text(
+                  'Aucune activité récente',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Les lots que vous validez apparaîtront ici',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.hintColor,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                SeaButton.primary(
+                  text: 'Voir les lots en attente',
+                  icon: Icons.pending_actions,
+                  onPressed: () {
+                    _navigationService.navigateToWithSlideLeft(
+                      context,
+                      const PendingLotsScreen(),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Column(
       children:
-          activities.map((activity) {
+          _filteredActivities.map((activity) {
+            final bool isApproved = activity['status'] == true;
+            final IconData icon =
+                isApproved ? Icons.check_circle : Icons.cancel;
+            final Color color =
+                isApproved
+                    ? theme.colorScheme.secondary
+                    : theme.colorScheme.error;
+            final String status = isApproved ? 'Approuvé' : 'Refusé';
+            final String date =
+                activity['dateTest'] != null
+                    ? DateFormat(
+                      'dd/MM/yyyy',
+                    ).format(DateTime.parse(activity['dateTest']))
+                    : 'Date inconnue';
+            final String title =
+                activity['espece'] != null
+                    ? (activity['espece'] is Map
+                        ? activity['espece']['nom']
+                        : activity['espece'].toString())
+                    : 'Lot inconnu';
+
             return _animationService.fadeIn(
               SeaCard(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -533,45 +691,45 @@ class _VeterinaireDashboardScreenState
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: (activity['color'] as Color).withValues(
-                        alpha: 0.1,
-                      ),
+                      color: color.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      activity['icon'] as IconData,
-                      color: activity['color'] as Color,
-                    ),
+                    child: Icon(icon, color: color),
                   ),
                   title: Text(
-                    activity['title'] as String,
+                    title,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  subtitle: Text(activity['date'] as String),
+                  subtitle: Text(date),
                   trailing: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: (activity['color'] as Color).withValues(
-                        alpha: 0.1,
-                      ),
+                      color: color.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
-                      activity['status'] as String,
+                      status,
                       style: TextStyle(
-                        color: activity['color'] as Color,
+                        color: color,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),
                     ),
                   ),
                   onTap: () {
-                    // Naviguer vers les détails du lot
+                    // Naviguer vers les détails du lot si un ID est disponible
+                    if (activity['_id'] != null || activity['id'] != null) {
+                      final lotId = activity['_id'] ?? activity['id'];
+                      _navigationService.navigateToWithSlideLeft(
+                        context,
+                        LotDetailsScreen(lotId: lotId.toString()),
+                      );
+                    }
                   },
                 ),
               ),
