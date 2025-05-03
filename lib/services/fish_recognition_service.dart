@@ -5,6 +5,7 @@ import 'package:seatrace/models/espece.dart';
 import 'package:image/image.dart' as img;
 import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/services/google_vision_service.dart';
+import 'package:seatrace/services/tensorflow_service.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
@@ -96,78 +97,110 @@ class FishRecognitionService {
       }
     }
 
-    // Utiliser le modèle local (TensorFlow Lite)
-    debugPrint('Utilisation du modèle local pour la reconnaissance');
-    await initialize();
-
-    if (_interpreter == null) {
-      throw Exception('Le modèle n\'a pas été initialisé correctement');
-    }
+    // Utiliser le nouveau modèle Keras via TensorFlow Service
+    debugPrint('Utilisation du modèle Keras pour la reconnaissance');
 
     try {
-      // Prétraiter l'image
-      final inputBuffer = await _preprocessImage(imageFile);
-
-      // Préparer le buffer de sortie
-      // Supposons que notre modèle produit un vecteur de probabilités pour chaque classe
-      final outputBuffer = List<List<double>>.filled(
-        1,
-        List<double>.filled(_labels.length, 0),
+      // Utiliser le service TensorFlow pour la prédiction
+      final prediction = await TensorFlowService.instance.predictFish(
+        imageFile,
       );
 
-      // Exécuter l'inférence
-      _interpreter!.run(inputBuffer, outputBuffer);
-
-      // Traiter les résultats
-      final result = outputBuffer[0];
-
-      // Trouver l'indice de la classe avec la plus haute probabilité
-      int maxIndex = 0;
-      double maxProb = result[0];
-
-      for (int i = 1; i < result.length; i++) {
-        if (result[i] > maxProb) {
-          maxProb = result[i];
-          maxIndex = i;
-        }
-      }
+      final String especeNom = prediction['espece'] as String;
+      final double confiance = prediction['confiance'] as double;
 
       // Si la probabilité est trop faible, considérer comme non reconnu
-      if (maxProb < 0.5) {
-        debugPrint('Confiance trop faible: $maxProb pour ${_labels[maxIndex]}');
+      if (confiance < 0.5) {
+        debugPrint(
+          'Confiance trop faible: ${(confiance * 100).toStringAsFixed(1)}% pour $especeNom',
+        );
         return null;
       }
 
       debugPrint(
-        'Espèce identifiée localement: ${_labels[maxIndex]} (confiance: ${(maxProb * 100).toStringAsFixed(1)}%)',
+        'Espèce identifiée avec Keras: $especeNom (confiance: ${(confiance * 100).toStringAsFixed(1)}%)',
       );
 
       // Récupérer l'espèce correspondante depuis l'API
       try {
+        final espece = await ApiService.instance.getEspeceByNom(especeNom);
+        return Espece.fromMap(espece);
+      } catch (e) {
+        // Si l'espèce n'existe pas, la créer via l'API
+        final nouvelleEspece = await ApiService.instance.createEspece(
+          especeNom,
+        );
+        return Espece.fromMap(nouvelleEspece);
+      }
+    } catch (e) {
+      debugPrint('Erreur lors de la reconnaissance du poisson avec Keras: $e');
+
+      // Essayer avec l'ancien modèle TensorFlow Lite comme solution de secours
+      try {
+        debugPrint('Tentative avec l\'ancien modèle TensorFlow Lite');
+        await initialize();
+
+        if (_interpreter == null) {
+          throw Exception('Le modèle n\'a pas été initialisé correctement');
+        }
+
+        // Prétraiter l'image
+        final inputBuffer = await _preprocessImage(imageFile);
+
+        // Préparer le buffer de sortie
+        final outputBuffer = List<List<double>>.filled(
+          1,
+          List<double>.filled(_labels.length, 0),
+        );
+
+        // Exécuter l'inférence
+        _interpreter!.run(inputBuffer, outputBuffer);
+
+        // Traiter les résultats
+        final result = outputBuffer[0];
+
+        // Trouver l'indice de la classe avec la plus haute probabilité
+        int maxIndex = 0;
+        double maxProb = result[0];
+
+        for (int i = 1; i < result.length; i++) {
+          if (result[i] > maxProb) {
+            maxProb = result[i];
+            maxIndex = i;
+          }
+        }
+
+        // Si la probabilité est trop faible, considérer comme non reconnu
+        if (maxProb < 0.5) {
+          debugPrint(
+            'Confiance trop faible: $maxProb pour ${_labels[maxIndex]}',
+          );
+          return null;
+        }
+
+        debugPrint(
+          'Espèce identifiée avec l\'ancien modèle: ${_labels[maxIndex]} (confiance: ${(maxProb * 100).toStringAsFixed(1)}%)',
+        );
+
+        // Récupérer l'espèce correspondante depuis l'API
         final espece = await ApiService.instance.getEspeceByNom(
           _labels[maxIndex],
         );
         return Espece.fromMap(espece);
       } catch (e) {
-        // Si l'espèce n'existe pas, la créer via l'API
-        final nouvelleEspece = await ApiService.instance.createEspece(
-          _labels[maxIndex],
-        );
-        return Espece.fromMap(nouvelleEspece);
-      }
-    } catch (e) {
-      debugPrint('Erreur lors de la reconnaissance du poisson: $e');
+        debugPrint('Erreur avec l\'ancien modèle: $e');
 
-      // En cas d'erreur, essayer de récupérer une espèce aléatoire via l'API
-      // comme solution de secours
-      try {
-        final allEspeces = await ApiService.instance.getAllEspeces();
-        if (allEspeces.isNotEmpty) {
-          final randomIndex = Random().nextInt(allEspeces.length);
-          return Espece.fromMap(allEspeces[randomIndex]);
+        // En cas d'erreur, essayer de récupérer une espèce aléatoire via l'API
+        // comme solution de secours
+        try {
+          final allEspeces = await ApiService.instance.getAllEspeces();
+          if (allEspeces.isNotEmpty) {
+            final randomIndex = Random().nextInt(allEspeces.length);
+            return Espece.fromMap(allEspeces[randomIndex]);
+          }
+        } catch (e) {
+          debugPrint('Erreur lors de la récupération des espèces: $e');
         }
-      } catch (e) {
-        debugPrint('Erreur lors de la récupération des espèces: $e');
       }
 
       return null;

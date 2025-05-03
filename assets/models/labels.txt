@@ -1,0 +1,31 @@
+0 baliste
+1 bou kachech
+2 boumessk
+3 bouri
+4 calamr
+5 chevrette
+6 choubay
+7 crevettes
+8 djej
+9 espadon
+10 far bhar
+11 ghzel
+12 jaghali
+13 kalb bhar
+14 karnit
+15 karous
+16 karradh
+17 khadhraya
+18 mankous
+19 mannani
+20 mbellem
+21 meeza
+22 morjan
+23 msalla
+24 sardouk
+25 sbares
+26 scorpaena
+27 serdina
+28 thon
+29 trillia
+30 wrata
