@@ -6,6 +6,7 @@ class Espece {
   final double prixMinimal;
   final double prixMoyen;
   final bool isActive;
+  final String nomScientifique;
 
   Espece({
     required this.id,
@@ -15,6 +16,7 @@ class Espece {
     this.prixMinimal = 0.0,
     this.prixMoyen = 0.0,
     this.isActive = true,
+    this.nomScientifique = '',
   });
 
   factory Espece.fromMap(Map<String, dynamic> map) {
@@ -27,6 +29,7 @@ class Espece {
           _parseDouble(map['prixMinimal'] ?? map['prix_minimal']) ?? 0.0,
       prixMoyen: _parseDouble(map['prixMoyen'] ?? map['prix_moyen']) ?? 0.0,
       isActive: map['isActive'] ?? map['is_active'] ?? true,
+      nomScientifique: map['nomScientifique'] ?? map['nom_scientifique'] ?? '',
     );
   }
 
@@ -39,12 +42,13 @@ class Espece {
       'prixMinimal': prixMinimal,
       'prixMoyen': prixMoyen,
       'isActive': isActive,
+      'nomScientifique': nomScientifique,
     };
   }
 
   @override
   String toString() {
-    return 'Espece{id: $id, nom: $nom, description: $description, photo: $photo, prixMinimal: $prixMinimal, prixMoyen: $prixMoyen, isActive: $isActive}';
+    return 'Espece{id: $id, nom: $nom, description: $description, photo: $photo, prixMinimal: $prixMinimal, prixMoyen: $prixMoyen, isActive: $isActive, nomScientifique: $nomScientifique}';
   }
 
   /// Convertit une valeur en double

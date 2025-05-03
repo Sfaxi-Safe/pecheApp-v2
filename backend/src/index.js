@@ -17,6 +17,7 @@ const lotRoutes = require('./routes/lotRoutes');
 const imageRoutes = require('./routes/imageRoutes');
 const authRoutes = require('./routes/authRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const statsRoutes = require('./routes/statsRoutes');
 
 const app = express();
 
@@ -63,6 +64,7 @@ app.use('/api/lots', lotRoutes);
 app.use('/api/images', imageRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/stats', statsRoutes);
 
 // Route de test pour vérifier que le serveur fonctionne
 app.get('/api/health', (req, res) => {

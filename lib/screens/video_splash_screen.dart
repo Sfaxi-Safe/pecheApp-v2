@@ -50,13 +50,23 @@ class VideoSplashScreenState extends State<VideoSplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Supprimer les marges de sécurité pour éviter les débordements
     return Scaffold(
+      // Désactiver le resizing automatique qui peut causer des problèmes
+      resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [
           // Vidéo en arrière-plan
           _isVideoInitialized
-              ? VideoPlayer(_controller)
+              ? FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _controller.value.size.width,
+                  height: _controller.value.size.height,
+                  child: VideoPlayer(_controller),
+                ),
+              )
               : const Center(child: CircularProgressIndicator()),
 
           // Contenu superposé
@@ -68,6 +78,8 @@ class VideoSplashScreenState extends State<VideoSplashScreen> {
 
           // Texte et bouton
           SafeArea(
+            // Minimiser les marges de sécurité pour éviter les débordements
+            minimum: EdgeInsets.zero,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

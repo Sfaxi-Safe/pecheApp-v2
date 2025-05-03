@@ -35,19 +35,9 @@ class _ActiveAuctionsScreenState extends State<ActiveAuctionsScreen> {
 
       if (user.id != null) {
         try {
-          final response = await ApiService.instance.get(
-            'auctions/maryeur/${user.id}',
-          );
-          final lots = List<Map<String, dynamic>>.from(response['data']);
-
+          _activeAuctions = await ApiService.instance
+              .getActiveAuctionsByMaryeurId(user.id);
           setState(() {
-            _activeAuctions =
-                lots
-                    .where(
-                      (lot) =>
-                          lot['prixInitial'] != null && lot['vendu'] == false,
-                    )
-                    .toList();
             _isLoading = false;
           });
         } catch (e) {

@@ -103,6 +103,317 @@ router.post('/', auth, checkRole(['ROLE_MARYEUR', 'ROLE_ADMIN']), async (req, re
 });
 
 /**
+ * @route GET /api/lots/featured
+ * @desc Récupérer les lots en vedette pour la page d'accueil
+ * @access Public
+ */
+router.get('/featured', async (req, res, next) => {
+  try {
+    // Récupérer les lots qui ont un prix initial, qui sont validés par un vétérinaire et qui ne sont pas vendus
+    const filter = {
+      prixInitial: { $exists: true, $ne: null },
+      test: true,
+      status: true,
+      vendu: false
+    };
+
+    // Limiter à 5 lots maximum, triés par date de soumission (les plus récents d'abord)
+    const lots = await Lot.find(filter)
+      .sort({ dateSoumission: -1 })
+      .limit(5)
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin lieu')
+      .populate('acheteur', 'nom prenom');
+
+    res.success(lots, 'Liste des lots en vedette récupérée avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route GET /api/lots/available
+ * @desc Récupérer tous les lots disponibles pour enchères
+ * @access Public
+ */
+router.get('/available', async (req, res, next) => {
+  try {
+    // Récupérer les lots qui ont un prix initial, qui sont validés par un vétérinaire et qui ne sont pas vendus
+    const filter = {
+      prixInitial: { $exists: true, $ne: null },
+      test: true,
+      status: true,
+      vendu: false
+    };
+
+    // Trier par date de soumission (les plus récents d'abord)
+    const lots = await Lot.find(filter)
+      .sort({ dateSoumission: -1 })
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin lieu')
+      .populate('acheteur', 'nom prenom');
+
+    res.success(lots, 'Liste des lots disponibles récupérée avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route GET /api/lots/maryeur/:id
+ * @desc Récupérer tous les lots associés à un maryeur
+ * @access Private (Maryeur ou Admin)
+ */
+router.get('/maryeur/:id', auth, checkRole(['ROLE_MARYEUR', 'ROLE_ADMIN']), async (req, res, next) => {
+  try {
+    let filter = {};
+
+    // Vérifier si l'ID est un ObjectId valide
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      // Chercher les prises associées à ce maryeur
+      const Prise = require('../models/Prise');
+      const prises = await Prise.find({ maryeur: req.params.id });
+
+      // Récupérer les IDs des prises
+      const priseIds = prises.map(prise => prise._id);
+
+      // Filtrer les lots par ces prises
+      filter.prise = { $in: priseIds };
+    } else {
+      // Si ce n'est pas un ObjectId, chercher le maryeur par ID personnalisé
+      const Maryeur = require('../models/Maryeur');
+      const maryeur = await Maryeur.findOne({ id: req.params.id });
+
+      if (!maryeur) {
+        return res.success([], 'Aucun lot trouvé pour ce maryeur');
+      }
+
+      // Chercher les prises associées à ce maryeur
+      const Prise = require('../models/Prise');
+      const prises = await Prise.find({ maryeur: maryeur._id });
+
+      // Récupérer les IDs des prises
+      const priseIds = prises.map(prise => prise._id);
+
+      // Filtrer les lots par ces prises
+      filter.prise = { $in: priseIds };
+    }
+
+    // Récupérer tous les lots associés à ce maryeur
+    const lots = await Lot.find(filter)
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin')
+      .populate('acheteur', 'nom prenom');
+
+    res.success(lots, 'Liste des lots du maryeur récupérée avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route GET /api/lots/pecheur/:id
+ * @desc Récupérer tous les lots associés à un pêcheur
+ * @access Public
+ */
+router.get('/pecheur/:id', async (req, res, next) => {
+  try {
+    let filter = {};
+
+    // Vérifier si l'ID est un ObjectId valide
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      // Chercher les prises associées à ce pêcheur
+      const Prise = require('../models/Prise');
+      const prises = await Prise.find({ pecheur: req.params.id });
+
+      // Récupérer les IDs des prises
+      const priseIds = prises.map(prise => prise._id);
+
+      // Filtrer les lots par ces prises
+      filter.prise = { $in: priseIds };
+    } else {
+      // Si ce n'est pas un ObjectId, chercher le pêcheur par ID personnalisé
+      const Pecheur = require('../models/Pecheur');
+      const pecheur = await Pecheur.findOne({ id: req.params.id });
+
+      if (!pecheur) {
+        return res.success([], 'Aucun lot trouvé pour ce pêcheur');
+      }
+
+      // Chercher les prises associées à ce pêcheur
+      const Prise = require('../models/Prise');
+      const prises = await Prise.find({ pecheur: pecheur._id });
+
+      // Récupérer les IDs des prises
+      const priseIds = prises.map(prise => prise._id);
+
+      // Filtrer les lots par ces prises
+      filter.prise = { $in: priseIds };
+    }
+
+    // Récupérer tous les lots associés à ce pêcheur
+    const lots = await Lot.find(filter)
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin')
+      .populate('acheteur', 'nom prenom');
+
+    res.success(lots, 'Liste des lots du pêcheur récupérée avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route GET /api/lots/search
+ * @desc Rechercher des lots par nom d'espèce
+ * @access Public
+ */
+router.get('/search', async (req, res, next) => {
+  try {
+    const query = req.query.query;
+
+    if (!query) {
+      return res.success([], 'Aucun terme de recherche fourni');
+    }
+
+    // Rechercher l'espèce par nom
+    const Espece = require('../models/Espece');
+    const especes = await Espece.find({
+      nom: { $regex: query, $options: 'i' }
+    });
+
+    // Récupérer les IDs des espèces trouvées
+    const especeIds = especes.map(espece => espece._id);
+
+    // Filtrer les lots par ces espèces et qui sont disponibles pour enchères
+    const filter = {
+      espece: { $in: especeIds },
+      prixInitial: { $exists: true, $ne: null },
+      test: true,
+      status: true,
+      vendu: false
+    };
+
+    // Récupérer les lots correspondants
+    const lots = await Lot.find(filter)
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin lieu')
+      .populate('acheteur', 'nom prenom');
+
+    res.success(lots, 'Résultats de recherche récupérés avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route GET /api/auctions/maryeur/:id
+ * @desc Récupérer les enchères actives d'un maryeur
+ * @access Private (Maryeur ou Admin)
+ */
+router.get('/auctions/maryeur/:id', auth, checkRole(['ROLE_MARYEUR', 'ROLE_ADMIN']), async (req, res, next) => {
+  try {
+    let filter = {};
+
+    // Vérifier si l'ID est un ObjectId valide
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      // Chercher les prises associées à ce maryeur
+      const Prise = require('../models/Prise');
+      const prises = await Prise.find({ maryeur: req.params.id });
+
+      // Récupérer les IDs des prises
+      const priseIds = prises.map(prise => prise._id);
+
+      // Filtrer les lots par ces prises, avec prix initial et non vendus
+      filter = {
+        prise: { $in: priseIds },
+        prixInitial: { $exists: true, $ne: null },
+        vendu: false,
+        test: true,
+        status: true
+      };
+    } else {
+      // Si ce n'est pas un ObjectId, chercher le maryeur par ID personnalisé
+      const Maryeur = require('../models/Maryeur');
+      const maryeur = await Maryeur.findOne({ id: req.params.id });
+
+      if (!maryeur) {
+        return res.success([], 'Aucune enchère trouvée pour ce maryeur');
+      }
+
+      // Chercher les prises associées à ce maryeur
+      const Prise = require('../models/Prise');
+      const prises = await Prise.find({ maryeur: maryeur._id });
+
+      // Récupérer les IDs des prises
+      const priseIds = prises.map(prise => prise._id);
+
+      // Filtrer les lots par ces prises, avec prix initial et non vendus
+      filter = {
+        prise: { $in: priseIds },
+        prixInitial: { $exists: true, $ne: null },
+        vendu: false,
+        test: true,
+        status: true
+      };
+    }
+
+    // Récupérer toutes les enchères actives associées à ce maryeur
+    const lots = await Lot.find(filter)
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin')
+      .populate('acheteur', 'nom prenom');
+
+    res.success(lots, 'Liste des enchères actives du maryeur récupérée avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route GET /api/lots/veterinaire/:id
+ * @desc Récupérer tous les lots associés à un vétérinaire
+ * @access Private (Vétérinaire ou Admin)
+ */
+router.get('/veterinaire/:id', auth, checkRole(['ROLE_VETERINAIRE', 'ROLE_ADMIN']), async (req, res, next) => {
+  try {
+    let filter = {};
+
+    // Vérifier si l'ID est un ObjectId valide
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      filter.veterinaire = req.params.id;
+    } else {
+      // Si ce n'est pas un ObjectId, chercher le vétérinaire par ID personnalisé
+      const Veterinaire = require('../models/Veterinaire');
+      const veterinaire = await Veterinaire.findOne({ id: req.params.id });
+
+      if (!veterinaire) {
+        return res.success([], 'Aucun lot trouvé pour ce vétérinaire');
+      }
+
+      filter.veterinaire = veterinaire._id;
+    }
+
+    // Récupérer tous les lots associés à ce vétérinaire
+    const lots = await Lot.find(filter)
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin')
+      .populate('acheteur', 'nom prenom');
+
+    res.success(lots, 'Liste des lots du vétérinaire récupérée avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * @route GET /api/lots/:id
  * @desc Récupérer un lot spécifique
  * @access Public
@@ -143,6 +454,69 @@ router.get('/:id', async (req, res, next) => {
     }
 
     res.success(lot, 'Lot récupéré avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route POST /api/lots/:id/bid
+ * @desc Placer une enchère sur un lot
+ * @access Private (Client uniquement)
+ */
+router.post('/:id/bid', auth, checkRole('ROLE_CLIENT'), async (req, res, next) => {
+  try {
+    const { amount, userId } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.error('Le montant de l\'enchère doit être supérieur à 0', 400);
+    }
+
+    // Vérifier que l'utilisateur est bien un client
+    const Client = require('../models/Client');
+    let client;
+
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      client = await Client.findById(userId);
+    } else {
+      client = await Client.findOne({ id: userId });
+    }
+
+    if (!client) {
+      return res.error('Client non trouvé', 404);
+    }
+
+    // Récupérer le lot
+    let lot;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      lot = await Lot.findById(req.params.id);
+    } else {
+      lot = await Lot.findOne({ identifiant: req.params.id });
+    }
+
+    if (!lot) {
+      return res.error('Lot non trouvé', 404);
+    }
+
+    // Vérifier que le lot est disponible pour enchères
+    if (!lot.prixInitial || !lot.test || !lot.status || lot.vendu) {
+      return res.error('Ce lot n\'est pas disponible pour enchères', 400);
+    }
+
+    // Vérifier que l'enchère est supérieure au prix initial ou à l'enchère actuelle
+    const prixActuel = lot.prixEnchere || lot.prixInitial;
+    if (amount <= prixActuel) {
+      return res.error(`L'enchère doit être supérieure au prix actuel (${prixActuel})`, 400);
+    }
+
+    // Mettre à jour le lot avec la nouvelle enchère
+    lot.prixEnchere = amount;
+    lot.acheteur = client._id;
+    lot.dateEnchere = new Date();
+
+    await lot.save();
+
+    res.success(lot, 'Enchère placée avec succès');
   } catch (error) {
     next(error);
   }

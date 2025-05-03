@@ -4,6 +4,11 @@ import 'package:seatrace/models/espece.dart';
 import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/services/auth_service.dart';
 import 'package:seatrace/services/image_service.dart';
+import 'package:seatrace/utils/animation_service.dart';
+import 'package:seatrace/utils/responsive_service.dart';
+import 'package:seatrace/utils/navigation_service.dart';
+import 'package:seatrace/utils/color_extensions.dart';
+import 'package:seatrace/widgets/sea_widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -18,7 +23,7 @@ class FishDetailsScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _FishDetailsScreenState createState() => _FishDetailsScreenState();
+  State<FishDetailsScreen> createState() => _FishDetailsScreenState();
 }
 
 class _FishDetailsScreenState extends State<FishDetailsScreen> {
@@ -34,11 +39,37 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
   bool _isLoading = false;
   bool _isGettingLocation = false;
   String? _errorMessage;
+  String? _successMessage;
+
+  final _animationService = AnimationService();
+  final _responsiveService = ResponsiveService();
+  final _navigationService = NavigationService();
+
+  final List<String> _methodesDepeche = [
+    'Filet',
+    'Ligne',
+    'Chalut',
+    'Casier',
+    'Palangre',
+    'Autre',
+  ];
+
+  final List<String> _zonesDepeche = [
+    'Méditerranée Nord',
+    'Méditerranée Sud',
+    'Atlantique Nord',
+    'Atlantique Sud',
+    'Manche',
+    'Mer du Nord',
+    'Autre',
+  ];
 
   @override
   void initState() {
     super.initState();
     _enginController.text = 'Filet'; // Default value
+    _zoneController.text = 'Méditerranée Nord'; // Default value
+    _temperatureController.text = '4'; // Default value
   }
 
   @override
@@ -54,6 +85,7 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
   Future<void> _getCurrentLocation() async {
     setState(() {
       _isGettingLocation = true;
+      _errorMessage = null;
     });
 
     try {
@@ -62,12 +94,14 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          throw Exception('Location permissions are denied');
+          throw Exception('Les permissions de localisation sont refusées');
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        throw Exception('Location permissions are permanently denied');
+        throw Exception(
+          'Les permissions de localisation sont définitivement refusées',
+        );
       }
 
       // Get current position
@@ -77,6 +111,16 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
         _latitude = position.latitude.toString();
         _longitude = position.longitude.toString();
         _isGettingLocation = false;
+        _successMessage = 'Position récupérée avec succès';
+      });
+
+      // Clear success message after 3 seconds
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() {
+            _successMessage = null;
+          });
+        }
       });
     } catch (e) {
       setState(() {
@@ -151,9 +195,17 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
 
       // Show success message and navigate back to dashboard
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Poisson enregistré avec succès!'),
-          backgroundColor: Colors.green,
+        SnackBar(
+          content: Row(
+            children: const [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Poisson enregistré avec succès!'),
+            ],
+          ),
+          backgroundColor: Theme.of(context).colorScheme.secondary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
 
@@ -168,246 +220,418 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Détails du poisson')),
+      appBar: AppBar(title: const Text('Détails du poisson'), elevation: 0),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: _responsiveService.adaptivePadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+            children: _animationService.staggeredList([
               // Fish identification result
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+              SeaCard(
+                elevated: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.secondary.withValues(
+                              alpha: 0.1,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.check_circle,
+                            color: theme.colorScheme.secondary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Espèce identifiée avec succès',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(
+                            widget.imageFile,
+                            width: 120,
+                            height: 120,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.espece.nom,
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: primaryColor,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Nom scientifique: ${widget.espece.nomScientifique}',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Identification réussie avec notre système d\'IA',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Fish details form
+              SeaSectionHeader(
+                title: 'Informations complémentaires',
+                icon: Icons.edit_note,
+                subtitle:
+                    'Veuillez compléter les informations sur votre capture',
+              ),
+
+              SeaCard(
+                child: Form(
+                  key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Espèce identifiée',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
+                      // Quantity
+                      TextFormField(
+                        controller: _quantiteController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Quantité (nombre)',
+                          hintText: 'Entrez le nombre de poissons',
+                          prefixIcon: Icon(Icons.numbers),
                         ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Veuillez entrer la quantité';
+                          }
+                          if (int.tryParse(value) == null) {
+                            return 'Veuillez entrer un nombre valide';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              widget.imageFile,
-                              width: 100,
-                              height: 100,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  widget.espece.nom,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.headlineSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context).primaryColor,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Identification réussie avec notre système d\'IA',
-                                  style: TextStyle(color: Colors.grey[600]),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+
+                      // Weight
+                      TextFormField(
+                        controller: _poidController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Poids (kg)',
+                          hintText: 'Entrez le poids total en kg',
+                          prefixIcon: Icon(Icons.scale),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Veuillez entrer le poids';
+                          }
+                          if (double.tryParse(value) == null) {
+                            return 'Veuillez entrer un nombre valide';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Temperature
+                      TextFormField(
+                        controller: _temperatureController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Température (°C)',
+                          hintText: 'Entrez la température de conservation',
+                          prefixIcon: Icon(Icons.thermostat),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Veuillez entrer la température';
+                          }
+                          if (double.tryParse(value) == null) {
+                            return 'Veuillez entrer un nombre valide';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Fishing method
+                      DropdownButtonFormField<String>(
+                        value: _enginController.text,
+                        decoration: const InputDecoration(
+                          labelText: 'Méthode de pêche',
+                          prefixIcon: Icon(Icons.sailing),
+                        ),
+                        items:
+                            _methodesDepeche.map((String method) {
+                              return DropdownMenuItem<String>(
+                                value: method,
+                                child: Text(method),
+                              );
+                            }).toList(),
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              _enginController.text = newValue;
+                            });
+                          }
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Veuillez sélectionner une méthode de pêche';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Fishing zone
+                      DropdownButtonFormField<String>(
+                        value: _zoneController.text,
+                        decoration: const InputDecoration(
+                          labelText: 'Zone de pêche',
+                          prefixIcon: Icon(Icons.map),
+                        ),
+                        items:
+                            _zonesDepeche.map((String zone) {
+                              return DropdownMenuItem<String>(
+                                value: zone,
+                                child: Text(zone),
+                              );
+                            }).toList(),
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              _zoneController.text = newValue;
+                            });
+                          }
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Veuillez sélectionner une zone de pêche';
+                          }
+                          return null;
+                        },
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
 
-              // Fish details form
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              // Location
+              SeaSectionHeader(
+                title: 'Localisation',
+                icon: Icons.location_on,
+                subtitle: 'Enregistrez votre position actuelle',
+              ),
+
+              SeaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_latitude != null && _longitude != null)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.secondary.withValues(
+                            alpha: 0.1,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: theme.colorScheme.secondary.withValues(
+                              alpha: 0.3,
+                            ),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  color: theme.colorScheme.secondary,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Position enregistrée',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.secondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Latitude: $_latitude',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Longitude: $_longitude',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: theme.colorScheme.error.withValues(
+                              alpha: 0.3,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.location_off,
+                              color: theme.colorScheme.error,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Aucune position enregistrée. Veuillez cliquer sur le bouton ci-dessous pour obtenir votre position actuelle.',
+                                style: TextStyle(
+                                  color: theme.colorScheme.error,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    const SizedBox(height: 16),
+
+                    SeaButton.primary(
+                      text:
+                          _isGettingLocation
+                              ? 'Récupération...'
+                              : 'Obtenir ma position actuelle',
+                      icon: Icons.my_location,
+                      onPressed:
+                          _isGettingLocation ? null : _getCurrentLocation,
+                      isLoading: _isGettingLocation,
+                      width: double.infinity,
+                      color: theme.colorScheme.secondary,
+                    ),
+                  ],
+                ),
+              ),
+
+              // Error or success messages
+              if (_errorMessage != null)
+                _animationService.shake(
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: theme.colorScheme.error.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
                       children: [
-                        Text(
-                          'Informations complémentaires',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.bold),
+                        Icon(
+                          Icons.error_outline,
+                          color: theme.colorScheme.error,
                         ),
-                        const SizedBox(height: 16),
-
-                        // Quantity
-                        TextFormField(
-                          controller: _quantiteController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Quantité (nombre)',
-                            prefixIcon: Icon(Icons.numbers),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Veuillez entrer la quantité';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Weight
-                        TextFormField(
-                          controller: _poidController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Poids (kg)',
-                            prefixIcon: Icon(Icons.scale),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Veuillez entrer le poids';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Temperature
-                        TextFormField(
-                          controller: _temperatureController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Température (°C)',
-                            prefixIcon: Icon(Icons.thermostat),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Veuillez entrer la température';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Fishing method
-                        TextFormField(
-                          controller: _enginController,
-                          decoration: const InputDecoration(
-                            labelText: 'Méthode de pêche',
-                            prefixIcon: Icon(Icons.sailing),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Veuillez entrer la méthode de pêche';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Fishing zone
-                        TextFormField(
-                          controller: _zoneController,
-                          decoration: const InputDecoration(
-                            labelText: 'Zone de pêche',
-                            prefixIcon: Icon(Icons.map),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Veuillez entrer la zone de pêche';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Location
-                        Text(
-                          'Localisation',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        if (_latitude != null && _longitude != null) ...[
-                          Text(
-                            'Latitude: $_latitude',
-                            style: TextStyle(color: Colors.grey[700]),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Longitude: $_longitude',
-                            style: TextStyle(color: Colors.grey[700]),
-                          ),
-                        ] else
-                          Text(
-                            'Aucune localisation enregistrée',
-                            style: TextStyle(color: Colors.grey[500]),
-                          ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed:
-                              _isGettingLocation ? null : _getCurrentLocation,
-                          icon: const Icon(Icons.location_on),
-                          label:
-                              _isGettingLocation
-                                  ? const Text('Récupération...')
-                                  : const Text('Obtenir ma position actuelle'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue[700],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(color: theme.colorScheme.error),
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-              ),
 
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 16),
-                Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  textAlign: TextAlign.center,
+              if (_successMessage != null)
+                _animationService.fadeIn(
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.secondary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: theme.colorScheme.secondary.withValues(
+                          alpha: 0.3,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          color: theme.colorScheme.secondary,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _successMessage!,
+                            style: TextStyle(
+                              color: theme.colorScheme.secondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ],
-              const SizedBox(height: 24),
 
               // Save button
-              ElevatedButton(
-                onPressed: _isLoading ? null : _saveFishData,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child:
+              const SizedBox(height: 24),
+              SeaButton.primary(
+                text:
                     _isLoading
-                        ? Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            ),
-                            SizedBox(width: 12),
-                            Text('Enregistrement...'),
-                          ],
-                        )
-                        : const Text('Enregistrer et soumettre'),
+                        ? 'Enregistrement...'
+                        : 'Enregistrer et soumettre',
+                icon: _isLoading ? null : Icons.save,
+                onPressed: _isLoading ? null : _saveFishData,
+                isLoading: _isLoading,
+                width: double.infinity,
+                size: SeaButtonSize.large,
               ),
-            ],
+              const SizedBox(height: 16),
+            ]),
           ),
         ),
       ),

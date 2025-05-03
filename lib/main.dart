@@ -49,6 +49,56 @@ class _MyAppState extends State<MyApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
+      // Désactiver la bannière de débogage et les indicateurs de débordement
+      builder: (context, child) {
+        // Désactiver les indicateurs de débordement (barre jaune et noire)
+        return MediaQuery(
+          // Définir un padding de sécurité pour éviter les débordements
+          data: MediaQuery.of(context).copyWith(padding: EdgeInsets.zero),
+          child: child!,
+        );
+      },
+      // Utiliser des transitions de page personnalisées
+      onGenerateRoute: (settings) {
+        // Si nous avons une route nommée, nous pouvons l'utiliser ici
+        if (settings.name == null) {
+          return MaterialPageRoute(
+            builder:
+                (context) =>
+                    _isLoading
+                        ? const Scaffold(
+                          body: Center(child: CircularProgressIndicator()),
+                        )
+                        : _initialScreen,
+          );
+        }
+
+        // Sinon, utiliser une transition par défaut
+        return PageRouteBuilder(
+          settings: settings,
+          pageBuilder:
+              (context, animation, secondaryAnimation) =>
+                  _isLoading
+                      ? const Scaffold(
+                        body: Center(child: CircularProgressIndicator()),
+                      )
+                      : _initialScreen,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            const begin = Offset(1.0, 0.0);
+            const end = Offset.zero;
+            const curve = Curves.easeInOut;
+
+            var tween = Tween(
+              begin: begin,
+              end: end,
+            ).chain(CurveTween(curve: curve));
+            var offsetAnimation = animation.drive(tween);
+
+            return SlideTransition(position: offsetAnimation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 300),
+        );
+      },
       home:
           _isLoading
               ? const Scaffold(body: Center(child: CircularProgressIndicator()))

@@ -3,19 +3,38 @@ import 'package:seatrace/services/auth_service.dart';
 import 'package:seatrace/screens/login_screen.dart';
 import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/screens/veterinaire/pending_lots_screen.dart';
+import 'package:seatrace/screens/profile_screen.dart';
+import 'package:seatrace/utils/animation_service.dart';
+import 'package:seatrace/utils/responsive_service.dart';
+import 'package:seatrace/utils/navigation_service.dart';
+import 'package:seatrace/utils/color_extensions.dart';
+import 'package:seatrace/widgets/sea_widgets.dart';
 
-class VeterinaireScreen extends StatefulWidget {
-  const VeterinaireScreen({Key? key}) : super(key: key);
+class VeterinaireDashboardScreen extends StatefulWidget {
+  const VeterinaireDashboardScreen({Key? key}) : super(key: key);
 
   @override
-  _VeterinaireScreenState createState() => _VeterinaireScreenState();
+  State<VeterinaireDashboardScreen> createState() =>
+      _VeterinaireDashboardScreenState();
 }
 
-class _VeterinaireScreenState extends State<VeterinaireScreen> {
+class _VeterinaireDashboardScreenState
+    extends State<VeterinaireDashboardScreen> {
   String _userName = '';
+  String _userPhoto = '';
+  String _userTelephone = '';
+  String _userSpecialite = '';
+  String _userLicence = '';
+  String _userEtablissement = '';
   int _pendingLots = 0;
   int _approvedLots = 0;
   int _rejectedLots = 0;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  final _animationService = AnimationService();
+  final _responsiveService = ResponsiveService();
+  final _navigationService = NavigationService();
 
   @override
   void initState() {
@@ -24,59 +43,95 @@ class _VeterinaireScreenState extends State<VeterinaireScreen> {
   }
 
   Future<void> _loadUserData() async {
-    final user = await AuthService().getCurrentUser();
-    if (user != null) {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final user = await AuthService().getCurrentUser();
+      if (user == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      // Charger les détails du vétérinaire
+      final userData = await ApiService.instance.getVeterinaireDetails(user.id);
+
       setState(() {
-        _userName = '${user.prenom} ${user.nom}';
+        _userName = '${userData['prenom']} ${userData['nom']}';
+        _userPhoto = userData['photo'] ?? '';
+        _userTelephone = userData['telephone'] ?? '';
+        _userSpecialite = userData['specialite'] ?? '';
+        _userLicence = userData['licence'] ?? '';
+        _userEtablissement = userData['etablissement'] ?? '';
       });
 
-      // Load statistics
-      try {
-        final response = await ApiService.instance.get(
-          'lots/veterinaire/${user.id}',
-        );
-        final lots = List<Map<String, dynamic>>.from(response['data']);
+      // Charger les statistiques
+      final lots = await ApiService.instance.getLotsByVeterinaireId(user.id);
 
-        setState(() {
-          _pendingLots = lots.where((lot) => lot['test'] == false).length;
-          _approvedLots =
-              lots
-                  .where(
-                    (lot) => lot['test'] == true && lot['status'] == true,
-                  )
-                  .length;
-          _rejectedLots =
-              lots
-                  .where(
-                    (lot) => lot['test'] == true && lot['status'] == false,
-                  )
-                  .length;
-        });
-      } catch (e) {
-        debugPrint('Erreur lors du chargement des lots: $e');
-        setState(() {
-          _pendingLots = 0;
-          _approvedLots = 0;
-          _rejectedLots = 0;
-        });
-      }
+      setState(() {
+        _pendingLots = lots.where((lot) => lot['test'] == false).length;
+        _approvedLots =
+            lots
+                .where((lot) => lot['test'] == true && lot['status'] == true)
+                .length;
+        _rejectedLots =
+            lots
+                .where((lot) => lot['test'] == true && lot['status'] == false)
+                .length;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
+        _isLoading = false;
+      });
     }
   }
 
   Future<void> _logout() async {
     await AuthService().logout();
     if (!mounted) return;
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
+    _navigationService.replaceAllWithFade(context, const LoginScreen());
+  }
+
+  String _getInitials() {
+    if (_userName.isEmpty) return '?';
+
+    final nameParts = _userName.split(' ');
+    String initials = '';
+
+    if (nameParts.isNotEmpty && nameParts[0].isNotEmpty) {
+      initials += nameParts[0][0];
+    }
+
+    if (nameParts.length > 1 && nameParts[1].isNotEmpty) {
+      initials += nameParts[1][0];
+    }
+
+    return initials;
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tableau de bord Vétérinaire'),
+        elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              _navigationService.navigateToWithFade(
+                context,
+                const ProfileScreen(),
+              );
+            },
+            tooltip: 'Profil',
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _logout,
@@ -85,103 +140,75 @@ class _VeterinaireScreenState extends State<VeterinaireScreen> {
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Bienvenue, $_userName',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Vous avez $_pendingLots lots en attente de validation',
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                    ],
+        child:
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
+                ? _buildErrorView()
+                : RefreshIndicator(
+                  onRefresh: _loadUserData,
+                  child: SingleChildScrollView(
+                    padding: _responsiveService.adaptivePadding(context),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _animationService.staggeredList([
+                        // En-tête avec informations utilisateur
+                        _buildWelcomeCard(),
+
+                        // Carte d'action principale
+                        const SizedBox(height: 24),
+                        _buildMainActionCard(),
+
+                        // Statistiques
+                        const SizedBox(height: 24),
+                        SeaSectionHeader(
+                          title: 'Statistiques',
+                          icon: Icons.bar_chart,
+                        ),
+                        _buildStatisticsRow(),
+
+                        // Activité récente
+                        const SizedBox(height: 24),
+                        SeaSectionHeader(
+                          title: 'Activité récente',
+                          icon: Icons.history,
+                          subtitle: 'Historique des validations récentes',
+                        ),
+                        _buildRecentActivityList(),
+                      ]),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
+      ),
+    );
+  }
 
-              // Main actions
-              _buildActionCard(
-                context,
-                icon: Icons.pending_actions,
-                title: 'Lots en attente',
-                description: 'Examiner et valider les lots de poissons',
-                count: _pendingLots,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const PendingLotsScreen(),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-
-              // Statistics
-              Text(
-                'Statistiques',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+  Widget _buildErrorView() {
+    return _animationService.fadeIn(
+      Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Theme.of(context).colorScheme.error,
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      icon: Icons.pending_actions,
-                      value: _pendingLots.toString(),
-                      label: 'En attente',
-                      color: Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      icon: Icons.check_circle,
-                      value: _approvedLots.toString(),
-                      label: 'Approuvés',
-                      color: Colors.green,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      icon: Icons.cancel,
-                      value: _rejectedLots.toString(),
-                      label: 'Refusés',
-                      color: Colors.red,
-                    ),
-                  ),
-                ],
+              Text(
+                _errorMessage!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-
-              // Recent activity
-              Text(
-                'Activité récente',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              SeaButton.primary(
+                text: 'Réessayer',
+                icon: Icons.refresh,
+                onPressed: _loadUserData,
               ),
-              const SizedBox(height: 16),
-              _buildRecentActivityList(),
             ],
           ),
         ),
@@ -189,33 +216,189 @@ class _VeterinaireScreenState extends State<VeterinaireScreen> {
     );
   }
 
-  Widget _buildActionCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String description,
-    required int count,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
+  Widget _buildWelcomeCard() {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
+    return SeaCard(
+      elevated: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Avatar de l'utilisateur
+              SeaAvatar(
+                imageUrl:
+                    _userPhoto.isNotEmpty
+                        ? ApiService.instance.getImageUrl(_userPhoto)
+                        : null,
+                initials: _getInitials(),
+                size: 60,
+                backgroundColor: primaryColor.withValues(alpha: 0.1),
+                foregroundColor: primaryColor,
+                bordered: true,
+                borderColor: primaryColor,
+              ),
+              const SizedBox(width: 16),
+
+              // Informations utilisateur principales
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bienvenue, $_userName',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (_userSpecialite.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.medical_services,
+                              size: 14,
+                              color: theme.colorScheme.secondary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Spécialité: $_userSpecialite',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.secondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // Informations supplémentaires
+          const SizedBox(height: 12),
+          const Divider(),
+          const SizedBox(height: 8),
+
+          // Informations professionnelles
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_userLicence.isNotEmpty)
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.card_membership,
+                            size: 16,
+                            color: theme.hintColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Licence: $_userLicence',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 4),
+                    if (_userEtablissement.isNotEmpty)
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.business,
+                            size: 16,
+                            color: theme.hintColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Établissement: $_userEtablissement',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+
+              // Téléphone
+              if (_userTelephone.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.phone, size: 14, color: primaryColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        _userTelephone,
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+          // Lots en attente
+          const SizedBox(height: 12),
+          const Divider(),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                Icons.pending_actions,
+                size: 16,
+                color: theme.colorScheme.secondary,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Vous avez $_pendingLots lots en attente de validation',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.secondary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainActionCard() {
+    final theme = Theme.of(context);
+
+    return SeaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
               Container(
-                width: 60,
-                height: 60,
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.1),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  icon,
-                  size: 30,
-                  color: Theme.of(context).primaryColor,
+                  Icons.pending_actions,
+                  size: 32,
+                  color: theme.colorScheme.primary,
                 ),
               ),
               const SizedBox(width: 16),
@@ -224,130 +407,176 @@ class _VeterinaireScreenState extends State<VeterinaireScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      'Lots en attente',
+                      style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      description,
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      'Examiner et valider les lots de poissons',
+                      style: theme.textTheme.bodyMedium,
                     ),
                   ],
                 ),
               ),
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: count > 0 ? Colors.red : Colors.grey,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
+              if (_pendingLots > 0)
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.error,
+                    shape: BoxShape.circle,
+                  ),
                   child: Text(
-                    count.toString(),
+                    _pendingLots.toString(),
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-              ),
             ],
           ),
-        ),
+          const SizedBox(height: 16),
+          SeaButton.primary(
+            text: 'Voir les lots en attente',
+            icon: Icons.arrow_forward,
+            onPressed: () {
+              _navigationService.navigateToWithSlideLeft(
+                context,
+                const PendingLotsScreen(),
+              );
+            },
+            width: double.infinity,
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildStatCard(
-    BuildContext context, {
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color color,
-  }) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Icon(icon, size: 32, color: color),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-          ],
+  Widget _buildStatisticsRow() {
+    final theme = Theme.of(context);
+
+    return Row(
+      children: [
+        Expanded(
+          child: SeaStatCard(
+            label: 'En attente',
+            value: _pendingLots.toString(),
+            icon: Icons.pending_actions,
+            color: Colors.orange,
+            onTap: () {
+              _navigationService.navigateToWithSlideLeft(
+                context,
+                const PendingLotsScreen(),
+              );
+            },
+          ),
         ),
-      ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: SeaStatCard(
+            label: 'Approuvés',
+            value: _approvedLots.toString(),
+            icon: Icons.check_circle,
+            color: theme.colorScheme.secondary,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: SeaStatCard(
+            label: 'Refusés',
+            value: _rejectedLots.toString(),
+            icon: Icons.cancel,
+            color: theme.colorScheme.error,
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildRecentActivityList() {
-    return Card(
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: 3,
-        separatorBuilder: (context, index) => const Divider(),
-        itemBuilder: (context, index) {
-          // Sample data - in a real app, this would come from the database
-          final activities = [
-            {
-              'title': 'Thon rouge',
-              'status': 'Approuvé',
-              'date': '23/04/2023',
-              'icon': Icons.check_circle,
-              'color': Colors.green,
-            },
-            {
-              'title': 'Dorade',
-              'status': 'Refusé',
-              'date': '22/04/2023',
-              'icon': Icons.cancel,
-              'color': Colors.red,
-            },
-            {
-              'title': 'Sardine',
-              'status': 'Approuvé',
-              'date': '21/04/2023',
-              'icon': Icons.check_circle,
-              'color': Colors.green,
-            },
-          ];
+    final theme = Theme.of(context);
 
-          if (index >= activities.length) return const SizedBox();
+    // Données d'exemple - dans une application réelle, cela viendrait de la base de données
+    final activities = [
+      {
+        'title': 'Thon rouge',
+        'status': 'Approuvé',
+        'date': '23/04/2023',
+        'icon': Icons.check_circle,
+        'color': theme.colorScheme.secondary,
+      },
+      {
+        'title': 'Dorade',
+        'status': 'Refusé',
+        'date': '22/04/2023',
+        'icon': Icons.cancel,
+        'color': theme.colorScheme.error,
+      },
+      {
+        'title': 'Sardine',
+        'status': 'Approuvé',
+        'date': '21/04/2023',
+        'icon': Icons.check_circle,
+        'color': theme.colorScheme.secondary,
+      },
+    ];
 
-          final activity = activities[index];
-          return ListTile(
-            leading: Icon(
-              activity['icon'] as IconData,
-              color: activity['color'] as Color,
-            ),
-            title: Text(activity['title'] as String),
-            subtitle: Text(activity['date'] as String),
-            trailing: Chip(
-              label: Text(
-                activity['status'] as String,
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+    return Column(
+      children:
+          activities.map((activity) {
+            return _animationService.fadeIn(
+              SeaCard(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: (activity['color'] as Color).withValues(
+                        alpha: 0.1,
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      activity['icon'] as IconData,
+                      color: activity['color'] as Color,
+                    ),
+                  ),
+                  title: Text(
+                    activity['title'] as String,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(activity['date'] as String),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: (activity['color'] as Color).withValues(
+                        alpha: 0.1,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      activity['status'] as String,
+                      style: TextStyle(
+                        color: activity['color'] as Color,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  onTap: () {
+                    // Naviguer vers les détails du lot
+                  },
+                ),
               ),
-              backgroundColor: activity['color'] as Color,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-            ),
-          );
-        },
-      ),
+            );
+          }).toList(),
     );
   }
 }

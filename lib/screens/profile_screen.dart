@@ -5,7 +5,10 @@ import 'package:seatrace/services/auth_service.dart';
 import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/services/image_service.dart';
 import 'package:seatrace/utils/validators.dart';
+import 'package:seatrace/utils/animation_service.dart';
+import 'package:seatrace/utils/responsive_service.dart';
 import 'package:seatrace/screens/login_screen.dart';
+import 'package:seatrace/widgets/sea_widgets.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -35,6 +38,9 @@ class ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _userData;
   String _userType = '';
   String? _photoPath;
+
+  final _animationService = AnimationService();
+  final _responsiveService = ResponsiveService();
 
   @override
   void initState() {
@@ -68,39 +74,35 @@ class ProfileScreenState extends State<ProfileScreen> {
       Map<String, dynamic>? userData;
 
       if (user.isPecheur()) {
-        userData = await ApiService.instance.getPecheurDetails(user.id!);
+        userData = await ApiService.instance.getPecheurDetails(user.id);
         _userType = 'Pêcheur';
       } else if (user.isVeterinaire()) {
-        userData = await ApiService.instance.getVeterinaireDetails(user.id!);
+        userData = await ApiService.instance.getVeterinaireDetails(user.id);
         _userType = 'Vétérinaire';
       } else if (user.isMaryeur()) {
-        userData = await ApiService.instance.getMaryeurDetails(user.id!);
+        userData = await ApiService.instance.getMaryeurDetails(user.id);
         _userType = 'Maryeur';
       } else if (user.roles.contains('ROLE_ADMIN')) {
         userData = await ApiService.instance.getAdminById(user.id);
         _userType = 'Administrateur';
       } else {
-        userData = await ApiService.instance.get('clients/${user.id}');
+        userData = await ApiService.instance.getClientDetails(user.id);
         _userType = 'Client';
       }
 
       // Utiliser une variable locale pour éviter les problèmes de null-safety
-      if (userData != null) {
-        final Map<String, dynamic> data = userData;
+      final Map<String, dynamic> data = userData!;
 
-        setState(() {
-          _userData = data;
+      setState(() {
+        _userData = data;
 
-          // Accéder aux propriétés de manière sécurisée
-          _nomController.text = (data['nom'] ?? '').toString();
-          _prenomController.text = (data['prenom'] ?? '').toString();
-          _telephoneController.text = (data['telephone'] ?? '').toString();
-          _photoPath = data['photo']?.toString();
-          _isLoading = false;
-        });
-      } else {
-        throw Exception('Données utilisateur non trouvées');
-      }
+        // Accéder aux propriétés de manière sécurisée
+        _nomController.text = (data['nom'] ?? '').toString();
+        _prenomController.text = (data['prenom'] ?? '').toString();
+        _telephoneController.text = (data['telephone'] ?? '').toString();
+        _photoPath = data['photo']?.toString();
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() {
         _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
@@ -182,17 +184,18 @@ class ProfileScreenState extends State<ProfileScreen> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ListTile(
-                  leading: const Icon(Icons.camera_alt),
-                  title: const Text('Appareil photo'),
+                SeaListItem(
+                  title: 'Appareil photo',
+                  icon: Icons.camera_alt,
                   onTap: () {
                     Navigator.of(context).pop();
                     _pickImage(ImageSource.camera);
                   },
+                  margin: const EdgeInsets.only(bottom: 8),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.photo_library),
-                  title: const Text('Galerie'),
+                SeaListItem(
+                  title: 'Galerie',
+                  icon: Icons.photo_library,
                   onTap: () {
                     Navigator.of(context).pop();
                     _pickImage(ImageSource.gallery);
@@ -201,9 +204,9 @@ class ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
             actions: [
-              TextButton(
+              SeaButton.text(
+                text: 'Annuler',
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Annuler'),
               ),
             ],
           ),
@@ -351,6 +354,9 @@ class ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mon profil'),
@@ -367,355 +373,334 @@ class ProfileScreenState extends State<ProfileScreen> {
             _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _errorMessage != null && _userData == null
-                ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                ? _animationService.fadeIn(
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: theme.colorScheme.error,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: _loadUserData,
-                        child: const Text('Réessayer'),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        Text(
+                          _errorMessage!,
+                          style: TextStyle(color: theme.colorScheme.error),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        SeaButton.primary(
+                          text: 'Réessayer',
+                          icon: Icons.refresh,
+                          onPressed: _loadUserData,
+                        ),
+                      ],
+                    ),
                   ),
                 )
                 : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: _responsiveService.adaptivePadding(context),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                    children: _animationService.staggeredList([
                       // En-tête du profil avec photo
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            children: [
-                              // Photo de profil
-                              Stack(
-                                alignment: Alignment.bottomRight,
-                                children: [
-                                  GestureDetector(
-                                    onTap:
-                                        _isUploadingPhoto
-                                            ? null
-                                            : _showImageSourceDialog,
-                                    child: CircleAvatar(
-                                      radius: 60,
-                                      backgroundColor: Theme.of(
-                                        context,
-                                      ).primaryColor.withAlpha(25),
-                                      backgroundImage:
-                                          _photoPath != null &&
-                                                  _photoPath!.isNotEmpty
-                                              ? NetworkImage(
-                                                ImageService.instance
-                                                    .getImageUrl(_photoPath!),
-                                              )
-                                              : null,
-                                      child:
-                                          _photoPath == null ||
-                                                  _photoPath!.isEmpty
-                                              ? Text(
-                                                _getInitials(),
-                                                style: const TextStyle(
-                                                  fontSize: 36,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.white,
-                                                ),
-                                              )
-                                              : null,
+                      SeaCard(
+                        elevated: true,
+                        child: Column(
+                          children: [
+                            // Photo de profil
+                            Stack(
+                              alignment: Alignment.bottomRight,
+                              children: [
+                                GestureDetector(
+                                  onTap:
+                                      _isUploadingPhoto
+                                          ? null
+                                          : _showImageSourceDialog,
+                                  child: SeaAvatar(
+                                    imageUrl:
+                                        _photoPath != null &&
+                                                _photoPath!.isNotEmpty
+                                            ? ImageService.instance.getImageUrl(
+                                              _photoPath!,
+                                            )
+                                            : null,
+                                    initials: _getInitials(),
+                                    size: 120,
+                                    backgroundColor: primaryColor.withValues(
+                                      alpha: 0.1,
                                     ),
+                                    foregroundColor: primaryColor,
+                                    bordered: true,
+                                    borderColor: primaryColor,
+                                    isLoading: _isUploadingPhoto,
                                   ),
+                                ),
+                                if (!_isUploadingPhoto)
                                   Container(
                                     padding: const EdgeInsets.all(4),
                                     decoration: BoxDecoration(
-                                      color: Theme.of(context).primaryColor,
+                                      color: primaryColor,
                                       shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.1,
+                                          ),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
                                     ),
-                                    child:
-                                        _isUploadingPhoto
-                                            ? const SizedBox(
-                                              width: 24,
-                                              height: 24,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: Colors.white,
-                                              ),
-                                            )
-                                            : IconButton(
-                                              icon: const Icon(
-                                                Icons.camera_alt,
-                                                color: Colors.white,
-                                                size: 20,
-                                              ),
-                                              onPressed: _showImageSourceDialog,
-                                              tooltip: 'Changer la photo',
-                                              constraints: const BoxConstraints(
-                                                minWidth: 24,
-                                                minHeight: 24,
-                                              ),
-                                              padding: EdgeInsets.zero,
-                                            ),
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.camera_alt,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      onPressed: _showImageSourceDialog,
+                                      tooltip: 'Changer la photo',
+                                      constraints: const BoxConstraints(
+                                        minWidth: 24,
+                                        minHeight: 24,
+                                      ),
+                                      padding: EdgeInsets.zero,
+                                    ),
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                '${_userData!['prenom']} ${_userData!['nom']}',
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _userData!['email'],
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(
-                                    context,
-                                  ).primaryColor.withAlpha(25),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  _userType,
-                                  style: TextStyle(
-                                    color: Theme.of(context).primaryColor,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Messages de succès ou d'erreur
-                      if (_successMessage != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withAlpha(25),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _successMessage!,
-                                  style: const TextStyle(color: Colors.green),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      if (_errorMessage != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withAlpha(25),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.red),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.error, color: Colors.red),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _errorMessage!,
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Formulaire de modification du profil
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Informations personnelles',
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 16),
-
-                                // Nom
-                                TextFormField(
-                                  controller: _nomController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Nom',
-                                    prefixIcon: Icon(Icons.person_outline),
-                                  ),
-                                  validator: Validators.validateName,
-                                ),
-                                const SizedBox(height: 16),
-
-                                // Prénom
-                                TextFormField(
-                                  controller: _prenomController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Prénom',
-                                    prefixIcon: Icon(Icons.person_outline),
-                                  ),
-                                  validator: Validators.validateName,
-                                ),
-                                const SizedBox(height: 16),
-
-                                // Téléphone
-                                TextFormField(
-                                  controller: _telephoneController,
-                                  keyboardType: TextInputType.phone,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Téléphone (optionnel)',
-                                    prefixIcon: Icon(Icons.phone_outlined),
-                                  ),
-                                  validator: Validators.validatePhone,
-                                ),
-                                const SizedBox(height: 24),
-
-                                // Bouton de sauvegarde
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: _isSaving ? null : _saveProfile,
-                                    child:
-                                        _isSaving
-                                            ? const SizedBox(
-                                              height: 20,
-                                              width: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: Colors.white,
-                                              ),
-                                            )
-                                            : const Text(
-                                              'Enregistrer les modifications',
-                                            ),
-                                  ),
-                                ),
                               ],
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '${_userData!['prenom']} ${_userData!['nom']}',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _userData!['email'],
+                              style: theme.textTheme.bodyLarge,
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: primaryColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                _userType,
+                                style: TextStyle(
+                                  color: primaryColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 24),
 
-                      // Formulaire de changement de mot de passe
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
+                      // Informations personnelles
+                      SeaSectionHeader(
+                        title: 'Informations personnelles',
+                        icon: Icons.person,
+                      ),
+
+                      SeaCard(
+                        child: Form(
+                          key: _formKey,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Changer le mot de passe',
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              TextFormField(
+                                controller: _nomController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Nom',
+                                  hintText: 'Entrez votre nom',
+                                  prefixIcon: Icon(Icons.person_outline),
+                                ),
+                                validator: Validators.validateRequired,
                               ),
                               const SizedBox(height: 16),
-
-                              // Mot de passe actuel
                               TextFormField(
-                                controller: _currentPasswordController,
-                                obscureText: true,
+                                controller: _prenomController,
                                 decoration: const InputDecoration(
-                                  labelText: 'Mot de passe actuel',
-                                  prefixIcon: Icon(Icons.lock_outline),
+                                  labelText: 'Prénom',
+                                  hintText: 'Entrez votre prénom',
+                                  prefixIcon: Icon(Icons.person_outline),
                                 ),
+                                validator: Validators.validateRequired,
                               ),
                               const SizedBox(height: 16),
-
-                              // Nouveau mot de passe
                               TextFormField(
-                                controller: _newPasswordController,
-                                obscureText: true,
+                                controller: _telephoneController,
                                 decoration: const InputDecoration(
-                                  labelText: 'Nouveau mot de passe',
-                                  prefixIcon: Icon(Icons.lock_outline),
-                                  helperText:
-                                      'Au moins 8 caractères avec lettres, chiffres et symboles',
+                                  labelText: 'Téléphone',
+                                  hintText: 'Entrez votre numéro de téléphone',
+                                  prefixIcon: Icon(Icons.phone_outlined),
                                 ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Confirmation du nouveau mot de passe
-                              TextFormField(
-                                controller: _confirmPasswordController,
-                                obscureText: true,
-                                decoration: const InputDecoration(
-                                  labelText:
-                                      'Confirmer le nouveau mot de passe',
-                                  prefixIcon: Icon(Icons.lock_outline),
-                                ),
+                                keyboardType: TextInputType.phone,
                               ),
                               const SizedBox(height: 24),
 
-                              // Bouton de changement de mot de passe
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed:
-                                      _isChangingPassword
-                                          ? null
-                                          : _changePassword,
-                                  child:
-                                      _isChangingPassword
-                                          ? const SizedBox(
-                                            height: 20,
-                                            width: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.white,
+                              // Messages d'erreur ou de succès
+                              if (_errorMessage != null && _userData != null)
+                                _animationService.shake(
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.error.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: theme.colorScheme.error
+                                            .withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.error_outline,
+                                          color: theme.colorScheme.error,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            _errorMessage!,
+                                            style: TextStyle(
+                                              color: theme.colorScheme.error,
                                             ),
-                                          )
-                                          : const Text(
-                                            'Changer le mot de passe',
                                           ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
+
+                              if (_successMessage != null)
+                                _animationService.fadeIn(
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.secondary
+                                          .withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: theme.colorScheme.secondary
+                                            .withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.check_circle_outline,
+                                          color: theme.colorScheme.secondary,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            _successMessage!,
+                                            style: TextStyle(
+                                              color:
+                                                  theme.colorScheme.secondary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                              if (_errorMessage != null ||
+                                  _successMessage != null)
+                                const SizedBox(height: 24),
+
+                              // Bouton d'enregistrement
+                              SeaButton.primary(
+                                text: 'Enregistrer les modifications',
+                                icon: Icons.save,
+                                onPressed: _isSaving ? null : _saveProfile,
+                                isLoading: _isSaving,
+                                width: double.infinity,
                               ),
                             ],
                           ),
                         ),
                       ),
-                    ],
+
+                      // Sécurité
+                      SeaSectionHeader(
+                        title: 'Sécurité',
+                        icon: Icons.security,
+                        subtitle:
+                            'Modifiez votre mot de passe pour sécuriser votre compte',
+                      ),
+
+                      SeaCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextFormField(
+                              controller: _currentPasswordController,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Mot de passe actuel',
+                                hintText: 'Entrez votre mot de passe actuel',
+                                prefixIcon: Icon(Icons.lock_outline),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _newPasswordController,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Nouveau mot de passe',
+                                hintText: 'Entrez votre nouveau mot de passe',
+                                prefixIcon: Icon(Icons.lock_outline),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _confirmPasswordController,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Confirmer le mot de passe',
+                                hintText:
+                                    'Confirmez votre nouveau mot de passe',
+                                prefixIcon: Icon(Icons.lock_outline),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Bouton de changement de mot de passe
+                            SeaButton.primary(
+                              text: 'Changer le mot de passe',
+                              icon: Icons.lock,
+                              onPressed:
+                                  _isChangingPassword ? null : _changePassword,
+                              isLoading: _isChangingPassword,
+                              width: double.infinity,
+                              color: theme.colorScheme.secondary,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Bouton de déconnexion
+                      const SizedBox(height: 16),
+                      SeaButton.outline(
+                        text: 'Déconnexion',
+                        icon: Icons.logout,
+                        onPressed: _logout,
+                        width: double.infinity,
+                        color: theme.colorScheme.error,
+                      ),
+                    ]),
                   ),
                 ),
       ),

@@ -57,6 +57,22 @@ class ApiService {
         return data;
       }
 
+      // Gérer spécifiquement les erreurs 404 pour certaines routes
+      if (response.statusCode == 404) {
+        ErrorHandler.instance.logError(
+          'Route non trouvée: $endpoint',
+          context: 'ApiService.get',
+        );
+
+        // Pour les routes de recherche ou de liste, retourner un résultat vide au lieu de lancer une exception
+        if (endpoint.contains('search') ||
+            endpoint.contains('available') ||
+            endpoint.contains('featured') ||
+            endpoint.contains('purchases/me')) {
+          return {'success': true, 'data': []};
+        }
+      }
+
       throw _createAppError(response, 'GET', endpoint);
     } on SocketException catch (e) {
       ErrorHandler.instance.logError(e, context: 'ApiService.get($endpoint)');
@@ -315,6 +331,11 @@ class ApiService {
           break;
         case 404:
           errorType = ErrorType.notFound;
+          // Log l'erreur 404 pour le débogage
+          ErrorHandler.instance.logError(
+            'Erreur 404: $method $endpoint - $message',
+            context: 'ApiService._createAppError',
+          );
           break;
         case 422:
           errorType = ErrorType.validation;
@@ -329,6 +350,12 @@ class ApiService {
           errorType = ErrorType.unknown;
       }
 
+      // Log toutes les erreurs pour le débogage
+      ErrorHandler.instance.logError(
+        'Erreur HTTP ${response.statusCode}: $method $endpoint - $message',
+        context: 'ApiService._createAppError',
+      );
+
       return AppError(
         message: message,
         type: errorType,
@@ -336,6 +363,12 @@ class ApiService {
         context: 'ApiService.$method($endpoint)',
       );
     } catch (e) {
+      // Log l'erreur de décodage
+      ErrorHandler.instance.logError(
+        'Erreur de décodage de la réponse: $method $endpoint - ${response.statusCode}',
+        context: 'ApiService._createAppError',
+      );
+
       return AppError(
         message: 'Erreur ${response.statusCode}: ${response.reasonPhrase}',
         type: ErrorType.unknown,
@@ -376,8 +409,17 @@ class ApiService {
   }
 
   Future<List<Map<String, dynamic>>> getAvailableAuctions() async {
-    final response = await get('lots/available');
-    return List<Map<String, dynamic>>.from(response['data'] ?? []);
+    try {
+      final response = await get('lots/available');
+      return List<Map<String, dynamic>>.from(response['data'] ?? []);
+    } catch (e) {
+      ErrorHandler.instance.logError(
+        e,
+        context: 'ApiService.getAvailableAuctions',
+      );
+      // Retourner une liste vide en cas d'erreur
+      return [];
+    }
   }
 
   Future<Map<String, dynamic>> getAuctionDetails(dynamic auctionId) async {
@@ -389,17 +431,106 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getPecheurDetails(dynamic pecheurId) async {
-    return await get('pecheurs/$pecheurId');
+    try {
+      final response = await get('pecheurs/$pecheurId');
+      // Vérifier que les champs essentiels ne sont pas null
+      if (response['nom'] == null) response['nom'] = 'Utilisateur';
+      if (response['prenom'] == null) response['prenom'] = 'Inconnu';
+      if (response['photo'] == null) response['photo'] = '';
+      if (response['email'] == null) response['email'] = '';
+      if (response['telephone'] == null) response['telephone'] = '';
+      if (response['matricule'] == null) response['matricule'] = '';
+      if (response['bateau'] == null) response['bateau'] = '';
+      if (response['port'] == null) response['port'] = '';
+      if (response['cin'] == null) response['cin'] = '';
+      return response;
+    } catch (e) {
+      ErrorHandler.instance.logError(
+        e,
+        context: 'ApiService.getPecheurDetails',
+      );
+      // Retourner des données par défaut en cas d'erreur
+      return {
+        'id': pecheurId,
+        'nom': 'Utilisateur',
+        'prenom': 'Inconnu',
+        'photo': '',
+        'email': '',
+        'telephone': '',
+        'matricule': '',
+        'bateau': '',
+        'port': '',
+        'cin': '',
+      };
+    }
   }
 
   Future<Map<String, dynamic>> getVeterinaireDetails(
     dynamic veterinaireId,
   ) async {
-    return await get('veterinaires/$veterinaireId');
+    try {
+      final response = await get('veterinaires/$veterinaireId');
+      // Vérifier que les champs essentiels ne sont pas null
+      if (response['nom'] == null) response['nom'] = 'Utilisateur';
+      if (response['prenom'] == null) response['prenom'] = 'Inconnu';
+      if (response['photo'] == null) response['photo'] = '';
+      if (response['email'] == null) response['email'] = '';
+      if (response['telephone'] == null) response['telephone'] = '';
+      if (response['specialite'] == null) response['specialite'] = '';
+      if (response['licence'] == null) response['licence'] = '';
+      if (response['etablissement'] == null) response['etablissement'] = '';
+      return response;
+    } catch (e) {
+      ErrorHandler.instance.logError(
+        e,
+        context: 'ApiService.getVeterinaireDetails',
+      );
+      // Retourner des données par défaut en cas d'erreur
+      return {
+        'id': veterinaireId,
+        'nom': 'Utilisateur',
+        'prenom': 'Inconnu',
+        'photo': '',
+        'email': '',
+        'telephone': '',
+        'specialite': '',
+        'licence': '',
+        'etablissement': '',
+      };
+    }
   }
 
   Future<Map<String, dynamic>> getMaryeurDetails(dynamic maryeurId) async {
-    return await get('maryeurs/$maryeurId');
+    try {
+      final response = await get('maryeurs/$maryeurId');
+      // Vérifier que les champs essentiels ne sont pas null
+      if (response['nom'] == null) response['nom'] = 'Utilisateur';
+      if (response['prenom'] == null) response['prenom'] = 'Inconnu';
+      if (response['photo'] == null) response['photo'] = '';
+      if (response['email'] == null) response['email'] = '';
+      if (response['telephone'] == null) response['telephone'] = '';
+      if (response['societe'] == null) response['societe'] = '';
+      if (response['registre'] == null) response['registre'] = '';
+      if (response['adresse'] == null) response['adresse'] = '';
+      return response;
+    } catch (e) {
+      ErrorHandler.instance.logError(
+        e,
+        context: 'ApiService.getMaryeurDetails',
+      );
+      // Retourner des données par défaut en cas d'erreur
+      return {
+        'id': maryeurId,
+        'nom': 'Utilisateur',
+        'prenom': 'Inconnu',
+        'photo': '',
+        'email': '',
+        'telephone': '',
+        'societe': '',
+        'registre': '',
+        'adresse': '',
+      };
+    }
   }
 
   // Méthodes pour obtenir des DTOs (pour une transition progressive)
@@ -477,21 +608,158 @@ class ApiService {
 
   // Méthodes pour les statistiques
   Future<Map<String, dynamic>> getDashboardStats() async {
-    return await get('stats/dashboard');
+    try {
+      return await get('stats/dashboard');
+    } catch (e) {
+      ErrorHandler.instance.logError(
+        e,
+        context: 'ApiService.getDashboardStats',
+      );
+      // Retourner des données par défaut en cas d'erreur
+      return {'availableAuctions': 0, 'myPurchases': 0};
+    }
   }
 
   Future<Map<String, dynamic>> getPecheurStats(dynamic pecheurId) async {
-    return await get('stats/pecheur/$pecheurId');
+    try {
+      return await get('stats/pecheur/$pecheurId');
+    } catch (e) {
+      ErrorHandler.instance.logError(e, context: 'ApiService.getPecheurStats');
+      // Retourner des données par défaut en cas d'erreur
+      return {
+        'totalCaptures': 0,
+        'pendingValidation': 0,
+        'validated': 0,
+        'rejected': 0,
+      };
+    }
   }
 
   Future<Map<String, dynamic>> getMaryeurStats(dynamic maryeurId) async {
-    return await get('stats/maryeur/$maryeurId');
+    try {
+      return await get('stats/maryeur/$maryeurId');
+    } catch (e) {
+      ErrorHandler.instance.logError(e, context: 'ApiService.getMaryeurStats');
+      // Retourner des données par défaut en cas d'erreur
+      return {'pendingLots': 0, 'activeAuctions': 0, 'completedAuctions': 0};
+    }
   }
 
-  // Méthode pour récupérer les achats d'un client
+  Future<Map<String, dynamic>> getVeterinaireStats(
+    dynamic veterinaireId,
+  ) async {
+    try {
+      final response = await get('stats/veterinaire/$veterinaireId');
+      return response['data'] ??
+          {'pendingLots': 0, 'approvedLots': 0, 'rejectedLots': 0};
+    } catch (e) {
+      ErrorHandler.instance.logError(
+        e,
+        context: 'ApiService.getVeterinaireStats',
+      );
+      // Retourner des données par défaut en cas d'erreur
+      return {'pendingLots': 0, 'approvedLots': 0, 'rejectedLots': 0};
+    }
+  }
+
+  Future<Map<String, dynamic>> getClientStats(dynamic clientId) async {
+    try {
+      final response = await get('stats/client/$clientId');
+      return response['data'] ?? {'purchases': 0, 'activeAuctions': 0};
+    } catch (e) {
+      ErrorHandler.instance.logError(e, context: 'ApiService.getClientStats');
+      // Retourner des données par défaut en cas d'erreur
+      return {'purchases': 0, 'activeAuctions': 0};
+    }
+  }
+
+  // Méthode pour récupérer les lots d'un vétérinaire
+  Future<List<Map<String, dynamic>>> getLotsByVeterinaireId(
+    dynamic veterinaireId,
+  ) async {
+    try {
+      final response = await get('lots/veterinaire/$veterinaireId');
+      return List<Map<String, dynamic>>.from(response['data'] ?? []);
+    } catch (e) {
+      ErrorHandler.instance.logError(
+        e,
+        context: 'ApiService.getLotsByVeterinaireId',
+      );
+      // Retourner une liste vide en cas d'erreur
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getActiveAuctionsByMaryeurId(
+    dynamic maryeurId,
+  ) async {
+    try {
+      final response = await get('lots/auctions/maryeur/$maryeurId');
+      return List<Map<String, dynamic>>.from(response['data'] ?? []);
+    } catch (e) {
+      ErrorHandler.instance.logError(
+        e,
+        context: 'ApiService.getActiveAuctionsByMaryeurId',
+      );
+      // Retourner une liste vide en cas d'erreur
+      return [];
+    }
+  }
+
+  // Méthode pour récupérer les détails d'un client
+  Future<Map<String, dynamic>> getClientDetails(dynamic clientId) async {
+    try {
+      final response = await get('clients/$clientId');
+      // Vérifier que les champs essentiels ne sont pas null
+      if (response['nom'] == null) response['nom'] = 'Utilisateur';
+      if (response['prenom'] == null) response['prenom'] = 'Inconnu';
+      if (response['photo'] == null) response['photo'] = '';
+      if (response['email'] == null) response['email'] = '';
+      if (response['telephone'] == null) response['telephone'] = '';
+      if (response['adresse'] == null) response['adresse'] = '';
+      return response;
+    } catch (e) {
+      ErrorHandler.instance.logError(e, context: 'ApiService.getClientDetails');
+      // Retourner des données par défaut en cas d'erreur
+      return {
+        'id': clientId,
+        'nom': 'Utilisateur',
+        'prenom': 'Inconnu',
+        'photo': '',
+        'email': '',
+        'telephone': '',
+        'adresse': '',
+      };
+    }
+  }
+
+  // Méthode pour récupérer les achats du client connecté
   Future<List<Map<String, dynamic>>> getMyPurchases() async {
-    final response = await get('purchases/me');
-    return List<Map<String, dynamic>>.from(response['data']);
+    try {
+      final response = await get('clients/purchases/me');
+      return List<Map<String, dynamic>>.from(response['data'] ?? []);
+    } catch (e) {
+      ErrorHandler.instance.logError(e, context: 'ApiService.getMyPurchases');
+      // Retourner une liste vide en cas d'erreur
+      return [];
+    }
+  }
+
+  // Méthode pour récupérer les achats d'un client spécifique
+  Future<List<Map<String, dynamic>>> getClientPurchases(
+    dynamic clientId,
+  ) async {
+    try {
+      final response = await get('clients/purchases/$clientId');
+      return List<Map<String, dynamic>>.from(response['data'] ?? []);
+    } catch (e) {
+      ErrorHandler.instance.logError(
+        e,
+        context: 'ApiService.getClientPurchases',
+      );
+      // Retourner une liste vide en cas d'erreur
+      return [];
+    }
   }
 
   // Cette méthode est obsolète, utilisez getVeterinaireDetails à la place

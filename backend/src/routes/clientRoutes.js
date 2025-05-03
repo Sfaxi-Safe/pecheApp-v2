@@ -24,6 +24,76 @@ router.get('/', auth, checkRole('ROLE_ADMIN'), async (req, res, next) => {
 });
 
 /**
+ * @route GET /api/clients/purchases/me
+ * @desc Récupérer les achats du client connecté
+ * @access Private (Client uniquement)
+ */
+router.get('/purchases/me', auth, checkRole('ROLE_CLIENT'), async (req, res, next) => {
+  try {
+    // Récupérer l'ID du client connecté
+    const clientId = req.user._id;
+
+    // Récupérer tous les lots achetés par ce client
+    const Lot = require('../models/Lot');
+    const lots = await Lot.find({ acheteur: clientId, vendu: true })
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin lieu')
+      .sort({ dateSoumission: -1 });
+
+    res.success(lots, 'Liste des achats récupérée avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route GET /api/clients/purchases/:id
+ * @desc Récupérer les achats d'un client spécifique
+ * @access Private (Admin ou le client lui-même)
+ */
+router.get('/purchases/:id', auth, async (req, res, next) => {
+  try {
+    let clientId;
+
+    // Vérifier si l'ID est un ObjectId valide
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      clientId = req.params.id;
+    } else {
+      // Si ce n'est pas un ObjectId, chercher le client par ID personnalisé
+      const client = await Client.findOne({ id: req.params.id });
+
+      if (!client) {
+        return res.success([], 'Aucun achat trouvé pour ce client');
+      }
+
+      clientId = client._id;
+    }
+
+    // Vérifier les autorisations (admin ou le client lui-même)
+    const isAdmin = req.user.roles.includes('ROLE_ADMIN');
+    const isSelf = req.user._id.toString() === clientId.toString() ||
+                  (req.user.id && req.user.id === req.params.id);
+
+    if (!isAdmin && !isSelf) {
+      throw new ForbiddenError('Vous n\'êtes pas autorisé à accéder à ces achats');
+    }
+
+    // Récupérer tous les lots achetés par ce client
+    const Lot = require('../models/Lot');
+    const lots = await Lot.find({ acheteur: clientId, vendu: true })
+      .populate('espece', 'nom imageUrl')
+      .populate('veterinaire', 'nom prenom')
+      .populate('prise', 'nom debut fin lieu')
+      .sort({ dateSoumission: -1 });
+
+    res.success(lots, 'Liste des achats du client récupérée avec succès');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * @route GET /api/clients/:id
  * @desc Récupérer un client spécifique
  * @access Private (Admin ou le client lui-même)

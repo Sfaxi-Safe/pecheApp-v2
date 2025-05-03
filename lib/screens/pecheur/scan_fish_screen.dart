@@ -3,23 +3,50 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:seatrace/services/fish_recognition_service.dart';
 import 'package:seatrace/screens/pecheur/fish_details_screen.dart';
+import 'package:seatrace/utils/animation_service.dart';
+import 'package:seatrace/utils/responsive_service.dart';
+import 'package:seatrace/utils/navigation_service.dart';
+import 'package:seatrace/widgets/sea_widgets.dart';
 
 class ScanFishScreen extends StatefulWidget {
   const ScanFishScreen({Key? key}) : super(key: key);
 
   @override
-  _ScanFishScreenState createState() => _ScanFishScreenState();
+  State<ScanFishScreen> createState() => _ScanFishScreenState();
 }
 
-class _ScanFishScreenState extends State<ScanFishScreen> {
+class _ScanFishScreenState extends State<ScanFishScreen> with SingleTickerProviderStateMixin {
   File? _imageFile;
   bool _isAnalyzing = false;
   String? _errorMessage;
   bool _useOnlineApi = true; // Par défaut, utiliser l'API en ligne
   final FishRecognitionService _recognitionService = FishRecognitionService();
+  final AnimationService _animationService = AnimationService();
+  final ResponsiveService _responsiveService = ResponsiveService();
+  final NavigationService _navigationService = NavigationService();
+  
+  late AnimationController _animationController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
 
   @override
   void dispose() {
+    _animationController.dispose();
     _recognitionService.dispose();
     super.dispose();
   }
@@ -59,26 +86,41 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
       _recognitionService.setPreferOnlineRecognition(_useOnlineApi);
 
       // Afficher un message indiquant la méthode utilisée
-      final String methodMessage =
-          _useOnlineApi
-              ? 'Analyse avec Google Cloud Vision API...'
-              : 'Analyse avec le modèle local...';
+      final String methodMessage = _useOnlineApi
+          ? 'Analyse avec Google Cloud Vision API...'
+          : 'Analyse avec le modèle local...';
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(methodMessage)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(methodMessage),
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      );
 
       final espece = await _recognitionService.recognizeFish(_imageFile!);
 
       if (!mounted) return;
 
       if (espece != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder:
-                (_) =>
-                    FishDetailsScreen(imageFile: _imageFile!, espece: espece),
-          ),
+        _navigationService.navigateToWithSlideUp(
+          context,
+          FishDetailsScreen(imageFile: _imageFile!, espece: espece),
         );
       } else {
         setState(() {
@@ -96,208 +138,232 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final isPhone = _responsiveService.isPhone(context);
+    
     return Scaffold(
-      appBar: AppBar(title: const Text('Scanner un poisson')),
+      appBar: AppBar(
+        title: const Text('Scanner un poisson'),
+        elevation: 0,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: _responsiveService.adaptivePadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+            children: _animationService.staggeredList([
               // Instructions
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Comment scanner un poisson',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildInstructionStep(
-                        context,
-                        number: '1',
-                        title: 'Prendre une photo',
-                        description:
-                            'Prenez une photo claire du poisson ou importez-en une depuis votre galerie.',
-                      ),
-                      const SizedBox(height: 12),
-                      _buildInstructionStep(
-                        context,
-                        number: '2',
-                        title: 'Analyser',
-                        description:
-                            'Notre IA identifiera automatiquement l\'espèce de poisson.',
-                      ),
-                      const SizedBox(height: 12),
-                      _buildInstructionStep(
-                        context,
-                        number: '3',
-                        title: 'Ajouter les détails',
-                        description:
-                            'Complétez les informations sur votre capture pour l\'enregistrer.',
-                      ),
-                    ],
-                  ),
+              SeaCard(
+                title: 'Comment scanner un poisson',
+                icon: Icons.help_outline,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInstructionStep(
+                      context,
+                      number: '1',
+                      title: 'Prendre une photo',
+                      description: 'Prenez une photo claire du poisson ou importez-en une depuis votre galerie.',
+                      icon: Icons.camera_alt,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildInstructionStep(
+                      context,
+                      number: '2',
+                      title: 'Analyser',
+                      description: 'Notre IA identifiera automatiquement l\'espèce de poisson.',
+                      icon: Icons.search,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildInstructionStep(
+                      context,
+                      number: '3',
+                      title: 'Ajouter les détails',
+                      description: 'Complétez les informations sur votre capture pour l\'enregistrer.',
+                      icon: Icons.edit_note,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 24),
 
               // Image preview
-              Container(
-                height: 300,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child:
-                    _imageFile != null
-                        ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(
-                            _imageFile!,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
+              SeaCard(
+                title: 'Image du poisson',
+                icon: Icons.image,
+                actionIcon: _imageFile != null ? Icons.delete : null,
+                onActionPressed: _imageFile != null ? () {
+                  setState(() {
+                    _imageFile = null;
+                    _errorMessage = null;
+                  });
+                } : null,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      height: 300,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: theme.dividerTheme.color ?? Colors.grey.withValues(alpha: 0.2)),
+                      ),
+                      child: _imageFile != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                _imageFile!,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                              ),
+                            )
+                          : AnimatedBuilder(
+                              animation: _pulseAnimation,
+                              builder: (context, child) {
+                                return Transform.scale(
+                                  scale: _pulseAnimation.value,
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: primaryColor.withValues(alpha: 0.1),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            Icons.camera_alt,
+                                            size: 48,
+                                            color: primaryColor,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Aucune image sélectionnée',
+                                          style: theme.textTheme.titleMedium?.copyWith(
+                                            color: theme.textTheme.bodySmall?.color,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Prenez une photo ou importez-en une',
+                                          style: theme.textTheme.bodySmall,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: 16),
+                      _animationService.shake(
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.error.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: theme.colorScheme.error.withValues(alpha: 0.3),
+                            ),
                           ),
-                        )
-                        : Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          child: Row(
                             children: [
                               Icon(
-                                Icons.image,
-                                size: 80,
-                                color: Colors.grey[400],
+                                Icons.error_outline,
+                                color: theme.colorScheme.error,
                               ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Aucune image sélectionnée',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 16,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: TextStyle(
+                                    color: theme.colorScheme.error,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-              ),
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 16),
-                Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-              const SizedBox(height: 24),
-
-              // Image source buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed:
-                          _isAnalyzing
-                              ? null
-                              : () => _getImage(ImageSource.camera),
-                      icon: const Icon(Icons.camera_alt),
-                      label: const Text('Appareil photo'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed:
-                          _isAnalyzing
-                              ? null
-                              : () => _getImage(ImageSource.gallery),
-                      icon: const Icon(Icons.photo_library),
-                      label: const Text('Galerie'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // API selection
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Méthode d\'analyse',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      SwitchListTile(
-                        title: const Text('Utiliser Google Cloud Vision API'),
-                        subtitle: Text(
-                          _useOnlineApi
-                              ? 'Analyse en ligne (plus précise, nécessite une connexion internet)'
-                              : 'Analyse locale (fonctionne hors ligne)',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        value: _useOnlineApi,
-                        onChanged: (value) {
-                          setState(() {
-                            _useOnlineApi = value;
-                          });
-                        },
-                        secondary: Icon(
-                          _useOnlineApi ? Icons.cloud : Icons.phone_android,
-                          color: Theme.of(context).primaryColor,
-                        ),
                       ),
                     ],
-                  ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Image source buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SeaButton.primary(
+                            text: 'Appareil photo',
+                            icon: Icons.camera_alt,
+                            onPressed: _isAnalyzing ? null : () => _getImage(ImageSource.camera),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: SeaButton.outline(
+                            text: 'Galerie',
+                            icon: Icons.photo_library,
+                            onPressed: _isAnalyzing ? null : () => _getImage(ImageSource.gallery),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 24),
+
+              // API selection
+              SeaCard(
+                title: 'Méthode d\'analyse',
+                icon: _useOnlineApi ? Icons.cloud : Icons.phone_android,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SwitchListTile(
+                      title: const Text('Utiliser Google Cloud Vision API'),
+                      subtitle: Text(
+                        _useOnlineApi
+                            ? 'Analyse en ligne (plus précise, nécessite une connexion internet)'
+                            : 'Analyse locale (fonctionne hors ligne)',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      value: _useOnlineApi,
+                      onChanged: (value) {
+                        setState(() {
+                          _useOnlineApi = value;
+                        });
+                      },
+                      secondary: Icon(
+                        _useOnlineApi ? Icons.cloud : Icons.phone_android,
+                        color: primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Note: L\'analyse en ligne offre une meilleure précision mais nécessite une connexion internet. L\'analyse locale fonctionne hors ligne mais peut être moins précise.',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
 
               // Analyze button
-              ElevatedButton(
-                onPressed: _isAnalyzing ? null : _analyzeImage,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Theme.of(context).primaryColor,
-                ),
-                child:
-                    _isAnalyzing
-                        ? Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            ),
-                            SizedBox(width: 12),
-                            Text('Analyse en cours...'),
-                          ],
-                        )
-                        : const Text('Analyser l\'image'),
+              const SizedBox(height: 16),
+              SeaButton.primary(
+                text: _isAnalyzing ? 'Analyse en cours...' : 'Analyser l\'image',
+                icon: _isAnalyzing ? null : Icons.search,
+                onPressed: _isAnalyzing || _imageFile == null ? null : _analyzeImage,
+                isLoading: _isAnalyzing,
+                width: double.infinity,
+                size: SeaButtonSize.large,
               ),
-            ],
+            ]),
           ),
         ),
       ),
@@ -309,23 +375,32 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
     required String number,
     required String title,
     required String description,
+    required IconData icon,
   }) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 28,
-          height: 28,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            color: Theme.of(context).primaryColor,
+            color: primaryColor.withValues(alpha: 0.1),
             shape: BoxShape.circle,
+            border: Border.all(
+              color: primaryColor.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
           ),
           child: Center(
             child: Text(
               number,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: primaryColor,
                 fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
             ),
           ),
@@ -335,15 +410,29 @@ class _ScanFishScreenState extends State<ScanFishScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+              Row(
+                children: [
+                  Icon(
+                    icon,
+                    size: 16,
+                    color: primaryColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 4),
-              Text(description, style: TextStyle(color: Colors.grey[600])),
+              Text(
+                description,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.textTheme.bodySmall?.color,
+                ),
+              ),
             ],
           ),
         ),
