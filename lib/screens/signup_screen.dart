@@ -4,6 +4,7 @@ import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/screens/login_screen.dart';
 import 'package:seatrace/utils/validators.dart';
 import 'package:seatrace/widgets/password_strength_indicator.dart';
+import 'package:seatrace/widgets/sea_widgets.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -504,22 +505,12 @@ class SignupScreenState extends State<SignupScreen> {
                       const SizedBox(height: 24),
 
                       // Submit button
-                      ElevatedButton(
+                      CustomButton.filled(
+                        text: 'Créer un compte',
                         onPressed: _isLoading ? null : _signup,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child:
-                            _isLoading
-                                ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                                : const Text('Créer un compte'),
+                        isLoading: _isLoading,
+                        size: CustomButtonSize.large,
+                        width: double.infinity,
                       ),
 
                       const SizedBox(height: 16),
@@ -529,7 +520,9 @@ class SignupScreenState extends State<SignupScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Text('Vous avez déjà un compte?'),
-                          TextButton(
+                          const SizedBox(width: 8),
+                          CustomButton.text(
+                            text: 'Se connecter',
                             onPressed: () {
                               Navigator.of(context).pushReplacement(
                                 MaterialPageRoute(
@@ -537,7 +530,7 @@ class SignupScreenState extends State<SignupScreen> {
                                 ),
                               );
                             },
-                            child: const Text('Se connecter'),
+                            size: CustomButtonSize.small,
                           ),
                         ],
                       ),
@@ -547,7 +540,9 @@ class SignupScreenState extends State<SignupScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Text('Mot de passe oublié?'),
-                          TextButton(
+                          const SizedBox(width: 8),
+                          CustomButton.text(
+                            text: 'Réinitialiser',
                             onPressed: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -555,7 +550,7 @@ class SignupScreenState extends State<SignupScreen> {
                                 ),
                               );
                             },
-                            child: const Text('Réinitialiser'),
+                            size: CustomButtonSize.small,
                           ),
                         ],
                       ),
@@ -705,31 +700,19 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ),
                         const SizedBox(height: 24),
                       ],
-                      ElevatedButton(
+                      CustomButton.filled(
+                        text: 'Envoyer le lien de réinitialisation',
                         onPressed: _isLoading ? null : _resetPassword,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child:
-                            _isLoading
-                                ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                                : const Text(
-                                  'Envoyer le lien de réinitialisation',
-                                ),
+                        isLoading: _isLoading,
+                        size: CustomButtonSize.large,
+                        width: double.infinity,
                       ),
                       const SizedBox(height: 16),
-                      TextButton(
+                      CustomButton.text(
+                        text: 'Retour à la connexion',
                         onPressed: () {
                           Navigator.of(context).pop();
                         },
-                        child: const Text('Retour à la connexion'),
                       ),
                     ],
                   ),

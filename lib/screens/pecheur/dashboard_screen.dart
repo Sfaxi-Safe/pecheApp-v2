@@ -51,21 +51,74 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
     });
 
     try {
+      // Récupérer l'utilisateur connecté
       final user = await AuthService().getCurrentUser();
       if (user == null) {
         throw Exception('Utilisateur non connecté');
       }
 
+      // Log pour déboguer
+      ErrorHandler.instance.logInfo(
+        'Utilisateur récupéré: id=${user.id}, nom=${user.nom}, prenom=${user.prenom}',
+        context: 'PecheurDashboardScreen._loadUserData',
+      );
+
       // Charger les détails du pêcheur
       final userData = await ApiService.instance.getPecheurDetails(user.id);
 
+      // Log pour déboguer
+      ErrorHandler.instance.logInfo(
+        'Détails pêcheur: ${userData.toString()}',
+        context: 'PecheurDashboardScreen._loadUserData',
+      );
+
+      // Créer un objet utilisateur complet en combinant les données de base et les détails
+      String userName = '${user.prenom} ${user.nom}';
+      String userPhoto = user.photo ?? '';
+      String userTelephone = user.telephone ?? '';
+      String userBateau = '';
+      String userPort = '';
+      String userMatricule = '';
+
+      // Mettre à jour les informations de base si elles sont disponibles dans les détails
+      if (userData['prenom'] != null &&
+          userData['prenom'].toString().isNotEmpty &&
+          userData['nom'] != null &&
+          userData['nom'].toString().isNotEmpty) {
+        userName = '${userData['prenom']} ${userData['nom']}';
+      }
+
+      if (userData['photo'] != null &&
+          userData['photo'].toString().isNotEmpty) {
+        userPhoto = userData['photo'];
+      }
+
+      if (userData['telephone'] != null &&
+          userData['telephone'].toString().isNotEmpty) {
+        userTelephone = userData['telephone'];
+      }
+
+      // Récupérer les informations spécifiques au pêcheur
+      if (userData['bateau'] != null) {
+        userBateau = userData['bateau'].toString();
+      }
+
+      if (userData['port'] != null) {
+        userPort = userData['port'].toString();
+      }
+
+      if (userData['matricule'] != null) {
+        userMatricule = userData['matricule'].toString();
+      }
+
+      // Mettre à jour l'état avec les informations complètes
       setState(() {
-        _userName = '${userData['prenom']} ${userData['nom']}';
-        _userPhoto = userData['photo'] ?? '';
-        _userTelephone = userData['telephone'] ?? '';
-        _userBateau = userData['bateau'] ?? '';
-        _userPort = userData['port'] ?? '';
-        _userMatricule = userData['matricule'] ?? '';
+        _userName = userName;
+        _userPhoto = userPhoto;
+        _userTelephone = userTelephone;
+        _userBateau = userBateau;
+        _userPort = userPort;
+        _userMatricule = userMatricule;
       });
 
       // Charger les statistiques
@@ -82,6 +135,26 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
       // Charger les captures récentes
       _loadRecentCaptures(user.id);
     } catch (e) {
+      ErrorHandler.instance.logError(
+        e,
+        context: 'PecheurDashboardScreen._loadUserData',
+      );
+
+      // En cas d'erreur, essayer de récupérer au moins les informations de base de l'utilisateur
+      try {
+        final user = await AuthService().getCurrentUser();
+        if (user != null) {
+          setState(() {
+            _userName = '${user.prenom} ${user.nom}';
+            _userPhoto = user.photo ?? '';
+            _userTelephone = user.telephone ?? '';
+            _isLoading = false;
+          });
+        }
+      } catch (secondError) {
+        debugPrint('Erreur secondaire: $secondError');
+      }
+
       setState(() {
         _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
         _isLoading = false;

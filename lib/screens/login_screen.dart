@@ -8,6 +8,7 @@ import 'package:seatrace/screens/signup_screen.dart';
 import 'package:seatrace/utils/validators.dart';
 import 'package:seatrace/utils/error_handler.dart';
 import 'package:seatrace/widgets/error_display.dart';
+import 'package:seatrace/widgets/sea_widgets.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -291,32 +292,12 @@ class LoginScreenState extends State<LoginScreen> {
                             const SizedBox(height: 24),
 
                             // Login button
-                            ElevatedButton(
+                            CustomButton.filled(
+                              text: 'Se connecter',
                               onPressed: _isLoading ? null : _login,
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                disabledBackgroundColor: primaryColor
-                                    .withOpacity(0.6),
-                              ),
-                              child:
-                                  _isLoading
-                                      ? const SizedBox(
-                                        height: 24,
-                                        width: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                      : const Text(
-                                        'Se connecter',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                              isLoading: _isLoading,
+                              size: CustomButtonSize.large,
+                              width: double.infinity,
                             ),
 
                             const SizedBox(height: 16),
@@ -334,7 +315,9 @@ class LoginScreenState extends State<LoginScreen> {
                                         ).textTheme.bodySmall?.color,
                                   ),
                                 ),
-                                TextButton(
+                                const SizedBox(width: 8),
+                                CustomButton.text(
+                                  text: 'Créer un compte',
                                   onPressed: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
@@ -342,12 +325,7 @@ class LoginScreenState extends State<LoginScreen> {
                                       ),
                                     );
                                   },
-                                  child: const Text(
-                                    'Créer un compte',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                  size: CustomButtonSize.small,
                                 ),
                               ],
                             ),

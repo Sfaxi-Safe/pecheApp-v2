@@ -346,50 +346,79 @@ const getProfile = async (req, res, next) => {
     // Utiliser l'ID personnalisé s'il existe, sinon utiliser l'ID MongoDB
     const userId = user.id || user._id.toString();
 
-    // Construire l'objet de réponse de base
+    // Récupérer les détails complets de l'utilisateur selon son type
+    let detailedUser = null;
+
+    try {
+      if (userType === 'pecheur') {
+        detailedUser = await Pecheur.findById(user._id);
+      } else if (userType === 'veterinaire') {
+        detailedUser = await Veterinaire.findById(user._id);
+      } else if (userType === 'maryeur') {
+        detailedUser = await Maryeur.findById(user._id);
+      } else if (userType === 'client') {
+        detailedUser = await Client.findById(user._id);
+      } else if (userType === 'admin') {
+        detailedUser = await Admin.findById(user._id);
+      }
+    } catch (error) {
+      console.log(`[${new Date().toISOString()}] WARN [AUTH] Erreur lors de la récupération des détails utilisateur: ${error.message}`);
+    }
+
+    // Utiliser les détails récupérés ou les informations de base si non disponibles
+    const userToUse = detailedUser || user;
+
+    // Construire l'objet de réponse de base avec des valeurs par défaut pour les champs null
     const userProfile = {
       id: userId,
-      email: user.email,
-      roles: user.roles,
-      nom: user.nom,
-      prenom: user.prenom,
-      telephone: user.telephone,
-      photo: user.photo,
+      email: userToUse.email || '',
+      roles: userToUse.roles || '',
+      nom: userToUse.nom || '',
+      prenom: userToUse.prenom || '',
+      telephone: userToUse.telephone || '',
+      photo: userToUse.photo || '',
       userType: userType,
-      isValidated: user.isValidated || user.isValid || false,
-      isBlocked: user.isBlocked || false
+      isValidated: userToUse.isValidated || userToUse.isValid || false,
+      isBlocked: userToUse.isBlocked || false
     };
 
     // Ajouter des champs spécifiques selon le type d'utilisateur
     if (userType === 'pecheur') {
-      userProfile.cin = user.cin;
-      userProfile.matricule = user.matricule;
-      userProfile.bateau = user.bateau;
-      userProfile.pays = user.pays;
-      userProfile.port = user.port;
-      userProfile.capacite = user.capacite;
+      userProfile.cin = userToUse.cin || '';
+      userProfile.matricule = userToUse.matricule || '';
+      userProfile.bateau = userToUse.bateau || '';
+      userProfile.pays = userToUse.pays || '';
+      userProfile.port = userToUse.port || '';
+      userProfile.capacite = userToUse.capacite || '';
     } else if (userType === 'veterinaire') {
-      userProfile.cin = user.cin;
-      userProfile.specialite = user.specialite;
-      userProfile.certification = user.certification;
-      userProfile.matricule = user.matricule;
-      userProfile.port = user.port;
+      userProfile.cin = userToUse.cin || '';
+      userProfile.specialite = userToUse.specialite || '';
+      userProfile.licence = userToUse.licence || '';
+      userProfile.matricule = userToUse.matricule || '';
+      userProfile.etablissement = userToUse.etablissement || '';
     } else if (userType === 'maryeur') {
-      userProfile.cin = user.cin;
-      userProfile.matricule = user.matricule;
-      userProfile.port = user.port;
-      userProfile.pays = user.pays;
-      userProfile.signature = user.signature;
+      userProfile.cin = userToUse.cin || '';
+      userProfile.matricule = userToUse.matricule || '';
+      userProfile.port = userToUse.port || '';
+      userProfile.pays = userToUse.pays || '';
+      userProfile.societe = userToUse.societe || '';
+      userProfile.registre = userToUse.registre || '';
+      userProfile.adresse = userToUse.adresse || '';
     } else if (userType === 'client') {
-      userProfile.service = user.service;
-      userProfile.fonction = user.fonction;
+      userProfile.service = userToUse.service || '';
+      userProfile.fonction = userToUse.fonction || '';
+      userProfile.adresse = userToUse.adresse || '';
     }
+
+    // Journaliser les informations renvoyées
+    console.log(`[${new Date().toISOString()}] INFO [AUTH] Profil utilisateur récupéré: ${userProfile.prenom} ${userProfile.nom} (${userType})`);
 
     res.json({
       success: true,
       user: userProfile
     });
   } catch (error) {
+    console.log(`[${new Date().toISOString()}] ERROR [AUTH] Erreur lors de la récupération du profil: ${error.message}`);
     next(error);
   }
 };

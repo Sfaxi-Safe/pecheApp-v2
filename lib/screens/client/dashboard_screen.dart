@@ -49,20 +49,69 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
     });
 
     try {
+      // Récupérer l'utilisateur connecté
       final user = await AuthService().getCurrentUser();
       if (user == null) {
         throw Exception('Utilisateur non connecté');
       }
 
+      // Log pour déboguer
+      ErrorHandler.instance.logInfo(
+        'Utilisateur récupéré: id=${user.id}, nom=${user.nom}, prenom=${user.prenom}',
+        context: 'ClientDashboardScreen._loadUserData',
+      );
+
       // Charger les détails du client
       final userData = await ApiService.instance.getClientDetails(user.id);
 
+      // Log pour déboguer
+      ErrorHandler.instance.logInfo(
+        'Détails client: ${userData.toString()}',
+        context: 'ClientDashboardScreen._loadUserData',
+      );
+
+      // Créer un objet utilisateur complet en combinant les données de base et les détails
+      String userName = '${user.prenom} ${user.nom}';
+      String userPhoto = user.photo ?? '';
+      String userTelephone = user.telephone ?? '';
+      String userEmail = user.email;
+      String userAdresse = '';
+
+      // Mettre à jour les informations de base si elles sont disponibles dans les détails
+      if (userData['prenom'] != null &&
+          userData['prenom'].toString().isNotEmpty &&
+          userData['nom'] != null &&
+          userData['nom'].toString().isNotEmpty) {
+        userName = '${userData['prenom']} ${userData['nom']}';
+      }
+
+      if (userData['photo'] != null &&
+          userData['photo'].toString().isNotEmpty) {
+        userPhoto = userData['photo'];
+      }
+
+      if (userData['telephone'] != null &&
+          userData['telephone'].toString().isNotEmpty) {
+        userTelephone = userData['telephone'];
+      }
+
+      if (userData['email'] != null &&
+          userData['email'].toString().isNotEmpty) {
+        userEmail = userData['email'];
+      }
+
+      // Récupérer les informations spécifiques au client
+      if (userData['adresse'] != null) {
+        userAdresse = userData['adresse'].toString();
+      }
+
+      // Mettre à jour l'état avec les informations complètes
       setState(() {
-        _userName = '${userData['prenom']} ${userData['nom']}';
-        _userPhoto = userData['photo'] ?? '';
-        _userTelephone = userData['telephone'] ?? '';
-        _userEmail = userData['email'] ?? '';
-        _userAdresse = userData['adresse'] ?? '';
+        _userName = userName;
+        _userPhoto = userPhoto;
+        _userTelephone = userTelephone;
+        _userEmail = userEmail;
+        _userAdresse = userAdresse;
       });
 
       // Charger les statistiques
@@ -77,6 +126,22 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
       // Charger les enchères en vedette (données réelles depuis l'API)
       await _loadFeaturedAuctions();
     } catch (e) {
+      // En cas d'erreur, essayer de récupérer au moins les informations de base de l'utilisateur
+      try {
+        final user = await AuthService().getCurrentUser();
+        if (user != null) {
+          setState(() {
+            _userName = '${user.prenom} ${user.nom}';
+            _userPhoto = user.photo ?? '';
+            _userTelephone = user.telephone ?? '';
+            _userEmail = user.email;
+            _isLoading = false;
+          });
+        }
+      } catch (secondError) {
+        debugPrint('Erreur secondaire: $secondError');
+      }
+
       setState(() {
         _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
         _isLoading = false;
@@ -189,8 +254,6 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
     final isPhone = _responsiveService.isPhone(context);
 
     return Scaffold(

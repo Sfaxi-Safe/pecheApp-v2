@@ -10,6 +10,7 @@ import 'package:seatrace/utils/responsive_service.dart';
 import 'package:seatrace/screens/login_screen.dart';
 import 'package:seatrace/widgets/sea_widgets.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as path;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -71,6 +72,12 @@ class ProfileScreenState extends State<ProfileScreen> {
         throw Exception('Utilisateur non connecté');
       }
 
+      // Log pour déboguer
+      debugPrint(
+        'Utilisateur récupéré: id=${user.id}, nom=${user.nom}, prenom=${user.prenom}, telephone=${user.telephone}',
+      );
+
+      // Déterminer le type d'utilisateur et récupérer les détails
       Map<String, dynamic>? userData;
 
       if (user.isPecheur()) {
@@ -90,20 +97,101 @@ class ProfileScreenState extends State<ProfileScreen> {
         _userType = 'Client';
       }
 
-      // Utiliser une variable locale pour éviter les problèmes de null-safety
-      final Map<String, dynamic> data = userData!;
+      // Log pour déboguer
+      debugPrint('Détails utilisateur: ${userData.toString()}');
+
+      // Créer un objet utilisateur complet en combinant les données de base et les détails
+      final Map<String, dynamic> completeUserData = {
+        'id': user.id,
+        'nom': user.nom,
+        'prenom': user.prenom,
+        'telephone': user.telephone,
+        'photo': user.photo,
+        'email': user.email,
+      };
+
+      // Ajouter les détails supplémentaires s'ils existent
+      if (userData != null) {
+        // Mettre à jour les informations de base si elles sont disponibles dans les détails
+        if (userData['nom'] != null && userData['nom'].toString().isNotEmpty) {
+          completeUserData['nom'] = userData['nom'];
+        }
+        if (userData['prenom'] != null &&
+            userData['prenom'].toString().isNotEmpty) {
+          completeUserData['prenom'] = userData['prenom'];
+        }
+        if (userData['telephone'] != null &&
+            userData['telephone'].toString().isNotEmpty) {
+          completeUserData['telephone'] = userData['telephone'];
+        }
+        if (userData['photo'] != null &&
+            userData['photo'].toString().isNotEmpty) {
+          completeUserData['photo'] = userData['photo'];
+        }
+        if (userData['email'] != null &&
+            userData['email'].toString().isNotEmpty) {
+          completeUserData['email'] = userData['email'];
+        }
+
+        // Ajouter les champs spécifiques au type d'utilisateur
+        if (user.isPecheur()) {
+          completeUserData['matricule'] = userData['matricule'];
+          completeUserData['bateau'] = userData['bateau'];
+          completeUserData['port'] = userData['port'];
+          completeUserData['cin'] = userData['cin'];
+        } else if (user.isMaryeur()) {
+          completeUserData['societe'] = userData['societe'];
+          completeUserData['registre'] = userData['registre'];
+          completeUserData['adresse'] = userData['adresse'];
+        } else if (user.isVeterinaire()) {
+          completeUserData['specialite'] = userData['specialite'];
+          completeUserData['licence'] = userData['licence'];
+          completeUserData['adresse'] = userData['adresse'];
+        } else if (user.isClient()) {
+          completeUserData['adresse'] = userData['adresse'];
+        }
+      }
+
+      debugPrint('Données utilisateur complètes: $completeUserData');
 
       setState(() {
-        _userData = data;
-
-        // Accéder aux propriétés de manière sécurisée
-        _nomController.text = (data['nom'] ?? '').toString();
-        _prenomController.text = (data['prenom'] ?? '').toString();
-        _telephoneController.text = (data['telephone'] ?? '').toString();
-        _photoPath = data['photo']?.toString();
+        _userData = completeUserData;
+        _nomController.text = completeUserData['nom'] ?? '';
+        _prenomController.text = completeUserData['prenom'] ?? '';
+        _telephoneController.text =
+            completeUserData['telephone']?.toString() ?? '';
+        _photoPath = completeUserData['photo']?.toString();
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('Erreur lors du chargement des données utilisateur: $e');
+
+      // Essayer de récupérer les données de base de l'utilisateur
+      try {
+        final user = await AuthService().getCurrentUser();
+        if (user != null) {
+          setState(() {
+            _userData = {
+              'id': user.id,
+              'nom': user.nom,
+              'prenom': user.prenom,
+              'telephone': user.telephone,
+              'photo': user.photo,
+              'email': user.email,
+            };
+
+            _nomController.text = user.nom;
+            _prenomController.text = user.prenom;
+            _telephoneController.text = user.telephone ?? '';
+            _photoPath = user.photo;
+            _isLoading = false;
+          });
+          return;
+        }
+      } catch (secondError) {
+        debugPrint('Erreur secondaire: $secondError');
+      }
+
       setState(() {
         _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
         _isLoading = false;
@@ -115,58 +203,148 @@ class ProfileScreenState extends State<ProfileScreen> {
     try {
       setState(() {
         _isUploadingPhoto = true;
+        _errorMessage = null;
+        _successMessage = null;
       });
 
+      // Sélectionner l'image
       final picker = ImagePicker();
       final pickedFile = await picker.pickImage(
         source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 80,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+        requestFullMetadata:
+            false, // Réduire les métadonnées pour alléger le fichier
       );
 
-      if (pickedFile != null) {
-        // Télécharger l'image sur le serveur
-        final imageFile = File(pickedFile.path);
-        final imageUrl = await ImageService.instance.uploadImage(imageFile);
-
-        if (imageUrl == null) {
-          throw Exception('Échec du téléchargement de l\'image');
-        }
-
-        // Mettre à jour le chemin de la photo dans la base de données
-        final user = await AuthService().getCurrentUser();
-        if (user == null) {
-          throw Exception('Utilisateur non connecté');
-        }
-
-        final updatedData = {'id': user.id, 'photo': imageUrl};
-
-        String endpoint = '';
-        if (user.isPecheur()) {
-          endpoint = 'pecheurs/${user.id}';
-        } else if (user.isVeterinaire()) {
-          endpoint = 'veterinaires/${user.id}';
-        } else if (user.isMaryeur()) {
-          endpoint = 'maryeurs/${user.id}';
-        } else if (user.roles.contains('ROLE_ADMIN')) {
-          endpoint = 'admins/${user.id}';
-        } else {
-          endpoint = 'clients/${user.id}';
-        }
-        await ApiService.instance.patch(endpoint, updatedData);
-
-        // Rafraîchir les données utilisateur
-        await _loadUserData();
-
+      if (pickedFile == null) {
+        // L'utilisateur a annulé la sélection
+        debugPrint('Sélection d\'image annulée par l\'utilisateur');
         setState(() {
-          _successMessage = 'Photo de profil mise à jour avec succès';
+          _isUploadingPhoto = false;
         });
+        return;
       }
-    } catch (e) {
+
+      // Vérifier l'extension du fichier
+      final ext = path.extension(pickedFile.path).toLowerCase();
+      final validExtensions = [
+        '.jpg',
+        '.jpeg',
+        '.png',
+        '.gif',
+        '.webp',
+        '.heic',
+      ];
+      if (!validExtensions.contains(ext)) {
+        debugPrint('Extension de fichier non supportée: $ext');
+        setState(() {
+          _errorMessage =
+              'Format d\'image non supporté. Utilisez JPG, PNG, GIF ou WebP.';
+          _isUploadingPhoto = false;
+        });
+        return;
+      }
+
+      // Vérifier si l'utilisateur est connecté
+      final user = await AuthService().getCurrentUser();
+      if (user == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      // Préparer le fichier image
+      final imageFile = File(pickedFile.path);
+      debugPrint('Image sélectionnée: ${imageFile.path}');
+
+      // Vérifier la taille du fichier
+      final fileSize = await imageFile.length();
+      debugPrint('Taille de l\'image: ${fileSize / 1024} KB');
+
+      // Télécharger l'image sur le serveur avec gestion des erreurs
+      debugPrint('Début du téléchargement de l\'image...');
+
+      // Afficher un message de progression
       setState(() {
-        _errorMessage =
-            'Erreur lors de la mise à jour de la photo: ${e.toString()}';
+        _successMessage = 'Téléchargement en cours...';
+      });
+
+      final imageUrl = await ImageService.instance.uploadImage(imageFile);
+
+      if (imageUrl == null) {
+        throw Exception('Échec du téléchargement de l\'image');
+      }
+
+      debugPrint('Image téléchargée avec succès: $imageUrl');
+
+      // Afficher un message de progression
+      setState(() {
+        _successMessage = 'Mise à jour du profil...';
+      });
+
+      // Déterminer l'endpoint en fonction du type d'utilisateur
+      String endpoint = '';
+      if (user.isPecheur()) {
+        endpoint = 'pecheurs/${user.id}';
+      } else if (user.isVeterinaire()) {
+        endpoint = 'veterinaires/${user.id}';
+      } else if (user.isMaryeur()) {
+        endpoint = 'maryeurs/${user.id}';
+      } else if (user.roles.contains('ROLE_ADMIN')) {
+        endpoint = 'admins/${user.id}';
+      } else {
+        endpoint = 'clients/${user.id}';
+      }
+
+      debugPrint('Mise à jour du profil utilisateur: $endpoint');
+
+      // Mettre à jour le chemin de la photo dans la base de données
+      final updatedData = {'id': user.id, 'photo': imageUrl};
+      final response = await ApiService.instance.patch(endpoint, updatedData);
+
+      debugPrint('Réponse de mise à jour du profil: $response');
+
+      // Mettre à jour les données de l'utilisateur en session
+      final updatedUser = await AuthService().refreshCurrentUser();
+      debugPrint('Utilisateur mis à jour: ${updatedUser?.photo}');
+
+      // Rafraîchir les données utilisateur
+      await _loadUserData();
+
+      setState(() {
+        _successMessage = 'Photo de profil mise à jour avec succès';
+      });
+    } catch (e) {
+      debugPrint('Erreur lors de la mise à jour de la photo: $e');
+
+      // Message d'erreur plus convivial
+      String errorMessage = 'Erreur lors de la mise à jour de la photo';
+
+      if (e.toString().contains('taille')) {
+        errorMessage = 'La taille de l\'image est trop grande. Maximum 5 MB.';
+      } else if (e.toString().contains('connexion') ||
+          e.toString().contains('network') ||
+          e.toString().contains('timeout')) {
+        errorMessage =
+            'Problème de connexion au serveur. Vérifiez votre connexion internet.';
+      } else if (e.toString().contains('format') ||
+          e.toString().contains('extension') ||
+          e.toString().contains('type')) {
+        errorMessage =
+            'Format d\'image non supporté. Utilisez JPG, PNG ou GIF.';
+      } else if (e.toString().contains('token') ||
+          e.toString().contains('authentification') ||
+          e.toString().contains('connecté')) {
+        errorMessage = 'Vous devez être connecté pour télécharger une image.';
+      } else if (e.toString().contains('permission') ||
+          e.toString().contains('accès')) {
+        errorMessage =
+            'Problème de permission. Veuillez autoriser l\'accès à la caméra et aux photos.';
+      }
+
+      setState(() {
+        _errorMessage = errorMessage;
+        _successMessage = null;
       });
     } finally {
       setState(() {
@@ -175,7 +353,31 @@ class ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _showImageSourceDialog() {
+  Future<void> _showImageSourceDialog() async {
+    // Tester la connexion au serveur avant d'afficher le dialogue
+    setState(() {
+      _isUploadingPhoto = true;
+      _errorMessage = null;
+      _successMessage = 'Vérification de la connexion...';
+    });
+
+    final isConnected = await ImageService.instance.testImageUploadConnection();
+
+    setState(() {
+      _isUploadingPhoto = false;
+      _successMessage = null;
+    });
+
+    if (!isConnected) {
+      setState(() {
+        _errorMessage =
+            'Impossible de se connecter au serveur. Vérifiez votre connexion internet.';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+
     showDialog(
       context: context,
       builder:
@@ -228,6 +430,11 @@ class ProfileScreenState extends State<ProfileScreen> {
         throw Exception('Utilisateur non connecté');
       }
 
+      // Log pour déboguer
+      debugPrint(
+        'Sauvegarde du profil: id=${user.id}, nom=${_nomController.text}, prenom=${_prenomController.text}, telephone=${_telephoneController.text}',
+      );
+
       final updatedData = {
         'id': user.id,
         'nom': _nomController.text.trim(),
@@ -248,18 +455,43 @@ class ProfileScreenState extends State<ProfileScreen> {
         endpoint = 'clients/${user.id}';
       }
 
-      await ApiService.instance.patch(endpoint, updatedData);
+      debugPrint('Endpoint pour la mise à jour: $endpoint');
+      final response = await ApiService.instance.patch(endpoint, updatedData);
+      debugPrint('Réponse de la mise à jour: $response');
 
       // Mettre à jour les données de l'utilisateur en session
-      await AuthService().refreshCurrentUser();
+      final updatedUser = await AuthService().refreshCurrentUser();
+      debugPrint(
+        'Utilisateur mis à jour: ${updatedUser?.nom} ${updatedUser?.prenom}',
+      );
+
+      // Recharger les données utilisateur pour mettre à jour l'interface
+      await _loadUserData();
 
       setState(() {
         _successMessage = 'Profil mis à jour avec succès';
         _isSaving = false;
       });
     } catch (e) {
+      debugPrint('Erreur lors de la mise à jour du profil: $e');
+
+      // Message d'erreur plus convivial
+      String errorMessage = 'Erreur lors de la mise à jour du profil';
+
+      if (e.toString().contains('connexion') ||
+          e.toString().contains('network')) {
+        errorMessage =
+            'Problème de connexion au serveur. Vérifiez votre connexion internet';
+      } else if (e.toString().contains('non trouvé') ||
+          e.toString().contains('not found')) {
+        errorMessage = 'Utilisateur non trouvé. Veuillez vous reconnecter';
+      } else if (e.toString().contains('autorisation') ||
+          e.toString().contains('authorization')) {
+        errorMessage = 'Vous n\'êtes pas autorisé à effectuer cette action';
+      }
+
       setState(() {
-        _errorMessage = 'Erreur lors de la mise à jour: ${e.toString()}';
+        _errorMessage = errorMessage;
         _isSaving = false;
       });
     }
@@ -282,6 +514,15 @@ class ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
+    // Vérifier que le nouveau mot de passe est assez long
+    if (_newPasswordController.text.length < 6) {
+      setState(() {
+        _errorMessage =
+            'Le nouveau mot de passe doit contenir au moins 6 caractères';
+      });
+      return;
+    }
+
     setState(() {
       _isChangingPassword = true;
       _errorMessage = null;
@@ -294,14 +535,20 @@ class ProfileScreenState extends State<ProfileScreen> {
         throw Exception('Utilisateur non connecté');
       }
 
-      // Vérifier l'ancien mot de passe
+      // Log pour déboguer
+      debugPrint('Changement de mot de passe pour l\'utilisateur: ${user.id}');
+
       // Mettre à jour le mot de passe via l'API
       final passwordData = {
         'currentPassword': _currentPasswordController.text,
         'newPassword': _newPasswordController.text,
       };
 
-      await ApiService.instance.patch('auth/change-password', passwordData);
+      final response = await ApiService.instance.patch(
+        'auth/change-password',
+        passwordData,
+      );
+      debugPrint('Réponse du changement de mot de passe: $response');
 
       // Effacer les champs
       _currentPasswordController.clear();
@@ -313,8 +560,26 @@ class ProfileScreenState extends State<ProfileScreen> {
         _isChangingPassword = false;
       });
     } catch (e) {
+      debugPrint('Erreur lors du changement de mot de passe: $e');
+
+      // Message d'erreur plus convivial
+      String errorMessage = 'Erreur lors du changement de mot de passe';
+
+      if (e.toString().contains('mot de passe actuel') ||
+          e.toString().contains('current password') ||
+          e.toString().contains('incorrect')) {
+        errorMessage = 'Le mot de passe actuel est incorrect';
+      } else if (e.toString().contains('connexion') ||
+          e.toString().contains('network')) {
+        errorMessage =
+            'Problème de connexion au serveur. Vérifiez votre connexion internet';
+      } else if (e.toString().contains('non trouvé') ||
+          e.toString().contains('not found')) {
+        errorMessage = 'Utilisateur non trouvé. Veuillez vous reconnecter';
+      }
+
       setState(() {
-        _errorMessage = 'Erreur: ${e.toString()}';
+        _errorMessage = errorMessage;
         _isChangingPassword = false;
       });
     }
@@ -406,6 +671,20 @@ class ProfileScreenState extends State<ProfileScreen> {
                         elevated: true,
                         child: Column(
                           children: [
+                            // Nom et prénom
+                            if (_userData != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: Text(
+                                  'Bienvenue, ${_userData!['prenom']} ${_userData!['nom']}',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+
                             // Photo de profil
                             Stack(
                               alignment: Alignment.bottomRight,
@@ -479,6 +758,31 @@ class ProfileScreenState extends State<ProfileScreen> {
                               _userData!['email'],
                               style: theme.textTheme.bodyLarge,
                             ),
+                            const SizedBox(height: 8),
+
+                            // Numéro de téléphone
+                            if (_userData != null &&
+                                _userData!['telephone'] != null &&
+                                _userData!['telephone'].toString().isNotEmpty)
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.phone,
+                                    size: 18,
+                                    color: primaryColor,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _userData!['telephone'].toString(),
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: primaryColor,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             const SizedBox(height: 12),
                             Container(
                               padding: const EdgeInsets.symmetric(

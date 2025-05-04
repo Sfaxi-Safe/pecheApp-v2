@@ -1,3 +1,5 @@
+import 'package:seatrace/utils/error_handler.dart';
+
 class User {
   final String id;
   final String email;
@@ -28,7 +30,13 @@ class User {
   });
 
   factory User.fromMap(Map<String, dynamic> map) {
-    return User(
+    // Journaliser les données reçues pour le débogage
+    ErrorHandler.instance.logInfo(
+      'Création d\'un utilisateur à partir des données: ${map.toString()}',
+      context: 'User.fromMap',
+    );
+
+    final user = User(
       id: map['_id']?.toString() ?? map['id']?.toString() ?? '',
       email: map['email'] ?? '',
       roles: map['roles'] ?? '',
@@ -42,6 +50,16 @@ class User {
       isValidated: map['isValidated'] ?? map['isValid'] ?? false,
       isBlocked: map['isBlocked'] ?? false,
     );
+
+    // Vérifier si les informations essentielles sont présentes
+    if (user.nom.isEmpty || user.prenom.isEmpty) {
+      ErrorHandler.instance.logWarning(
+        'Utilisateur créé avec des informations incomplètes: nom=${user.nom}, prenom=${user.prenom}',
+        context: 'User.fromMap',
+      );
+    }
+
+    return user;
   }
 
   Map<String, dynamic> toMap() {

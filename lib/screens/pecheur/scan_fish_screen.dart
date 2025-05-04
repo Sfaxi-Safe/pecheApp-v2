@@ -315,24 +315,28 @@ class _ScanFishScreenState extends State<ScanFishScreen>
                     Row(
                       children: [
                         Expanded(
-                          child: SeaButton.primary(
+                          child: CustomButton.filled(
                             text: 'Appareil photo',
                             icon: Icons.camera_alt,
                             onPressed:
                                 _isAnalyzing
                                     ? null
                                     : () => _getImage(ImageSource.camera),
+                            isLoading: false,
+                            color: theme.primaryColor,
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: SeaButton.outline(
+                          child: CustomButton.outline(
                             text: 'Galerie',
                             icon: Icons.photo_library,
                             onPressed:
                                 _isAnalyzing
                                     ? null
                                     : () => _getImage(ImageSource.gallery),
+                            isLoading: false,
+                            color: theme.primaryColor,
                           ),
                         ),
                       ],
@@ -372,80 +376,26 @@ class _ScanFishScreenState extends State<ScanFishScreen>
                       'Note: L\'analyse en ligne offre une meilleure précision mais nécessite une connexion internet. L\'analyse locale utilise un modèle Keras entraîné sur 31 espèces de poissons méditerranéens.',
                       style: theme.textTheme.bodySmall,
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Espèces reconnues par le modèle local:',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children:
-                          [
-                                'baliste',
-                                'bou kachech',
-                                'boumessk',
-                                'bouri',
-                                'calamr',
-                                'chevrette',
-                                'choubay',
-                                'crevettes',
-                                'djej',
-                                'espadon',
-                                'far bhar',
-                                'ghzel',
-                                'jaghali',
-                                'kalb bhar',
-                                'karnit',
-                                'karous',
-                                'karradh',
-                                'khadhraya',
-                                'mankous',
-                                'mannani',
-                                'mbellem',
-                                'meeza',
-                                'morjan',
-                                'msalla',
-                                'sardouk',
-                                'sbares',
-                                'scorpaena',
-                                'serdina',
-                                'thon',
-                                'trillia',
-                                'wrata',
-                              ]
-                              .map(
-                                (espece) => Chip(
-                                  label: Text(espece),
-                                  backgroundColor: theme.colorScheme.primary
-                                      .withValues(alpha: 26),
-                                  side: BorderSide(
-                                    color: theme.colorScheme.primary.withValues(
-                                      alpha: 77,
-                                    ),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                    ),
                   ],
                 ),
               ),
 
               // Analyze button
               const SizedBox(height: 16),
-              SeaButton.primary(
-                text:
-                    _isAnalyzing ? 'Analyse en cours...' : 'Analyser l\'image',
-                icon: _isAnalyzing ? null : Icons.search,
-                onPressed:
-                    _isAnalyzing || _imageFile == null ? null : _analyzeImage,
-                isLoading: _isAnalyzing,
+              SizedBox(
                 width: double.infinity,
-                size: SeaButtonSize.large,
+                child: CustomButton.filled(
+                  text:
+                      _isAnalyzing
+                          ? 'Analyse en cours...'
+                          : 'Analyser l\'image',
+                  icon: _isAnalyzing ? null : Icons.search,
+                  onPressed:
+                      _isAnalyzing || _imageFile == null ? null : _analyzeImage,
+                  isLoading: _isAnalyzing,
+                  color: theme.primaryColor,
+                  size: CustomButtonSize.large,
+                ),
               ),
             ]),
           ),

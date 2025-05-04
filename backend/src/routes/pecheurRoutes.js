@@ -82,8 +82,32 @@ router.get('/:id', async (req, res, next) => {
       return res.error('Pêcheur non trouvé', 404);
     }
 
-    res.success(pecheur, 'Pêcheur récupéré avec succès');
+    // Créer un objet de réponse avec des valeurs par défaut pour les champs null
+    const pecheurResponse = {
+      id: pecheur.id || pecheur._id.toString(),
+      email: pecheur.email || '',
+      roles: pecheur.roles || 'ROLE_PECHEUR',
+      nom: pecheur.nom || '',
+      prenom: pecheur.prenom || '',
+      telephone: pecheur.telephone || '',
+      photo: pecheur.photo || '',
+      cin: pecheur.cin || '',
+      matricule: pecheur.matricule || '',
+      bateau: pecheur.bateau || '',
+      port: pecheur.port || '',
+      pays: pecheur.pays || '',
+      capacite: pecheur.capacite || '',
+      isValidated: pecheur.isValidated || pecheur.isValid || false,
+      isBlocked: pecheur.isBlocked || false,
+      prises: pecheur.prises || []
+    };
+
+    // Journaliser les informations renvoyées
+    console.log(`[${new Date().toISOString()}] INFO [PECHEUR] Détails pêcheur récupérés: ${pecheurResponse.prenom} ${pecheurResponse.nom} (ID: ${pecheurResponse.id})`);
+
+    res.success(pecheurResponse, 'Pêcheur récupéré avec succès');
   } catch (error) {
+    console.log(`[${new Date().toISOString()}] ERROR [PECHEUR] Erreur lors de la récupération du pêcheur: ${error.message}`);
     next(error);
   }
 });

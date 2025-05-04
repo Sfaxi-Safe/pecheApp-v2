@@ -85,7 +85,16 @@ class ApiService {
         if (endpoint.contains('search') ||
             endpoint.contains('available') ||
             endpoint.contains('featured') ||
-            endpoint.contains('purchases/me')) {
+            endpoint.contains('purchases/me') ||
+            endpoint == 'maryeurs' ||
+            endpoint.startsWith('maryeurs/')) {
+          debugPrint(
+            'Route non trouvée mais retournant un résultat vide: $endpoint',
+          );
+
+          // Ne pas retourner de mareyeur par défaut, laisser l'erreur se propager
+          // pour que l'application puisse afficher un message approprié
+
           return {'success': true, 'data': []};
         }
       }
@@ -583,32 +592,150 @@ class ApiService {
 
   Future<Map<String, dynamic>> getMaryeurDetails(dynamic maryeurId) async {
     try {
+      debugPrint('Récupération des détails du mareyeur avec ID: $maryeurId');
+
+      // Afficher l'URL complète pour le débogage
+      final fullUrl = '$baseUrl/maryeurs/$maryeurId';
+      debugPrint('URL complète: $fullUrl');
+
       final response = await get('maryeurs/$maryeurId');
-      // Conserver les valeurs réelles même si elles sont null
-      if (response['photo'] == null) response['photo'] = '';
-      if (response['email'] == null) response['email'] = '';
-      if (response['telephone'] == null) response['telephone'] = '';
-      if (response['societe'] == null) response['societe'] = '';
-      if (response['registre'] == null) response['registre'] = '';
-      if (response['adresse'] == null) response['adresse'] = '';
-      return response;
+
+      // Afficher la réponse complète pour le débogage
+      debugPrint('Réponse brute: ${response.toString()}');
+
+      // Vérifier si la réponse est valide
+      if (response.containsKey('nom') && response.containsKey('prenom')) {
+        debugPrint('Mareyeur trouvé: ${response['prenom']} ${response['nom']}');
+
+        // Conserver les valeurs réelles même si elles sont null
+        if (response['photo'] == null) response['photo'] = '';
+        if (response['email'] == null) response['email'] = '';
+        if (response['telephone'] == null) response['telephone'] = '';
+        if (response['societe'] == null) response['societe'] = '';
+        if (response['registre'] == null) response['registre'] = '';
+        if (response['adresse'] == null) response['adresse'] = '';
+
+        // Vérifier si le mareyeur est validé
+        final isValidated = response['isValidated'];
+        final isBlocked = response['isBlocked'];
+
+        debugPrint('Mareyeur validé: $isValidated, bloqué: $isBlocked');
+
+        return response;
+      } else {
+        // Si la réponse ne contient pas les champs attendus, essayer de l'extraire d'un champ 'data'
+        if (response.containsKey('data') &&
+            response['data'] is Map<String, dynamic>) {
+          final data = response['data'] as Map<String, dynamic>;
+
+          if (data.containsKey('nom') && data.containsKey('prenom')) {
+            debugPrint(
+              'Mareyeur trouvé dans le champ data: ${data['prenom']} ${data['nom']}',
+            );
+
+            // Conserver les valeurs réelles même si elles sont null
+            if (data['photo'] == null) data['photo'] = '';
+            if (data['email'] == null) data['email'] = '';
+            if (data['telephone'] == null) data['telephone'] = '';
+            if (data['societe'] == null) data['societe'] = '';
+            if (data['registre'] == null) data['registre'] = '';
+            if (data['adresse'] == null) data['adresse'] = '';
+
+            return data;
+          }
+        }
+
+        debugPrint('Mareyeur non trouvé dans la réponse');
+        throw Exception('Mareyeur non trouvé');
+      }
     } catch (e) {
       ErrorHandler.instance.logError(
         e,
         context: 'ApiService.getMaryeurDetails',
       );
-      // Retourner des données par défaut en cas d'erreur
-      return {
-        'id': maryeurId,
-        'nom': 'Utilisateur',
-        'prenom': 'Inconnu',
-        'photo': '',
-        'email': '',
-        'telephone': '',
-        'societe': '',
-        'registre': '',
-        'adresse': '',
-      };
+      debugPrint('Erreur lors de la récupération des détails du mareyeur: $e');
+
+      // Propager l'erreur au lieu de retourner un mareyeur par défaut
+      throw AppError(
+        message: 'Mareyeur non trouvé ou erreur de connexion',
+        type: ErrorType.notFound,
+        originalError: e,
+      );
+    }
+  }
+
+  // La méthode getDefaultMaryeur a été supprimée car elle n'est plus nécessaire
+
+  /// Récupère la liste de tous les mareyeurs actifs (validés et non bloqués)
+  Future<List<Map<String, dynamic>>> getAllMaryeurs() async {
+    try {
+      debugPrint('Récupération de la liste des mareyeurs actifs');
+
+      // Afficher l'URL complète pour le débogage
+      final fullUrl = '$baseUrl/maryeurs';
+      debugPrint('URL complète: $fullUrl');
+
+      final response = await get('maryeurs');
+
+      // Vérifier si la réponse contient directement les mareyeurs ou s'ils sont dans un champ 'data'
+      List<dynamic> maryeurs = [];
+
+      if (response.containsKey('data')) {
+        // Si la réponse contient un champ 'data', l'utiliser
+        final data = response['data'];
+        if (data is List) {
+          maryeurs = data;
+          debugPrint(
+            'Mareyeurs trouvés dans le champ data: ${maryeurs.length}',
+          );
+        }
+      } else if (response.containsKey('nom') &&
+          response.containsKey('prenom')) {
+        // Si la réponse ressemble à un seul mareyeur
+        maryeurs = [response];
+        debugPrint('Un seul mareyeur trouvé dans la réponse');
+      }
+
+      // Vérifier que chaque mareyeur a un nom et un prénom et est validé et non bloqué
+      final validMaryeurs =
+          maryeurs.where((maryeur) {
+            if (maryeur is! Map) return false;
+
+            final nom = maryeur['nom'];
+            final prenom = maryeur['prenom'];
+            final isValidated = maryeur['isValidated'];
+            final isBlocked = maryeur['isBlocked'];
+
+            return nom != null &&
+                nom.toString().isNotEmpty &&
+                prenom != null &&
+                prenom.toString().isNotEmpty &&
+                (isValidated == true || isValidated == 'true') &&
+                (isBlocked == false || isBlocked == 'false');
+          }).toList();
+
+      debugPrint(
+        'Nombre de mareyeurs actifs valides récupérés: ${validMaryeurs.length}',
+      );
+
+      // Afficher les détails des mareyeurs valides pour le débogage
+      for (var maryeur in validMaryeurs) {
+        debugPrint(
+          'Mareyeur valide trouvé: ${maryeur['prenom']} ${maryeur['nom']} (ID: ${maryeur['_id'] ?? maryeur['id']})',
+        );
+      }
+
+      return List<Map<String, dynamic>>.from(validMaryeurs);
+    } catch (e) {
+      ErrorHandler.instance.logError(e, context: 'ApiService.getAllMaryeurs');
+      debugPrint('Erreur lors de la récupération des mareyeurs: $e');
+
+      // Propager l'erreur au lieu de retourner une liste vide
+      throw AppError(
+        message: 'Erreur lors de la récupération des mareyeurs',
+        type: ErrorType.network,
+        originalError: e,
+      );
     }
   }
 
@@ -935,15 +1062,40 @@ class ApiService {
   }
 
   // Méthode pour construire l'URL complète d'une image
-  String getImageUrl(String imagePath) {
+  String getImageUrl(String? imagePath) {
+    // Si le chemin est null ou vide, retourner une chaîne vide
+    if (imagePath == null || imagePath.isEmpty) {
+      debugPrint('Chemin d\'image vide ou null');
+      return '';
+    }
+
     // Si le chemin commence déjà par http, c'est une URL complète
     if (imagePath.startsWith('http')) {
+      debugPrint('URL d\'image déjà complète: $imagePath');
       return imagePath;
     }
 
-    // Sinon, construire l'URL complète
+    // Si le chemin commence par /api/images, construire l'URL complète
+    if (imagePath.startsWith('/api/images/')) {
+      final baseUrlWithoutApi = baseUrl.split('/api').first;
+      final fullUrl = '$baseUrlWithoutApi$imagePath';
+      debugPrint('URL d\'image construite (chemin API): $fullUrl');
+      return fullUrl;
+    }
+
+    // Si le chemin commence par /api/, construire l'URL complète
+    if (imagePath.startsWith('/api/')) {
+      final baseUrlWithoutApi = baseUrl.split('/api').first;
+      final fullUrl = '$baseUrlWithoutApi$imagePath';
+      debugPrint('URL d\'image construite (chemin API): $fullUrl');
+      return fullUrl;
+    }
+
+    // Sinon, construire l'URL complète en supposant que c'est un nom de fichier
     // Supprimer le slash initial si présent pour éviter les doubles slashes
     final path = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
-    return '$baseUrl/images/$path';
+    final fullUrl = '$baseUrl/images/$path';
+    debugPrint('URL d\'image construite (nom de fichier): $fullUrl');
+    return fullUrl;
   }
 }

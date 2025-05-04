@@ -125,8 +125,28 @@ router.get('/:id', auth, async (req, res, next) => {
       throw new ForbiddenError('Vous n\'êtes pas autorisé à accéder à ce profil');
     }
 
-    res.success(client, 'Client récupéré avec succès');
+    // Créer un objet de réponse avec des valeurs par défaut pour les champs null
+    const clientResponse = {
+      id: client.id || client._id.toString(),
+      email: client.email || '',
+      roles: client.roles || 'ROLE_CLIENT',
+      nom: client.nom || '',
+      prenom: client.prenom || '',
+      telephone: client.telephone || '',
+      photo: client.photo || '',
+      adresse: client.adresse || '',
+      service: client.service || '',
+      fonction: client.fonction || '',
+      isValidated: client.isValidated || client.isValid || false,
+      isBlocked: client.isBlocked || false
+    };
+
+    // Journaliser les informations renvoyées
+    console.log(`[${new Date().toISOString()}] INFO [CLIENT] Détails client récupérés: ${clientResponse.prenom} ${clientResponse.nom} (ID: ${clientResponse.id})`);
+
+    res.success(clientResponse, 'Client récupéré avec succès');
   } catch (error) {
+    console.log(`[${new Date().toISOString()}] ERROR [CLIENT] Erreur lors de la récupération du client: ${error.message}`);
     next(error);
   }
 });

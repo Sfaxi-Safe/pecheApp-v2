@@ -82,8 +82,31 @@ router.get('/:id', async (req, res, next) => {
       return res.error('Vétérinaire non trouvé', 404);
     }
 
-    res.success(veterinaire, 'Vétérinaire récupéré avec succès');
+    // Créer un objet de réponse avec des valeurs par défaut pour les champs null
+    const veterinaireResponse = {
+      id: veterinaire.id || veterinaire._id.toString(),
+      email: veterinaire.email || '',
+      roles: veterinaire.roles || 'ROLE_VETERINAIRE',
+      nom: veterinaire.nom || '',
+      prenom: veterinaire.prenom || '',
+      telephone: veterinaire.telephone || '',
+      photo: veterinaire.photo || '',
+      cin: veterinaire.cin || '',
+      specialite: veterinaire.specialite || '',
+      licence: veterinaire.licence || '',
+      matricule: veterinaire.matricule || '',
+      etablissement: veterinaire.etablissement || '',
+      adresse: veterinaire.adresse || '',
+      isValidated: veterinaire.isValidated || veterinaire.isValid || false,
+      isBlocked: veterinaire.isBlocked || false
+    };
+
+    // Journaliser les informations renvoyées
+    console.log(`[${new Date().toISOString()}] INFO [VETERINAIRE] Détails vétérinaire récupérés: ${veterinaireResponse.prenom} ${veterinaireResponse.nom} (ID: ${veterinaireResponse.id})`);
+
+    res.success(veterinaireResponse, 'Vétérinaire récupéré avec succès');
   } catch (error) {
+    console.log(`[${new Date().toISOString()}] ERROR [VETERINAIRE] Erreur lors de la récupération du vétérinaire: ${error.message}`);
     next(error);
   }
 });

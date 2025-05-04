@@ -49,8 +49,40 @@ app.use(standardizeBooleans);
 const { connectDB } = require('./config/database');
 connectDB();
 
+// Vérifier et créer le dossier d'uploads si nécessaire
+const path = require('path');
+const fs = require('fs');
+const uploadsDir = path.join(__dirname, '../uploads');
+
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    console.log(`Création du dossier d'uploads depuis index.js: ${uploadsDir}`);
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    // Définir les permissions (0755 = rwxr-xr-x)
+    fs.chmodSync(uploadsDir, 0o755);
+    console.log(`Dossier d'uploads créé avec succès avec les permissions 0755`);
+  } else {
+    // Vérifier les permissions
+    try {
+      const stats = fs.statSync(uploadsDir);
+      const currentPermissions = stats.mode & 0o777; // Masque pour obtenir uniquement les permissions
+      console.log(`Permissions actuelles du dossier d'uploads: ${currentPermissions.toString(8)}`);
+
+      // Si les permissions ne sont pas suffisantes, les mettre à jour
+      if (currentPermissions !== 0o755) {
+        fs.chmodSync(uploadsDir, 0o755);
+        console.log(`Permissions du dossier d'uploads mises à jour à 0755`);
+      }
+    } catch (error) {
+      console.error(`Erreur lors de la vérification des permissions:`, error);
+    }
+  }
+} catch (error) {
+  console.error('Erreur lors de la création du dossier d\'uploads:', error);
+}
+
 // Servir les fichiers statiques
-app.use('/uploads', express.static(require('path').join(__dirname, '../uploads')));
+app.use('/uploads', express.static(uploadsDir));
 
 // Routes API
 app.use('/api/admins', adminRoutes);

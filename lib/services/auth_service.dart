@@ -32,7 +32,27 @@ class AuthService {
       final response = await ApiService.instance.get('auth/me');
 
       if (response.containsKey('user')) {
-        return User.fromMap(response['user']);
+        final user = User.fromMap(response['user']);
+
+        // Vérifier si les informations de base sont présentes
+        if (user.nom.isEmpty || user.prenom.isEmpty) {
+          ErrorHandler.instance.logWarning(
+            'Informations utilisateur incomplètes: nom=${user.nom}, prenom=${user.prenom}',
+            context: 'AuthService.getCurrentUser',
+          );
+        } else {
+          ErrorHandler.instance.logInfo(
+            'Utilisateur récupéré avec succès: ${user.prenom} ${user.nom}',
+            context: 'AuthService.getCurrentUser',
+          );
+        }
+
+        return user;
+      } else {
+        ErrorHandler.instance.logWarning(
+          'Réponse API sans utilisateur: ${response.toString()}',
+          context: 'AuthService.getCurrentUser',
+        );
       }
     } on AppError catch (e) {
       // Si c'est une erreur d'authentification, déconnecter l'utilisateur

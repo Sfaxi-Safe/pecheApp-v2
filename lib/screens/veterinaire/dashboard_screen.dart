@@ -8,6 +8,7 @@ import 'package:seatrace/screens/lot_details_screen.dart';
 import 'package:seatrace/utils/animation_service.dart';
 import 'package:seatrace/utils/responsive_service.dart';
 import 'package:seatrace/utils/navigation_service.dart';
+import 'package:seatrace/utils/error_handler.dart';
 import 'package:seatrace/widgets/sea_widgets.dart';
 import 'package:seatrace/widgets/sea_filter_bar.dart';
 import 'package:intl/intl.dart';
@@ -120,21 +121,74 @@ class _VeterinaireDashboardScreenState
     });
 
     try {
+      // Récupérer l'utilisateur connecté
       final user = await AuthService().getCurrentUser();
       if (user == null) {
         throw Exception('Utilisateur non connecté');
       }
 
+      // Log pour déboguer
+      ErrorHandler.instance.logInfo(
+        'Utilisateur récupéré: id=${user.id}, nom=${user.nom}, prenom=${user.prenom}',
+        context: 'VeterinaireDashboardScreen._loadUserData',
+      );
+
       // Charger les détails du vétérinaire
       final userData = await ApiService.instance.getVeterinaireDetails(user.id);
 
+      // Log pour déboguer
+      ErrorHandler.instance.logInfo(
+        'Détails vétérinaire: ${userData.toString()}',
+        context: 'VeterinaireDashboardScreen._loadUserData',
+      );
+
+      // Créer un objet utilisateur complet en combinant les données de base et les détails
+      String userName = '${user.prenom} ${user.nom}';
+      String userPhoto = user.photo ?? '';
+      String userTelephone = user.telephone ?? '';
+      String userSpecialite = '';
+      String userLicence = '';
+      String userEtablissement = '';
+
+      // Mettre à jour les informations de base si elles sont disponibles dans les détails
+      if (userData['prenom'] != null &&
+          userData['prenom'].toString().isNotEmpty &&
+          userData['nom'] != null &&
+          userData['nom'].toString().isNotEmpty) {
+        userName = '${userData['prenom']} ${userData['nom']}';
+      }
+
+      if (userData['photo'] != null &&
+          userData['photo'].toString().isNotEmpty) {
+        userPhoto = userData['photo'];
+      }
+
+      if (userData['telephone'] != null &&
+          userData['telephone'].toString().isNotEmpty) {
+        userTelephone = userData['telephone'];
+      }
+
+      // Récupérer les informations spécifiques au vétérinaire
+      if (userData['specialite'] != null) {
+        userSpecialite = userData['specialite'].toString();
+      }
+
+      if (userData['licence'] != null) {
+        userLicence = userData['licence'].toString();
+      }
+
+      if (userData['etablissement'] != null) {
+        userEtablissement = userData['etablissement'].toString();
+      }
+
+      // Mettre à jour l'état avec les informations complètes
       setState(() {
-        _userName = '${userData['prenom']} ${userData['nom']}';
-        _userPhoto = userData['photo'] ?? '';
-        _userTelephone = userData['telephone'] ?? '';
-        _userSpecialite = userData['specialite'] ?? '';
-        _userLicence = userData['licence'] ?? '';
-        _userEtablissement = userData['etablissement'] ?? '';
+        _userName = userName;
+        _userPhoto = userPhoto;
+        _userTelephone = userTelephone;
+        _userSpecialite = userSpecialite;
+        _userLicence = userLicence;
+        _userEtablissement = userEtablissement;
       });
 
       // Charger les statistiques et les activités récentes
@@ -177,6 +231,21 @@ class _VeterinaireDashboardScreenState
         _isLoading = false;
       });
     } catch (e) {
+      // En cas d'erreur, essayer de récupérer au moins les informations de base de l'utilisateur
+      try {
+        final user = await AuthService().getCurrentUser();
+        if (user != null) {
+          setState(() {
+            _userName = '${user.prenom} ${user.nom}';
+            _userPhoto = user.photo ?? '';
+            _userTelephone = user.telephone ?? '';
+            _isLoading = false;
+          });
+        }
+      } catch (secondError) {
+        debugPrint('Erreur secondaire: $secondError');
+      }
+
       setState(() {
         _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
         _isLoading = false;

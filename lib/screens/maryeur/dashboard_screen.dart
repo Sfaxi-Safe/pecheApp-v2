@@ -9,6 +9,7 @@ import 'package:seatrace/screens/lot_details_screen.dart';
 import 'package:seatrace/utils/animation_service.dart';
 import 'package:seatrace/utils/responsive_service.dart';
 import 'package:seatrace/utils/navigation_service.dart';
+import 'package:seatrace/utils/error_handler.dart';
 import 'package:seatrace/widgets/sea_widgets.dart';
 import 'package:seatrace/widgets/sea_filter_bar.dart';
 import 'package:intl/intl.dart';
@@ -126,21 +127,74 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
     });
 
     try {
+      // Récupérer l'utilisateur connecté
       final user = await AuthService().getCurrentUser();
       if (user == null) {
         throw Exception('Utilisateur non connecté');
       }
 
+      // Log pour déboguer
+      ErrorHandler.instance.logInfo(
+        'Utilisateur récupéré: id=${user.id}, nom=${user.nom}, prenom=${user.prenom}',
+        context: 'MaryeurDashboardScreen._loadUserData',
+      );
+
       // Charger les détails du maryeur
       final userData = await ApiService.instance.getMaryeurDetails(user.id);
 
+      // Log pour déboguer
+      ErrorHandler.instance.logInfo(
+        'Détails maryeur: ${userData.toString()}',
+        context: 'MaryeurDashboardScreen._loadUserData',
+      );
+
+      // Créer un objet utilisateur complet en combinant les données de base et les détails
+      String userName = '${user.prenom} ${user.nom}';
+      String userPhoto = user.photo ?? '';
+      String userTelephone = user.telephone ?? '';
+      String userSociete = '';
+      String userRegistre = '';
+      String userAdresse = '';
+
+      // Mettre à jour les informations de base si elles sont disponibles dans les détails
+      if (userData['prenom'] != null &&
+          userData['prenom'].toString().isNotEmpty &&
+          userData['nom'] != null &&
+          userData['nom'].toString().isNotEmpty) {
+        userName = '${userData['prenom']} ${userData['nom']}';
+      }
+
+      if (userData['photo'] != null &&
+          userData['photo'].toString().isNotEmpty) {
+        userPhoto = userData['photo'];
+      }
+
+      if (userData['telephone'] != null &&
+          userData['telephone'].toString().isNotEmpty) {
+        userTelephone = userData['telephone'];
+      }
+
+      // Récupérer les informations spécifiques au mareyeur
+      if (userData['societe'] != null) {
+        userSociete = userData['societe'].toString();
+      }
+
+      if (userData['registre'] != null) {
+        userRegistre = userData['registre'].toString();
+      }
+
+      if (userData['adresse'] != null) {
+        userAdresse = userData['adresse'].toString();
+      }
+
+      // Mettre à jour l'état avec les informations complètes
       setState(() {
-        _userName = '${userData['prenom']} ${userData['nom']}';
-        _userPhoto = userData['photo'] ?? '';
-        _userTelephone = userData['telephone'] ?? '';
-        _userSociete = userData['societe'] ?? '';
-        _userRegistre = userData['registre'] ?? '';
-        _userAdresse = userData['adresse'] ?? '';
+        _userName = userName;
+        _userPhoto = userPhoto;
+        _userTelephone = userTelephone;
+        _userSociete = userSociete;
+        _userRegistre = userRegistre;
+        _userAdresse = userAdresse;
       });
 
       // Charger les statistiques
@@ -172,6 +226,21 @@ class _MaryeurDashboardScreenState extends State<MaryeurDashboardScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      // En cas d'erreur, essayer de récupérer au moins les informations de base de l'utilisateur
+      try {
+        final user = await AuthService().getCurrentUser();
+        if (user != null) {
+          setState(() {
+            _userName = '${user.prenom} ${user.nom}';
+            _userPhoto = user.photo ?? '';
+            _userTelephone = user.telephone ?? '';
+            _isLoading = false;
+          });
+        }
+      } catch (secondError) {
+        debugPrint('Erreur secondaire: $secondError');
+      }
+
       setState(() {
         _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
         _isLoading = false;

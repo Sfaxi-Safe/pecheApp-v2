@@ -9,12 +9,20 @@ const { auth, checkRole } = require('../middleware/auth');
 
 /**
  * @route GET /api/maryeurs
- * @desc Récupérer tous les mareyeurs
+ * @desc Récupérer tous les mareyeurs actifs (validés et non bloqués)
  * @access Public
  */
 router.get('/', async (req, res, next) => {
   try {
-    const maryeurs = await Maryeur.find();
+    // Par défaut, ne récupérer que les mareyeurs validés et non bloqués
+    let filter = { isValidated: true, isBlocked: false };
+
+    // Si le paramètre all=true est fourni et que l'utilisateur est admin, récupérer tous les mareyeurs
+    if (req.query.all === 'true' && req.user && req.user.isAdmin()) {
+      filter = {};
+    }
+
+    const maryeurs = await Maryeur.find(filter);
     res.success(maryeurs, 'Liste des mareyeurs récupérée avec succès');
   } catch (error) {
     next(error);
@@ -82,8 +90,32 @@ router.get('/:id', async (req, res, next) => {
       return res.error('Mareyeur non trouvé', 404);
     }
 
-    res.success(maryeur, 'Mareyeur récupéré avec succès');
+    // Créer un objet de réponse avec des valeurs par défaut pour les champs null
+    const maryeurResponse = {
+      id: maryeur.id || maryeur._id.toString(),
+      email: maryeur.email || '',
+      roles: maryeur.roles || 'ROLE_MARYEUR',
+      nom: maryeur.nom || '',
+      prenom: maryeur.prenom || '',
+      telephone: maryeur.telephone || '',
+      photo: maryeur.photo || '',
+      societe: maryeur.societe || '',
+      registre: maryeur.registre || '',
+      adresse: maryeur.adresse || '',
+      cin: maryeur.cin || '',
+      matricule: maryeur.matricule || '',
+      port: maryeur.port || '',
+      pays: maryeur.pays || '',
+      isValidated: maryeur.isValidated || maryeur.isValid || false,
+      isBlocked: maryeur.isBlocked || false
+    };
+
+    // Journaliser les informations renvoyées
+    console.log(`[${new Date().toISOString()}] INFO [MARYEUR] Détails mareyeur récupérés: ${maryeurResponse.prenom} ${maryeurResponse.nom} (ID: ${maryeurResponse.id})`);
+
+    res.success(maryeurResponse, 'Mareyeur récupéré avec succès');
   } catch (error) {
+    console.log(`[${new Date().toISOString()}] ERROR [MARYEUR] Erreur lors de la récupération du mareyeur: ${error.message}`);
     next(error);
   }
 });
