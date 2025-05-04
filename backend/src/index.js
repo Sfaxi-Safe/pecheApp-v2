@@ -81,7 +81,10 @@ app.use(errorHandler);
 
 // Utiliser le port configuré dans .env ou 3005 par défaut
 const PORT = 3005; // Fixer le port à 3005 pour éviter les changements
-console.log('Port utilisé pour le serveur:', PORT);
-app.listen(PORT, () => {
-  console.log(`Serveur démarré sur le port ${PORT}`);
+const HOST = '0.0.0.0'; // Écouter sur toutes les interfaces réseau
+console.log(`Port utilisé pour le serveur: ${PORT}`);
+console.log(`Adresse d'écoute: ${HOST} (toutes les interfaces réseau)`);
+app.listen(PORT, HOST, () => {
+  console.log(`Serveur démarré sur http://${HOST}:${PORT}`);
+  console.log(`Pour accéder au serveur depuis d'autres appareils, utilisez l'adresse IP de cet ordinateur`);
 });

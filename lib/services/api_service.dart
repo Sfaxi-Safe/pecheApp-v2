@@ -12,12 +12,25 @@ import '../services/dto_service.dart';
 
 class ApiService {
   static final ApiService instance = ApiService._init();
-  // Utilisez l'adresse IP de votre ordinateur au lieu de localhost pour les appareils physiques
-  // Pour les émulateurs Android, utilisez 10.0.2.2 au lieu de localhost
-  final String baseUrl = 'http://10.0.2.2:3005/api';
+  // URL de l'API
+  late String baseUrl;
   String? _authToken;
 
-  ApiService._init();
+  // Constructeur privé qui initialise l'URL de l'API
+  ApiService._init() {
+    // Adresse IP de votre ordinateur pour les tests sur appareil physique
+    const String physicalDeviceUrl =
+        'http://192.168.3.233:3005/api'; // Adresse IP de votre carte Wi-Fi
+    const String emulatorUrl = 'http://10.0.2.2:3005/api';
+
+    // Utilisez l'URL appropriée selon le contexte
+    // Décommentez la ligne ci-dessous pour utiliser l'émulateur
+    // baseUrl = emulatorUrl;
+
+    // Décommentez la ligne ci-dessous pour utiliser un appareil physique
+    baseUrl =
+        physicalDeviceUrl; // ⚠️ N'oubliez pas de remplacer X par votre adresse IP
+  }
 
   void setAuthToken(String? token) {
     _authToken = token;
