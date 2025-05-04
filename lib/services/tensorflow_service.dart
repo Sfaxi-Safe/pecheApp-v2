@@ -5,6 +5,8 @@ import 'package:path/path.dart' as path;
 import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
+import 'package:seatrace/models/fish_classification_result.dart';
+import 'package:seatrace/config/fish_species_config.dart';
 
 /// Service pour l'intégration du modèle TensorFlow Lite
 class TensorFlowService {
@@ -42,10 +44,7 @@ class TensorFlowService {
       }
 
       // Charger le modèle
-      _interpreter = await Interpreter.fromFile(
-        File(modelPath),
-        options: options,
-      );
+      _interpreter = Interpreter.fromFile(File(modelPath), options: options);
 
       _isInitialized = true;
       debugPrint('Modèle TensorFlow initialisé avec succès');
@@ -56,10 +55,7 @@ class TensorFlowService {
       try {
         final modelPath = await _getModelPath();
         final options = InterpreterOptions();
-        _interpreter = await Interpreter.fromFile(
-          File(modelPath),
-          options: options,
-        );
+        _interpreter = Interpreter.fromFile(File(modelPath), options: options);
         _isInitialized = true;
         debugPrint('Modèle initialisé avec CPU seulement');
       } catch (e) {
@@ -121,6 +117,9 @@ class TensorFlowService {
               return line;
             }).toList();
 
+        // Enrichir les labels avec les espèces supplémentaires
+        _enrichLabels();
+
         debugPrint('Labels chargés: ${_labels!.length} espèces');
       } else {
         throw Exception('Fichier de labels non trouvé');
@@ -131,6 +130,25 @@ class TensorFlowService {
     }
   }
 
+  /// Enrichit les labels avec les espèces supplémentaires
+  void _enrichLabels() {
+    if (_labels == null) return;
+
+    // Créer un ensemble pour éviter les doublons
+    final Set<String> uniqueLabels = Set.from(_labels!);
+
+    // Ajouter les espèces méditerranéennes
+    uniqueLabels.addAll(FishSpeciesConfig.mediterraneanSpecies);
+
+    // Ajouter les espèces supplémentaires
+    uniqueLabels.addAll(FishSpeciesConfig.additionalSpecies);
+
+    // Mettre à jour les labels
+    _labels = uniqueLabels.toList()..sort();
+
+    debugPrint('Labels enrichis: ${_labels!.length} espèces au total');
+  }
+
   /// Obtient le chemin du modèle
   Future<String> _getModelPath() async {
     final appDir = await getApplicationDocumentsDirectory();
@@ -138,7 +156,7 @@ class TensorFlowService {
   }
 
   /// Prédit l'espèce de poisson à partir d'une image
-  Future<Map<String, dynamic>> predictFish(File imageFile) async {
+  Future<FishClassificationResult> predictFish(File imageFile) async {
     await initialize();
 
     if (_interpreter == null) {
@@ -165,26 +183,43 @@ class TensorFlowService {
       // Traiter les résultats
       final result = outputBuffer[0];
 
-      // Trouver l'indice de la classe avec la plus haute probabilité
-      int maxIndex = 0;
-      double maxProb = result[0];
+      // Créer une liste de résultats triés par confiance
+      final List<FishClassificationResult> allResults = [];
 
-      for (int i = 1; i < result.length; i++) {
-        if (result[i] > maxProb) {
-          maxProb = result[i];
-          maxIndex = i;
+      for (int i = 0; i < result.length; i++) {
+        if (i < _labels!.length) {
+          allResults.add(
+            FishClassificationResult(
+              espece: _labels![i],
+              confiance: result[i],
+              source: 'TensorFlow',
+            ),
+          );
         }
       }
 
-      // Retourner le résultat
-      return {
-        'espece': _labels![maxIndex],
-        'confiance': maxProb,
-        'resultats': Map.fromIterables(
-          _labels!,
-          result.map((prob) => prob * 100).toList(),
-        ),
-      };
+      // Trier les résultats par confiance (du plus élevé au plus bas)
+      allResults.sort((a, b) => b.confiance.compareTo(a.confiance));
+
+      // Le premier résultat est celui avec la plus haute confiance
+      final topResult = allResults.first;
+
+      // Garder les 5 meilleurs résultats comme alternatives
+      final alternatives =
+          allResults.length > 1
+              ? allResults.sublist(
+                1,
+                allResults.length > 5 ? 5 : allResults.length,
+              )
+              : <FishClassificationResult>[];
+
+      // Retourner le résultat principal avec les alternatives
+      return FishClassificationResult(
+        espece: topResult.espece,
+        confiance: topResult.confiance,
+        source: 'TensorFlow',
+        alternatives: alternatives,
+      );
     } catch (e) {
       debugPrint('Erreur lors de la prédiction: $e');
       rethrow;

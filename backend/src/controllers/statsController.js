@@ -29,14 +29,14 @@ exports.getDashboardStats = async (req, res, next) => {
     // Si c'est un client, récupérer les enchères disponibles et les achats
     if (userRoles.includes('ROLE_CLIENT')) {
       // Compter les enchères disponibles
-      const availableAuctions = await Lot.countDocuments({ 
-        status: true, 
+      const availableAuctions = await Lot.countDocuments({
+        status: true,
         vendu: false,
         test: true
       });
 
       // Compter les achats du client
-      const myPurchases = await Lot.countDocuments({ 
+      const myPurchases = await Lot.countDocuments({
         acheteur: userId,
         vendu: true
       });
@@ -62,38 +62,81 @@ exports.getDashboardStats = async (req, res, next) => {
 exports.getPecheurStats = async (req, res, next) => {
   try {
     const pecheurId = req.params.id;
-    
+
     // Vérifier si l'ID est valide
-    let query = {};
+    let pecheurObjectId;
     if (mongoose.Types.ObjectId.isValid(pecheurId)) {
-      query = { pecheur: pecheurId };
+      pecheurObjectId = new mongoose.Types.ObjectId(pecheurId);
     } else {
       // Chercher le pêcheur par ID personnalisé
       const pecheur = await Pecheur.findOne({ id: pecheurId });
       if (!pecheur) {
         return res.error('Pêcheur non trouvé', 404);
       }
-      query = { pecheur: pecheur._id };
+      pecheurObjectId = pecheur._id;
     }
 
-    // Récupérer toutes les prises du pêcheur
-    const prises = await Prise.find(query);
-    
-    // Récupérer tous les lots associés à ces prises
-    const priseIds = prises.map(prise => prise._id);
-    const lots = await Lot.find({ prise: { $in: priseIds } });
+    // Utiliser une agrégation pour compter les prises
+    const prisesCount = await Prise.countDocuments({ pecheur: pecheurObjectId });
 
-    // Calculer les statistiques
-    const totalCaptures = prises.length;
-    const pendingValidation = lots.filter(lot => !lot.test).length;
-    const validated = lots.filter(lot => lot.test && lot.status).length;
-    const rejected = lots.filter(lot => lot.test && !lot.status).length;
+    // Utiliser une agrégation pour obtenir les statistiques des lots en une seule requête
+    const lotStats = await Prise.aggregate([
+      // Étape 1: Filtrer les prises du pêcheur
+      { $match: { pecheur: pecheurObjectId } },
 
+      // Étape 2: Joindre avec la collection des lots
+      { $lookup: {
+          from: 'lots',
+          localField: '_id',
+          foreignField: 'prise',
+          as: 'lots'
+      }},
+
+      // Étape 3: Dérouler les lots pour pouvoir les compter
+      { $unwind: { path: '$lots', preserveNullAndEmptyArrays: true } },
+
+      // Étape 4: Grouper et compter les différents types de lots
+      { $group: {
+          _id: null,
+          totalLots: { $sum: 1 },
+          pendingValidation: {
+            $sum: {
+              $cond: [{ $eq: ['$lots.test', false] }, 1, 0]
+            }
+          },
+          validated: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $eq: ['$lots.test', true] },
+                  { $eq: ['$lots.status', true] }
+                ]},
+                1,
+                0
+              ]
+            }
+          },
+          rejected: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $eq: ['$lots.test', true] },
+                  { $eq: ['$lots.status', false] }
+                ]},
+                1,
+                0
+              ]
+            }
+          }
+      }}
+    ]);
+
+    // Préparer les statistiques
     const stats = {
-      totalCaptures,
-      pendingValidation,
-      validated,
-      rejected
+      totalCaptures: prisesCount,
+      pendingValidation: lotStats.length > 0 ? lotStats[0].pendingValidation : 0,
+      validated: lotStats.length > 0 ? lotStats[0].validated : 0,
+      rejected: lotStats.length > 0 ? lotStats[0].rejected : 0
     };
 
     res.success(stats, 'Statistiques du pêcheur récupérées avec succès');
@@ -110,18 +153,90 @@ exports.getPecheurStats = async (req, res, next) => {
  */
 exports.getMaryeurStats = async (req, res, next) => {
   try {
-    // Récupérer tous les lots
-    const lots = await Lot.find();
-    
-    // Calculer les statistiques
-    const pendingLots = lots.filter(lot => lot.test && lot.status && !lot.prix_initial).length;
-    const activeAuctions = lots.filter(lot => lot.test && lot.status && lot.prix_initial && !lot.vendu).length;
-    const completedAuctions = lots.filter(lot => lot.test && lot.status && lot.vendu).length;
+    const maryeurId = req.params.id;
 
+    // Vérifier si l'ID est valide
+    let maryeurObjectId;
+    if (mongoose.Types.ObjectId.isValid(maryeurId)) {
+      maryeurObjectId = new mongoose.Types.ObjectId(maryeurId);
+    } else {
+      // Chercher le maryeur par ID personnalisé
+      const maryeur = await Maryeur.findOne({ id: maryeurId });
+      if (!maryeur) {
+        return res.error('Maryeur non trouvé', 404);
+      }
+      maryeurObjectId = maryeur._id;
+    }
+
+    // Utiliser une agrégation pour obtenir les statistiques en une seule requête
+    const pipeline = [
+      // Étape 1: Trouver les prises associées au maryeur
+      { $match: { maryeur: maryeurObjectId } },
+
+      // Étape 2: Joindre avec la collection des lots
+      { $lookup: {
+          from: 'lots',
+          localField: '_id',
+          foreignField: 'prise',
+          as: 'lots'
+      }},
+
+      // Étape 3: Dérouler les lots pour pouvoir les compter
+      { $unwind: { path: '$lots', preserveNullAndEmptyArrays: true } },
+
+      // Étape 4: Grouper et compter les différents types de lots
+      { $group: {
+          _id: null,
+          pendingLots: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $eq: ['$lots.test', true] },
+                  { $eq: ['$lots.status', true] },
+                  { $eq: [{ $ifNull: ['$lots.prixInitial', null] }, null] }
+                ]},
+                1,
+                0
+              ]
+            }
+          },
+          activeAuctions: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $eq: ['$lots.test', true] },
+                  { $eq: ['$lots.status', true] },
+                  { $ne: [{ $ifNull: ['$lots.prixInitial', null] }, null] },
+                  { $eq: ['$lots.vendu', false] }
+                ]},
+                1,
+                0
+              ]
+            }
+          },
+          completedAuctions: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $eq: ['$lots.test', true] },
+                  { $eq: ['$lots.status', true] },
+                  { $eq: ['$lots.vendu', true] }
+                ]},
+                1,
+                0
+              ]
+            }
+          }
+      }}
+    ];
+
+    const results = await Prise.aggregate(pipeline);
+
+    // Préparer les statistiques
     const stats = {
-      pendingLots,
-      activeAuctions,
-      completedAuctions
+      pendingLots: results.length > 0 ? results[0].pendingLots : 0,
+      activeAuctions: results.length > 0 ? results[0].activeAuctions : 0,
+      completedAuctions: results.length > 0 ? results[0].completedAuctions : 0
     };
 
     res.success(stats, 'Statistiques du maryeur récupérées avec succès');

@@ -61,6 +61,16 @@ const lotSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Ajouter des index pour améliorer les performances des requêtes
+lotSchema.index({ veterinaire: 1 });
+lotSchema.index({ prise: 1 });
+lotSchema.index({ espece: 1 });
+lotSchema.index({ acheteur: 1 });
+lotSchema.index({ test: 1, status: 1 });
+lotSchema.index({ vendu: 1 });
+lotSchema.index({ prixInitial: 1 });
+lotSchema.index({ dateSoumission: -1 });
+
 const Lot = mongoose.model('Lot', lotSchema);
 
 module.exports = Lot;

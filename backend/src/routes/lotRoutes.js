@@ -118,13 +118,23 @@ router.get('/featured', async (req, res, next) => {
     };
 
     // Limiter à 5 lots maximum, triés par date de soumission (les plus récents d'abord)
-    const lots = await Lot.find(filter)
+    const lots = await Lot.find(filter, {
+      // Projection: sélectionner uniquement les champs nécessaires
+      identifiant: 1,
+      photo: 1,
+      prixInitial: 1,
+      prixMinimal: 1,
+      dateSoumission: 1,
+      espece: 1,
+      prise: 1,
+      veterinaire: 1
+    })
       .sort({ dateSoumission: -1 })
       .limit(5)
       .populate('espece', 'nom imageUrl')
       .populate('veterinaire', 'nom prenom')
       .populate('prise', 'nom debut fin lieu')
-      .populate('acheteur', 'nom prenom');
+      .lean(); // Convertir en objets JavaScript simples pour de meilleures performances
 
     res.success(lots, 'Liste des lots en vedette récupérée avec succès');
   } catch (error) {
@@ -134,11 +144,16 @@ router.get('/featured', async (req, res, next) => {
 
 /**
  * @route GET /api/lots/available
- * @desc Récupérer tous les lots disponibles pour enchères
+ * @desc Récupérer tous les lots disponibles pour enchères avec pagination
  * @access Public
  */
 router.get('/available', async (req, res, next) => {
   try {
+    // Récupérer les paramètres de pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
     // Récupérer les lots qui ont un prix initial, qui sont validés par un vétérinaire et qui ne sont pas vendus
     const filter = {
       prixInitial: { $exists: true, $ne: null },
@@ -147,15 +162,49 @@ router.get('/available', async (req, res, next) => {
       vendu: false
     };
 
-    // Trier par date de soumission (les plus récents d'abord)
-    const lots = await Lot.find(filter)
+    // Filtrer par espèce si spécifiée
+    if (req.query.espece) {
+      if (mongoose.Types.ObjectId.isValid(req.query.espece)) {
+        filter.espece = new mongoose.Types.ObjectId(req.query.espece);
+      }
+    }
+
+    // Compter le nombre total de lots pour la pagination
+    const total = await Lot.countDocuments(filter);
+
+    // Trier par date de soumission (les plus récents d'abord) avec pagination
+    const lots = await Lot.find(filter, {
+      // Projection: sélectionner uniquement les champs nécessaires
+      identifiant: 1,
+      photo: 1,
+      prixInitial: 1,
+      prixMinimal: 1,
+      dateSoumission: 1,
+      espece: 1,
+      prise: 1,
+      veterinaire: 1,
+      vendu: 1,
+      test: 1,
+      status: 1
+    })
       .sort({ dateSoumission: -1 })
+      .skip(skip)
+      .limit(limit)
       .populate('espece', 'nom imageUrl')
       .populate('veterinaire', 'nom prenom')
       .populate('prise', 'nom debut fin lieu')
-      .populate('acheteur', 'nom prenom');
+      .lean(); // Convertir en objets JavaScript simples pour de meilleures performances
 
-    res.success(lots, 'Liste des lots disponibles récupérée avec succès');
+    // Ajouter les informations de pagination à la réponse
+    res.success({
+      data: lots,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
+    }, 'Liste des lots disponibles récupérée avec succès');
   } catch (error) {
     next(error);
   }
@@ -363,43 +412,152 @@ router.get('/pecheur/:id', async (req, res, next) => {
 
 /**
  * @route GET /api/lots/search
- * @desc Rechercher des lots par nom d'espèce
+ * @desc Rechercher des lots par nom d'espèce avec pagination
  * @access Public
  */
 router.get('/search', async (req, res, next) => {
   try {
     const query = req.query.query;
 
+    // Récupérer les paramètres de pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
     if (!query) {
-      return res.success([], 'Aucun terme de recherche fourni');
+      return res.success({
+        data: [],
+        pagination: {
+          total: 0,
+          page,
+          limit,
+          pages: 0
+        }
+      }, 'Aucun terme de recherche fourni');
     }
 
-    // Rechercher l'espèce par nom
+    // Rechercher l'espèce par nom avec un index texte pour de meilleures performances
     const Espece = require('../models/Espece');
-    const especes = await Espece.find({
-      nom: { $regex: query, $options: 'i' }
-    });
 
-    // Récupérer les IDs des espèces trouvées
-    const especeIds = especes.map(espece => espece._id);
+    // Utiliser une agrégation pour optimiser la recherche
+    const pipeline = [
+      // Étape 1: Rechercher les espèces correspondant à la requête
+      {
+        $match: {
+          nom: { $regex: query, $options: 'i' }
+        }
+      },
 
-    // Filtrer les lots par ces espèces et qui sont disponibles pour enchères
-    const filter = {
-      espece: { $in: especeIds },
-      prixInitial: { $exists: true, $ne: null },
-      test: true,
-      status: true,
-      vendu: false
-    };
+      // Étape 2: Joindre avec la collection des lots
+      {
+        $lookup: {
+          from: 'lots',
+          localField: '_id',
+          foreignField: 'espece',
+          as: 'lots'
+        }
+      },
 
-    // Récupérer les lots correspondants
-    const lots = await Lot.find(filter)
-      .populate('espece', 'nom imageUrl')
-      .populate('veterinaire', 'nom prenom')
-      .populate('prise', 'nom debut fin lieu')
-      .populate('acheteur', 'nom prenom');
+      // Étape 3: Dérouler les lots pour pouvoir les filtrer
+      { $unwind: '$lots' },
 
-    res.success(lots, 'Résultats de recherche récupérés avec succès');
+      // Étape 4: Filtrer les lots disponibles pour enchères
+      {
+        $match: {
+          'lots.prixInitial': { $exists: true, $ne: null },
+          'lots.test': true,
+          'lots.status': true,
+          'lots.vendu': false
+        }
+      },
+
+      // Étape 5: Joindre avec les collections nécessaires
+      {
+        $lookup: {
+          from: 'veterinaires',
+          localField: 'lots.veterinaire',
+          foreignField: '_id',
+          as: 'veterinaire'
+        }
+      },
+      {
+        $lookup: {
+          from: 'prises',
+          localField: 'lots.prise',
+          foreignField: '_id',
+          as: 'prise'
+        }
+      },
+
+      // Étape 6: Restructurer les données pour la réponse
+      {
+        $project: {
+          _id: '$lots._id',
+          identifiant: '$lots.identifiant',
+          photo: '$lots.photo',
+          prixInitial: '$lots.prixInitial',
+          prixMinimal: '$lots.prixMinimal',
+          dateSoumission: '$lots.dateSoumission',
+          espece: {
+            _id: '$_id',
+            nom: '$nom',
+            imageUrl: '$imageUrl'
+          },
+          veterinaire: {
+            $cond: {
+              if: { $gt: [{ $size: '$veterinaire' }, 0] },
+              then: {
+                _id: { $arrayElemAt: ['$veterinaire._id', 0] },
+                nom: { $arrayElemAt: ['$veterinaire.nom', 0] },
+                prenom: { $arrayElemAt: ['$veterinaire.prenom', 0] }
+              },
+              else: null
+            }
+          },
+          prise: {
+            $cond: {
+              if: { $gt: [{ $size: '$prise' }, 0] },
+              then: {
+                _id: { $arrayElemAt: ['$prise._id', 0] },
+                nom: { $arrayElemAt: ['$prise.nom', 0] },
+                debut: { $arrayElemAt: ['$prise.debut', 0] },
+                fin: { $arrayElemAt: ['$prise.fin', 0] },
+                lieu: { $arrayElemAt: ['$prise.lieu', 0] }
+              },
+              else: null
+            }
+          }
+        }
+      },
+
+      // Étape 7: Trier par date de soumission (les plus récents d'abord)
+      { $sort: { dateSoumission: -1 } },
+
+      // Étape 8: Compter le nombre total de résultats
+      {
+        $facet: {
+          metadata: [{ $count: 'total' }],
+          data: [{ $skip: skip }, { $limit: limit }]
+        }
+      }
+    ];
+
+    const results = await Espece.aggregate(pipeline);
+
+    // Extraire les données et les métadonnées
+    const lots = results[0].data || [];
+    const total = results[0].metadata.length > 0 ? results[0].metadata[0].total : 0;
+
+    // Ajouter les informations de pagination à la réponse
+    res.success({
+      data: lots,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
+    }, 'Résultats de recherche récupérés avec succès');
   } catch (error) {
     next(error);
   }
@@ -1018,8 +1176,17 @@ router.put('/:id/set-price', auth, checkRole(['ROLE_MARYEUR', 'ROLE_ADMIN']), as
     const prixMinimal = parseFloat(req.body.prixMinimal);
     const prixInitial = parseFloat(req.body.prixInitial || req.body.prixMinimal);
 
+    // Validation des prix
     if (isNaN(prixMinimal) || prixMinimal <= 0) {
-      throw new BadRequestError('Prix minimal invalide');
+      throw new BadRequestError('Prix minimal invalide - doit être un nombre positif');
+    }
+
+    if (isNaN(prixInitial) || prixInitial <= 0) {
+      throw new BadRequestError('Prix initial invalide - doit être un nombre positif');
+    }
+
+    if (prixInitial < prixMinimal) {
+      throw new BadRequestError('Le prix initial ne peut pas être inférieur au prix minimal');
     }
 
     // Mettre à jour le lot

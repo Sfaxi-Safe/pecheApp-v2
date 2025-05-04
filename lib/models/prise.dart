@@ -1,6 +1,8 @@
 class Prise {
   final String id;
   final String pecheurId;
+  final String maryeurId;
+  final String? veterinaireId;
   final String date;
   final String lieu;
   final double? latitude;
@@ -12,6 +14,8 @@ class Prise {
   Prise({
     required this.id,
     required this.pecheurId,
+    required this.maryeurId,
+    this.veterinaireId,
     required this.date,
     required this.lieu,
     this.latitude,
@@ -26,6 +30,10 @@ class Prise {
       id: map['_id']?.toString() ?? map['id']?.toString() ?? '',
       pecheurId:
           map['pecheur']?.toString() ?? map['pecheurId']?.toString() ?? '',
+      maryeurId:
+          map['maryeur']?.toString() ?? map['maryeurId']?.toString() ?? '',
+      veterinaireId:
+          map['veterinaire']?.toString() ?? map['veterinaireId']?.toString(),
       date: map['date'] ?? '',
       lieu: map['lieu'] ?? '',
       latitude: _parseDouble(map['latitude']),
@@ -37,9 +45,10 @@ class Prise {
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = {
       'id': id,
       'pecheur': pecheurId,
+      'maryeur': maryeurId,
       'date': date,
       'lieu': lieu,
       'latitude': latitude,
@@ -48,6 +57,13 @@ class Prise {
       'photo': photo,
       'isValid': isValid,
     };
+
+    // Ajouter le vétérinaire seulement s'il est défini
+    if (veterinaireId != null) {
+      map['veterinaire'] = veterinaireId;
+    }
+
+    return map;
   }
 
   /// Convertit une valeur en double

@@ -46,6 +46,11 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
   // Mareyeur sélectionné
   Map<String, dynamic>? _selectedMaryeur;
 
+  // Liste des vétérinaires disponibles
+  List<Map<String, dynamic>> _veterinaires = [];
+  // Vétérinaire sélectionné
+  Map<String, dynamic>? _selectedVeterinaire;
+
   final _animationService = AnimationService();
   final _responsiveService = ResponsiveService();
   final _navigationService = NavigationService();
@@ -76,8 +81,9 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
     _zoneController.text = 'Méditerranée Nord'; // Default value
     _temperatureController.text = '4'; // Default value
 
-    // Charger la liste des mareyeurs
+    // Charger la liste des mareyeurs et des vétérinaires
     _loadMaryeurs();
+    _loadVeterinaires();
   }
 
   // Charger la liste des mareyeurs disponibles
@@ -150,7 +156,83 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
     }
   }
 
-  // La méthode _loadMaryeurDirectement a été supprimée car elle n'est plus nécessaire
+  // Charger la liste des vétérinaires disponibles
+  Future<void> _loadVeterinaires() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      debugPrint('Chargement des vétérinaires...');
+
+      // Vérifier si l'utilisateur est connecté
+      final user = await AuthService().getCurrentUser();
+      if (user == null) {
+        throw Exception('Utilisateur non connecté');
+      }
+
+      debugPrint('Utilisateur connecté: ${user.prenom} ${user.nom}');
+
+      // Récupérer les vétérinaires
+      final response = await ApiService.instance.get('veterinaires');
+      final List<dynamic> data = response['data'] ?? [];
+
+      // Filtrer pour ne garder que les vétérinaires validés et non bloqués
+      final veterinaires =
+          data.where((vet) {
+            return vet['isValidated'] == true &&
+                (vet['isBlocked'] == false || vet['isBlocked'] == null);
+          }).toList();
+
+      debugPrint('Nombre de vétérinaires récupérés: ${veterinaires.length}');
+
+      // Afficher les détails de chaque vétérinaire pour le débogage
+      for (var i = 0; i < veterinaires.length; i++) {
+        final veterinaire = veterinaires[i];
+        debugPrint(
+          'Vétérinaire $i: ${veterinaire['prenom']} ${veterinaire['nom']} (ID: ${veterinaire['_id'] ?? veterinaire['id']})',
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _veterinaires = List<Map<String, dynamic>>.from(veterinaires);
+          _isLoading = false;
+
+          // Sélectionner le premier vétérinaire par défaut s'il y en a
+          if (_veterinaires.isNotEmpty) {
+            _selectedVeterinaire = _veterinaires[0];
+            debugPrint(
+              'Vétérinaire sélectionné par défaut: ${_selectedVeterinaire!['prenom']} ${_selectedVeterinaire!['nom']}',
+            );
+          } else {
+            debugPrint('Aucun vétérinaire disponible dans la base de données');
+            _selectedVeterinaire = null;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _veterinaires = [];
+          _selectedVeterinaire = null;
+
+          // Message d'erreur plus convivial
+          if (e.toString().contains('network') ||
+              e.toString().contains('connexion')) {
+            _errorMessage =
+                'Problème de connexion au serveur. Vérifiez votre connexion internet et réessayez.';
+          } else {
+            _errorMessage =
+                'Aucun vétérinaire disponible. Veuillez demander à des vétérinaires de créer un compte dans l\'application.';
+          }
+        });
+      }
+      debugPrint('Erreur lors du chargement des vétérinaires: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -231,6 +313,13 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
         );
       }
 
+      // Vérifier si un vétérinaire est sélectionné
+      if (_selectedVeterinaire == null) {
+        throw Exception(
+          'Veuillez sélectionner un vétérinaire pour enregistrer votre prise.',
+        );
+      }
+
       // Récupérer l'ID du mareyeur sélectionné
       final maryeurId = _selectedMaryeur!['_id'] ?? _selectedMaryeur!['id'];
 
@@ -240,8 +329,22 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
         );
       }
 
+      // Récupérer l'ID du vétérinaire sélectionné
+      final veterinaireId =
+          _selectedVeterinaire!['_id'] ?? _selectedVeterinaire!['id'];
+
+      if (veterinaireId == null) {
+        throw Exception(
+          'ID du vétérinaire invalide. Veuillez sélectionner un autre vétérinaire.',
+        );
+      }
+
       debugPrint(
         'Enregistrement de la prise pour le mareyeur: ${_selectedMaryeur!['prenom']} ${_selectedMaryeur!['nom']} (ID: $maryeurId)',
+      );
+
+      debugPrint(
+        'Vétérinaire sélectionné pour validation: ${_selectedVeterinaire!['prenom']} ${_selectedVeterinaire!['nom']} (ID: $veterinaireId)',
       );
 
       // Create a new prise (catch)
@@ -252,6 +355,7 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
       final priseResponse = await ApiService.instance.post('prises', {
         'pecheur': user.id,
         'maryeur': maryeurId,
+        'veterinaire': veterinaireId,
         'nom': 'Prise du ${DateFormat('dd/MM/yyyy').format(now)}',
         'debut': dateFormat.format(now.subtract(const Duration(hours: 2))),
         'fin': dateFormat.format(now),
@@ -567,6 +671,129 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
 
                       const SizedBox(height: 16),
 
+                      // Sélection du vétérinaire
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Vétérinaire destinataire',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Sélectionnez un vétérinaire qui validera votre prise',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Affichage conditionnel selon l'état du chargement
+                          if (_isLoading && _veterinaires.isEmpty)
+                            Center(
+                              child: Column(
+                                children: [
+                                  const CircularProgressIndicator(),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Chargement des vétérinaires...',
+                                    style: theme.textTheme.bodyMedium,
+                                  ),
+                                ],
+                              ),
+                            )
+                          else if (_veterinaires.isEmpty)
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.error.withValues(
+                                  alpha: 0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: theme.colorScheme.error.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.warning_amber_rounded,
+                                        color: theme.colorScheme.error,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Aucun vétérinaire disponible dans la base de données',
+                                          style: theme.textTheme.titleMedium
+                                              ?.copyWith(
+                                                color: theme.colorScheme.error,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Veuillez demander à des vétérinaires de créer un compte dans l\'application pour pouvoir leur envoyer vos prises.',
+                                    style: theme.textTheme.bodyMedium,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  CustomButton.outline(
+                                    text: 'Actualiser la liste',
+                                    icon: Icons.refresh,
+                                    onPressed: _loadVeterinaires,
+                                    color: theme.primaryColor,
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            DropdownButtonFormField<Map<String, dynamic>>(
+                              value: _selectedVeterinaire,
+                              decoration: const InputDecoration(
+                                labelText: 'Sélectionnez un vétérinaire',
+                                prefixIcon: Icon(Icons.medical_services),
+                                hintText: 'Choisir un vétérinaire',
+                              ),
+                              items:
+                                  _veterinaires.map((veterinaire) {
+                                    final nom = veterinaire['nom'] ?? '';
+                                    final prenom = veterinaire['prenom'] ?? '';
+                                    final nomComplet = '$prenom $nom';
+
+                                    return DropdownMenuItem<
+                                      Map<String, dynamic>
+                                    >(
+                                      value: veterinaire,
+                                      child: Text(nomComplet),
+                                    );
+                                  }).toList(),
+                              onChanged: (Map<String, dynamic>? newValue) {
+                                if (newValue != null) {
+                                  setState(() {
+                                    _selectedVeterinaire = newValue;
+                                  });
+                                }
+                              },
+                              validator: (value) {
+                                if (value == null) {
+                                  return 'Veuillez sélectionner un vétérinaire';
+                                }
+                                return null;
+                              },
+                              isExpanded: true,
+                            ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 24),
+
                       // Sélection du mareyeur
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -688,6 +915,69 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                   ),
                 ),
               ),
+
+              // Vétérinaire sélectionné
+              if (_selectedVeterinaire != null) ...[
+                SeaSectionHeader(
+                  title: 'Vétérinaire sélectionné',
+                  icon: Icons.medical_services,
+                  subtitle:
+                      'Informations sur le vétérinaire qui validera votre prise',
+                ),
+
+                SeaCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.secondary.withValues(
+                                alpha: 0.1,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Icon(
+                                Icons.medical_services,
+                                color: theme.colorScheme.secondary,
+                                size: 30,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${_selectedVeterinaire!['prenom'] ?? ''} ${_selectedVeterinaire!['nom'] ?? ''}',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (_selectedVeterinaire!['matricule'] != null)
+                                  Text(
+                                    'Matricule: ${_selectedVeterinaire!['matricule']}',
+                                    style: theme.textTheme.bodyMedium,
+                                  ),
+                                if (_selectedVeterinaire!['telephone'] != null)
+                                  Text(
+                                    'Tél: ${_selectedVeterinaire!['telephone']}',
+                                    style: theme.textTheme.bodyMedium,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               // Mareyeur sélectionné
               if (_selectedMaryeur != null) ...[
@@ -934,7 +1224,9 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                           : 'Enregistrer et soumettre',
                   icon: _isLoading ? null : Icons.save,
                   onPressed:
-                      (_isLoading || _selectedMaryeur == null)
+                      (_isLoading ||
+                              _selectedMaryeur == null ||
+                              _selectedVeterinaire == null)
                           ? null
                           : _saveFishData,
                   isLoading: _isLoading,
@@ -942,10 +1234,11 @@ class _FishDetailsScreenState extends State<FishDetailsScreen> {
                   size: CustomButtonSize.large,
                 ),
               ),
-              if (_selectedMaryeur == null && !_isLoading) ...[
+              if ((_selectedMaryeur == null || _selectedVeterinaire == null) &&
+                  !_isLoading) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Vous devez sélectionner un mareyeur pour enregistrer votre prise.',
+                  'Vous devez sélectionner un mareyeur et un vétérinaire pour enregistrer votre prise.',
                   style: TextStyle(
                     color: theme.colorScheme.error,
                     fontSize: 12,

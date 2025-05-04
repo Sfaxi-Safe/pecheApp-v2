@@ -4,6 +4,7 @@ import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/services/auth_service.dart';
 import 'package:seatrace/utils/error_handler.dart';
 import 'package:intl/intl.dart';
+import 'package:seatrace/screens/veterinaire/select_maryeur_screen.dart';
 
 class PendingLotsScreen extends StatefulWidget {
   const PendingLotsScreen({Key? key}) : super(key: key);
@@ -117,16 +118,24 @@ class _PendingLotsScreenState extends State<PendingLotsScreen> {
         'veterinaire': user.id,
       });
 
-      // Actualiser la liste
-      _loadPendingLots();
+      // Récupérer les détails du lot pour les passer à l'écran de sélection du mareyeur
+      final lotDetails = await ApiService.instance.get('lots/$lotId');
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Lot approuvé avec succès'),
-          backgroundColor: Colors.green,
+
+      // Naviguer vers l'écran de sélection du mareyeur
+      final result = await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder:
+              (context) =>
+                  SelectMaryeurScreen(lotId: lotId, lotData: lotDetails),
         ),
       );
+
+      // Si la sélection du mareyeur a réussi, actualiser la liste
+      if (result == true) {
+        _loadPendingLots();
+      }
     } catch (e) {
       // Log l'erreur pour le débogage
       ErrorHandler.instance.logError(

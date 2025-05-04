@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import '../utils/error_handler.dart';
 import '../dtos/user_dto.dart';
 import '../dtos/espece_dto.dart';
@@ -15,6 +16,9 @@ class ApiService {
   // URL de l'API
   late String baseUrl;
   String? _authToken;
+
+  // Instance de Dio pour les requêtes multipart
+  final Dio _dio = Dio();
 
   // Constructeur privé qui initialise l'URL de l'API
   ApiService._init() {
@@ -799,8 +803,82 @@ class ApiService {
   Future<Map<String, dynamic>> createEspece(
     String nom, {
     String? imageUrl,
+    String? description,
+    String? nomScientifique,
+    double? prixMinimal,
+    double? prixMoyen,
+    double? confiance,
+    String? source,
+    List<Map<String, dynamic>>? alternatives,
   }) async {
-    return await post('especes', {'nom': nom, 'image_url': imageUrl});
+    final Map<String, dynamic> data = {'nom': nom};
+
+    if (imageUrl != null) data['imageUrl'] = imageUrl;
+    if (description != null) data['description'] = description;
+    if (nomScientifique != null) data['nomScientifique'] = nomScientifique;
+    if (prixMinimal != null) data['prixMinimal'] = prixMinimal;
+    if (prixMoyen != null) data['prixMoyen'] = prixMoyen;
+    if (confiance != null) data['confiance'] = confiance;
+    if (source != null) data['source'] = source;
+    if (alternatives != null) data['alternatives'] = alternatives;
+
+    return await post('especes', data);
+  }
+
+  // Méthodes pour la classification des poissons
+  Future<Map<String, dynamic>> classifyFish(String nom) async {
+    final response = await post('fish-classification/classify', {'nom': nom});
+    return response;
+  }
+
+  Future<Map<String, dynamic>> classifyFishImage(File imageFile) async {
+    try {
+      // Préparer les en-têtes
+      final headers = _headers;
+
+      // Configurer l'URL de base pour Dio
+      _dio.options.baseUrl = baseUrl.split('/api').first;
+
+      // Créer un FormData avec l'image
+      final formData = FormData.fromMap({
+        'image': await MultipartFile.fromFile(
+          imageFile.path,
+          filename: 'fish_image.jpg',
+        ),
+      });
+
+      // Envoyer la requête
+      final response = await _dio.post(
+        '/api/fish-classification/classify-image',
+        data: formData,
+        options: Options(headers: headers),
+      );
+
+      // Retourner les données
+      if (response.data is Map) {
+        return Map<String, dynamic>.from(response.data);
+      } else {
+        return {'success': true, 'data': response.data};
+      }
+    } catch (e) {
+      ErrorHandler.instance.logError(
+        e,
+        context: 'ApiService.classifyFishImage',
+      );
+
+      // Retourner une erreur formatée
+      return {
+        'success': false,
+        'error': e.toString(),
+        'message': 'Erreur lors de la classification de l\'image',
+      };
+    }
+  }
+
+  Future<List<String>> getFishSpecies() async {
+    final response = await get('fish-classification/species');
+    final List<dynamic> species = response['species'] ?? [];
+    return species.map((e) => e.toString()).toList();
   }
 
   // Méthodes spécifiques pour l'authentification
@@ -1058,7 +1136,33 @@ class ApiService {
   Future<Map<String, dynamic>> getVitirinaireDetails(
     dynamic veterinaireId,
   ) async {
+    // Log pour aider à identifier les endroits où cette méthode est encore utilisée
+    ErrorHandler.instance.logWarning(
+      'La méthode getVitirinaireDetails est obsolète. Utilisez getVeterinaireDetails à la place.',
+      context: 'ApiService.getVitirinaireDetails',
+    );
     return await getVeterinaireDetails(veterinaireId);
+  }
+
+  // Méthode pour qu'un vétérinaire assigne un mareyeur à une prise
+  Future<Map<String, dynamic>> assignMaryeurToPrise(
+    dynamic veterinaireId,
+    dynamic priseId,
+    dynamic maryeurId,
+  ) async {
+    try {
+      final response = await put('veterinaires/$veterinaireId/assign-maryeur', {
+        'priseId': priseId,
+        'maryeurId': maryeurId,
+      });
+      return response;
+    } catch (e) {
+      ErrorHandler.instance.logError(
+        e,
+        context: 'ApiService.assignMaryeurToPrise',
+      );
+      rethrow;
+    }
   }
 
   // Méthode pour construire l'URL complète d'une image

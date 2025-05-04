@@ -11,9 +11,9 @@ import 'package:seatrace/models/lot.dart';
 /// Service pour convertir les données entre les modèles et les DTOs
 class DtoService {
   static final DtoService instance = DtoService._internal();
-  
+
   DtoService._internal();
-  
+
   /// Convertit un Map (JSON) en UserDto
   UserDto jsonToUserDto(Map<String, dynamic> json) {
     try {
@@ -23,7 +23,7 @@ class DtoService {
       rethrow;
     }
   }
-  
+
   /// Convertit un User en UserDto
   UserDto userToDto(User user) {
     try {
@@ -31,7 +31,7 @@ class DtoService {
       if (user.roles.isNotEmpty) {
         roles = user.roles.split(',');
       }
-      
+
       return UserDto(
         id: user.id,
         email: user.email,
@@ -48,7 +48,7 @@ class DtoService {
       rethrow;
     }
   }
-  
+
   /// Convertit un Map (JSON) en EspeceDto
   EspeceDto jsonToEspeceDto(Map<String, dynamic> json) {
     try {
@@ -58,7 +58,7 @@ class DtoService {
       rethrow;
     }
   }
-  
+
   /// Convertit un Espece en EspeceDto
   EspeceDto especeToDto(Espece espece) {
     try {
@@ -76,7 +76,7 @@ class DtoService {
       rethrow;
     }
   }
-  
+
   /// Convertit un Map (JSON) en PriseDto
   PriseDto jsonToPriseDto(Map<String, dynamic> json) {
     try {
@@ -86,13 +86,15 @@ class DtoService {
       rethrow;
     }
   }
-  
+
   /// Convertit un Prise en PriseDto
   PriseDto priseToDto(Prise prise) {
     try {
       return PriseDto(
         id: prise.id,
         pecheurId: prise.pecheurId,
+        maryeurId: prise.maryeurId,
+        veterinaireId: prise.veterinaireId,
         date: prise.date,
         lieu: prise.lieu,
         latitude: prise.latitude,
@@ -106,7 +108,7 @@ class DtoService {
       rethrow;
     }
   }
-  
+
   /// Convertit un Map (JSON) en LotDto
   LotDto jsonToLotDto(Map<String, dynamic> json) {
     try {
@@ -116,7 +118,7 @@ class DtoService {
       rethrow;
     }
   }
-  
+
   /// Convertit un Lot en LotDto
   LotDto lotToDto(Lot lot) {
     try {
@@ -146,11 +148,16 @@ class DtoService {
       rethrow;
     }
   }
-  
+
   /// Convertit une liste de Map (JSON) en liste de DTOs
-  List<T> jsonListToDtoList<T>(List<dynamic> jsonList, T Function(Map<String, dynamic>) converter) {
+  List<T> jsonListToDtoList<T>(
+    List<dynamic> jsonList,
+    T Function(Map<String, dynamic>) converter,
+  ) {
     try {
-      return jsonList.map((json) => converter(json as Map<String, dynamic>)).toList();
+      return jsonList
+          .map((json) => converter(json as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       debugPrint('Erreur lors de la conversion JSON List -> DTO List: $e');
       rethrow;

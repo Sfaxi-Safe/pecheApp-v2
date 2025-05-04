@@ -15,6 +15,12 @@ const priseSchema = new mongoose.Schema({
     required: true
   },
 
+  // Référence au vétérinaire qui validera la prise
+  veterinaire: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Veterinaire'
+  },
+
   // Nom de la prise (ex: "Prise du 15/05/2025")
   nom: {
     type: String,
@@ -79,6 +85,14 @@ const priseSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Ajouter des index pour améliorer les performances des requêtes
+priseSchema.index({ pecheur: 1 });
+priseSchema.index({ maryeur: 1 });
+priseSchema.index({ veterinaire: 1 });
+priseSchema.index({ debut: -1 });
+priseSchema.index({ fin: -1 });
+priseSchema.index({ isValid: 1 });
 
 const Prise = mongoose.model('Prise', priseSchema);
 

@@ -307,6 +307,7 @@ class ErrorHandler {
     dynamic error, {
     String? errorContext,
     bool showDialog = false,
+    VoidCallback? onDismiss,
   }) {
     final appError =
         error is AppError
@@ -318,9 +319,108 @@ class ErrorHandler {
 
     // Afficher l'erreur à l'utilisateur
     if (showDialog) {
-      showErrorDialog(context, 'Erreur', appError.message);
+      showErrorDialog(context, 'Erreur', appError.message).then((_) {
+        if (onDismiss != null) onDismiss();
+      });
     } else {
       showErrorSnackBar(context, appError.message);
+      if (onDismiss != null) {
+        // Attendre un court instant pour que le SnackBar soit visible
+        Future.delayed(const Duration(milliseconds: 300), onDismiss);
+      }
+    }
+  }
+
+  /// Gère spécifiquement les erreurs d'API
+  Future<T?> handleApiCall<T>(
+    BuildContext context,
+    Future<T> Function() apiCall, {
+    String? loadingMessage,
+    String? successMessage,
+    String? errorContext,
+    bool showErrorDialog = false,
+    bool showSuccessMessage = true,
+    VoidCallback? onSuccess,
+    VoidCallback? onError,
+  }) async {
+    // Capturer le ScaffoldMessenger actuel pour éviter les problèmes de contexte
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    // Afficher un indicateur de chargement si demandé
+    if (loadingMessage != null) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Text(loadingMessage),
+            ],
+          ),
+          duration: const Duration(
+            days: 1,
+          ), // Longue durée pour ne pas disparaître
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
+    try {
+      // Exécuter l'appel API
+      final result = await apiCall();
+
+      // Vérifier si le widget est toujours monté
+      if (!context.mounted) return result;
+
+      // Masquer l'indicateur de chargement
+      if (loadingMessage != null) {
+        scaffoldMessenger.hideCurrentSnackBar();
+      }
+
+      // Afficher un message de succès si demandé
+      if (successMessage != null && showSuccessMessage) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(successMessage),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Appeler le callback de succès si fourni
+      if (onSuccess != null) {
+        onSuccess();
+      }
+
+      return result;
+    } catch (error) {
+      // Vérifier si le widget est toujours monté
+      if (!context.mounted) return null;
+
+      // Masquer l'indicateur de chargement
+      if (loadingMessage != null) {
+        scaffoldMessenger.hideCurrentSnackBar();
+      }
+
+      // Gérer et afficher l'erreur
+      handleAndShowError(
+        context,
+        error,
+        errorContext: errorContext,
+        showDialog: showErrorDialog,
+        onDismiss: onError,
+      );
+
+      return null;
     }
   }
 }

@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const adminRoutes = require('./routes/adminRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const pecheurRoutes = require('./routes/pecheurRoutes');
-const veterinaireRoutes = require('./routes/veterinaireRoutes');
+const veterinaireRoutes = require('./routes/veterinairesRoutes');
 const maryeurRoutes = require('./routes/maryeurRoutes');
 const especeRoutes = require('./routes/especeRoutes');
 const priseRoutes = require('./routes/priseRoutes');
@@ -18,6 +18,7 @@ const imageRoutes = require('./routes/imageRoutes');
 const authRoutes = require('./routes/authRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const statsRoutes = require('./routes/statsRoutes');
+const fishClassificationRoutes = require('./routes/fishClassificationRoutes');
 
 const app = express();
 
@@ -97,6 +98,7 @@ app.use('/api/images', imageRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/fish-classification', fishClassificationRoutes);
 
 // Route de test pour vérifier que le serveur fonctionne
 app.get('/api/health', (req, res) => {

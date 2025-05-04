@@ -234,7 +234,7 @@ const login = async (req, res, next) => {
       throw new BadRequestError('Email ou mot de passe incorrect');
     }
 
-    if (!user.isValidated && !user.isValid) {
+    if (!user.isValidated) {
       // Journaliser l'échec
       console.log(`[${new Date().toISOString()}] WARN [AUTH] Échec de connexion (compte non validé): ${email}`);
       throw new ForbiddenError('Votre compte est en attente de validation par un administrateur');

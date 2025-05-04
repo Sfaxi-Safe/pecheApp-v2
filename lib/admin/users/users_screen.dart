@@ -14,7 +14,7 @@ class _UsersScreenState extends State<UsersScreen>
   List<Map<String, dynamic>> _clients = [];
   List<Map<String, dynamic>> _pecheurs = [];
   List<Map<String, dynamic>> _maryeurs = [];
-  List<Map<String, dynamic>> _vitirinaires = [];
+  List<Map<String, dynamic>> _veterinaires = [];
   bool _isLoading = true;
 
   @override
@@ -44,7 +44,7 @@ class _UsersScreenState extends State<UsersScreen>
       final maryeurs = List<Map<String, dynamic>>.from(
         maryeursResponse['data'] ?? [],
       );
-      final vitirinaires = List<Map<String, dynamic>>.from(
+      final veterinaires = List<Map<String, dynamic>>.from(
         veterinairesResponse['data'] ?? [],
       );
 
@@ -52,7 +52,7 @@ class _UsersScreenState extends State<UsersScreen>
         _clients = clients;
         _pecheurs = pecheurs;
         _maryeurs = maryeurs;
-        _vitirinaires = vitirinaires;
+        _veterinaires = veterinaires;
         _isLoading = false;
       });
     } catch (e) {
@@ -118,7 +118,7 @@ class _UsersScreenState extends State<UsersScreen>
                   _buildUserList(_clients, 'Client'),
                   _buildUserList(_pecheurs, 'Pêcheur'),
                   _buildUserList(_maryeurs, 'Mareyeur'),
-                  _buildUserList(_vitirinaires, 'Vétérinaire'),
+                  _buildUserList(_veterinaires, 'Vétérinaire'),
                 ],
               ),
     );

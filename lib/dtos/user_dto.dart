@@ -45,7 +45,7 @@ class UserDto {
       prenom: json['prenom'] ?? '',
       telephone: json['telephone']?.toString(),
       photo: json['photo'],
-      isValidated: json['isValidated'] ?? json['isValid'] ?? false,
+      isValidated: json['isValidated'] ?? false,
       isBlocked: json['isBlocked'] ?? false,
     );
   }

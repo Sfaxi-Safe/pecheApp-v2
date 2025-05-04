@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:seatrace/models/espece.dart';
+import 'package:seatrace/models/fish_classification_result.dart';
 import 'package:image/image.dart' as img;
 import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/services/google_vision_service.dart';
@@ -71,7 +72,8 @@ class FishRecognitionService {
     }
   }
 
-  Future<Espece?> recognizeFish(File imageFile) async {
+  /// Obtient le résultat de classification d'un poisson à partir d'une image
+  Future<FishClassificationResult?> classifyFish(File imageFile) async {
     // Vérifier la connectivité
     final connectivityResult = await Connectivity().checkConnectivity();
     final bool hasInternet = connectivityResult != ConnectivityResult.none;
@@ -80,14 +82,14 @@ class FishRecognitionService {
     if (hasInternet && _preferOnlineRecognition) {
       try {
         debugPrint(
-          'Utilisation de Google Cloud Vision API pour la reconnaissance',
+          'Utilisation de Google Cloud Vision API pour la classification',
         );
         // Utiliser l'API Google Cloud Vision
-        final espece = await GoogleVisionService.instance.identifyFish(
+        final result = await GoogleVisionService.instance.classifyFish(
           imageFile,
         );
-        if (espece != null) {
-          return espece;
+        if (result != null) {
+          return result;
         }
         // Si l'API échoue, utiliser le modèle local comme solution de secours
         debugPrint('Google Cloud Vision a échoué, utilisation du modèle local');
@@ -97,43 +99,14 @@ class FishRecognitionService {
       }
     }
 
-    // Utiliser le nouveau modèle Keras via TensorFlow Service
-    debugPrint('Utilisation du modèle Keras pour la reconnaissance');
-
+    // Utiliser le modèle TensorFlow
+    debugPrint('Utilisation du modèle TensorFlow pour la classification');
     try {
       // Utiliser le service TensorFlow pour la prédiction
-      final prediction = await TensorFlowService.instance.predictFish(
-        imageFile,
-      );
-
-      final String especeNom = prediction['espece'] as String;
-      final double confiance = prediction['confiance'] as double;
-
-      // Si la probabilité est trop faible, considérer comme non reconnu
-      if (confiance < 0.5) {
-        debugPrint(
-          'Confiance trop faible: ${(confiance * 100).toStringAsFixed(1)}% pour $especeNom',
-        );
-        return null;
-      }
-
-      debugPrint(
-        'Espèce identifiée avec Keras: $especeNom (confiance: ${(confiance * 100).toStringAsFixed(1)}%)',
-      );
-
-      // Récupérer l'espèce correspondante depuis l'API
-      try {
-        final espece = await ApiService.instance.getEspeceByNom(especeNom);
-        return Espece.fromMap(espece);
-      } catch (e) {
-        // Si l'espèce n'existe pas, la créer via l'API
-        final nouvelleEspece = await ApiService.instance.createEspece(
-          especeNom,
-        );
-        return Espece.fromMap(nouvelleEspece);
-      }
+      final result = await TensorFlowService.instance.predictFish(imageFile);
+      return result;
     } catch (e) {
-      debugPrint('Erreur lors de la reconnaissance du poisson avec Keras: $e');
+      debugPrint('Erreur lors de la classification avec TensorFlow: $e');
 
       // Essayer avec l'ancien modèle TensorFlow Lite comme solution de secours
       try {
@@ -159,36 +132,88 @@ class FishRecognitionService {
         // Traiter les résultats
         final result = outputBuffer[0];
 
-        // Trouver l'indice de la classe avec la plus haute probabilité
-        int maxIndex = 0;
-        double maxProb = result[0];
+        // Créer une liste de résultats triés par confiance
+        final List<FishClassificationResult> allResults = [];
 
-        for (int i = 1; i < result.length; i++) {
-          if (result[i] > maxProb) {
-            maxProb = result[i];
-            maxIndex = i;
+        for (int i = 0; i < result.length; i++) {
+          if (i < _labels.length) {
+            allResults.add(
+              FishClassificationResult(
+                espece: _labels[i],
+                confiance: result[i],
+                source: 'TensorFlow Lite (ancien)',
+              ),
+            );
           }
         }
 
-        // Si la probabilité est trop faible, considérer comme non reconnu
-        if (maxProb < 0.5) {
-          debugPrint(
-            'Confiance trop faible: $maxProb pour ${_labels[maxIndex]}',
-          );
-          return null;
-        }
+        // Trier les résultats par confiance (du plus élevé au plus bas)
+        allResults.sort((a, b) => b.confiance.compareTo(a.confiance));
 
-        debugPrint(
-          'Espèce identifiée avec l\'ancien modèle: ${_labels[maxIndex]} (confiance: ${(maxProb * 100).toStringAsFixed(1)}%)',
-        );
+        // Le premier résultat est celui avec la plus haute confiance
+        final topResult = allResults.first;
 
-        // Récupérer l'espèce correspondante depuis l'API
-        final espece = await ApiService.instance.getEspeceByNom(
-          _labels[maxIndex],
+        // Garder les 5 meilleurs résultats comme alternatives
+        final alternatives =
+            allResults.length > 1
+                ? allResults.sublist(
+                  1,
+                  allResults.length > 5 ? 5 : allResults.length,
+                )
+                : <FishClassificationResult>[];
+
+        // Retourner le résultat principal avec les alternatives
+        return FishClassificationResult(
+          espece: topResult.espece,
+          confiance: topResult.confiance,
+          source: topResult.source,
+          alternatives: alternatives,
         );
-        return Espece.fromMap(espece);
       } catch (e) {
         debugPrint('Erreur avec l\'ancien modèle: $e');
+        return null;
+      }
+    }
+  }
+
+  /// Reconnaît un poisson à partir d'une image et retourne l'espèce correspondante
+  Future<Espece?> recognizeFish(File imageFile) async {
+    // Obtenir le résultat de classification
+    final classificationResult = await classifyFish(imageFile);
+    if (classificationResult == null) {
+      return null;
+    }
+
+    final String especeNom = classificationResult.espece;
+    final double confiance = classificationResult.confiance;
+
+    // Si la probabilité est trop faible, considérer comme non reconnu
+    if (confiance < 0.5) {
+      debugPrint(
+        'Confiance trop faible: ${(confiance * 100).toStringAsFixed(1)}% pour $especeNom',
+      );
+      return null;
+    }
+
+    debugPrint(
+      'Espèce identifiée: $especeNom (confiance: ${(confiance * 100).toStringAsFixed(1)}%)',
+    );
+
+    // Récupérer l'espèce correspondante depuis l'API
+    try {
+      final espece = await ApiService.instance.getEspeceByNom(especeNom);
+      return Espece.fromMap(espece);
+    } catch (e) {
+      debugPrint('Espèce non trouvée dans la base de données: $e');
+
+      // Si l'espèce n'existe pas, la créer via l'API
+      try {
+        final nouvelleEspece = await ApiService.instance.createEspece(
+          especeNom,
+        );
+        return Espece.fromMap(nouvelleEspece);
+      } catch (e) {
+        debugPrint('Erreur lors de la création de l\'espèce: $e');
 
         // En cas d'erreur, essayer de récupérer une espèce aléatoire via l'API
         // comme solution de secours
@@ -202,9 +227,9 @@ class FishRecognitionService {
           debugPrint('Erreur lors de la récupération des espèces: $e');
         }
       }
-
-      return null;
     }
+
+    return null;
   }
 
   /// Définit si l'API en ligne doit être préférée au modèle local

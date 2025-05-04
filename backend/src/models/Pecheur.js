@@ -134,14 +134,6 @@ const pecheurSchema = new mongoose.Schema({
   },
 
   /**
-   * Champ alternatif pour la validation (pour compatibilité)
-   */
-  isValid: {
-    type: Boolean,
-    default: false
-  },
-
-  /**
    * Indique si le compte est bloqué
    */
   isBlocked: {

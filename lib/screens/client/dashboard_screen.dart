@@ -6,12 +6,15 @@ import 'package:seatrace/screens/client/available_auctions_screen.dart';
 import 'package:seatrace/screens/client/search_screen.dart';
 import 'package:seatrace/screens/client/my_purchases_screen.dart';
 import 'package:seatrace/screens/profile_screen.dart';
+import 'package:seatrace/screens/notifications_screen.dart';
+import 'package:seatrace/services/notification_service.dart';
 import 'package:seatrace/utils/animation_service.dart';
 import 'package:seatrace/utils/responsive_service.dart';
 import 'package:seatrace/utils/navigation_service.dart';
 import 'package:seatrace/utils/color_extensions.dart';
 import 'package:seatrace/utils/error_handler.dart';
 import 'package:seatrace/widgets/sea_widgets.dart';
+import 'package:seatrace/widgets/notification_badge.dart';
 
 class ClientDashboardScreen extends StatefulWidget {
   const ClientDashboardScreen({Key? key}) : super(key: key);
@@ -40,6 +43,9 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
   void initState() {
     super.initState();
     _loadUserData();
+
+    // Initialiser le service de notifications
+    NotificationService.instance.initialize();
   }
 
   Future<void> _loadUserData() async {
@@ -261,6 +267,21 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
         title: const Text('Tableau de bord Client'),
         elevation: 0,
         actions: [
+          // Badge de notification
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: NotificationBadge(
+              icon: Icons.notifications,
+              iconSize: 24,
+              badgeColor: Theme.of(context).colorScheme.error,
+              onTap: () {
+                _navigationService.navigateToWithSlideLeft(
+                  context,
+                  const NotificationsScreen(),
+                );
+              },
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {

@@ -5,6 +5,8 @@ import 'package:seatrace/models/prise.dart';
 class PriseDto {
   final String id;
   final String pecheurId;
+  final String maryeurId;
+  final String? veterinaireId;
   final String date;
   final String lieu;
   final double? latitude;
@@ -16,6 +18,8 @@ class PriseDto {
   PriseDto({
     required this.id,
     required this.pecheurId,
+    required this.maryeurId,
+    this.veterinaireId,
     required this.date,
     required this.lieu,
     this.latitude,
@@ -30,6 +34,8 @@ class PriseDto {
     return PriseDto(
       id: json['_id'] ?? json['id'] ?? '',
       pecheurId: json['pecheur'] ?? json['pecheurId'] ?? '',
+      maryeurId: json['maryeur'] ?? json['maryeurId'] ?? '',
+      veterinaireId: json['veterinaire'] ?? json['veterinaireId'],
       date: json['date'] ?? '',
       lieu: json['lieu'] ?? '',
       latitude: _parseDouble(json['latitude']),
@@ -45,6 +51,8 @@ class PriseDto {
     return Prise(
       id: id,
       pecheurId: pecheurId,
+      maryeurId: maryeurId,
+      veterinaireId: veterinaireId,
       date: date,
       lieu: lieu,
       latitude: latitude,
@@ -57,9 +65,10 @@ class PriseDto {
 
   /// Convertit le DTO en Map (JSON)
   Map<String, dynamic> toJson() {
-    return {
+    final map = {
       'id': id,
       'pecheur': pecheurId,
+      'maryeur': maryeurId,
       'date': date,
       'lieu': lieu,
       'latitude': latitude,
@@ -68,12 +77,21 @@ class PriseDto {
       'photo': photo,
       'isValid': isValid,
     };
+
+    // Ajouter le vétérinaire seulement s'il est défini
+    if (veterinaireId != null) {
+      map['veterinaire'] = veterinaireId;
+    }
+
+    return map;
   }
 
   /// Crée une copie du DTO avec des valeurs modifiées
   PriseDto copyWith({
     String? id,
     String? pecheurId,
+    String? maryeurId,
+    String? veterinaireId,
     String? date,
     String? lieu,
     double? latitude,
@@ -85,6 +103,8 @@ class PriseDto {
     return PriseDto(
       id: id ?? this.id,
       pecheurId: pecheurId ?? this.pecheurId,
+      maryeurId: maryeurId ?? this.maryeurId,
+      veterinaireId: veterinaireId ?? this.veterinaireId,
       date: date ?? this.date,
       lieu: lieu ?? this.lieu,
       latitude: latitude ?? this.latitude,

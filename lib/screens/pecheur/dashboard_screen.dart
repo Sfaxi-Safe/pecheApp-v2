@@ -5,12 +5,15 @@ import 'package:seatrace/screens/login_screen.dart';
 import 'package:seatrace/screens/pecheur/scan_fish_screen.dart';
 import 'package:seatrace/screens/pecheur/history_screen.dart';
 import 'package:seatrace/screens/profile_screen.dart';
+import 'package:seatrace/screens/notifications_screen.dart';
 import 'package:seatrace/services/api_service.dart';
+import 'package:seatrace/services/notification_service.dart';
 import 'package:seatrace/utils/animation_service.dart';
 import 'package:seatrace/utils/responsive_service.dart';
 import 'package:seatrace/utils/navigation_service.dart';
 import 'package:seatrace/utils/error_handler.dart';
 import 'package:seatrace/widgets/sea_widgets.dart';
+import 'package:seatrace/widgets/notification_badge.dart';
 
 class PecheurDashboardScreen extends StatefulWidget {
   const PecheurDashboardScreen({Key? key}) : super(key: key);
@@ -42,6 +45,9 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
   void initState() {
     super.initState();
     _loadUserData();
+
+    // Initialiser le service de notifications
+    NotificationService.instance.initialize();
   }
 
   Future<void> _loadUserData() async {
@@ -226,6 +232,21 @@ class _PecheurDashboardScreenState extends State<PecheurDashboardScreen> {
         title: const Text('Tableau de bord Pêcheur'),
         elevation: 0,
         actions: [
+          // Badge de notification
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: NotificationBadge(
+              icon: Icons.notifications,
+              iconSize: 24,
+              badgeColor: theme.colorScheme.error,
+              onTap: () {
+                _navigationService.navigateToWithSlideLeft(
+                  context,
+                  const NotificationsScreen(),
+                );
+              },
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {

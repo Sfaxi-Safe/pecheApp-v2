@@ -61,6 +61,11 @@ router.post('/', auth, checkRole(['ROLE_PECHEUR', 'ROLE_MARYEUR', 'ROLE_ADMIN'])
       throw new BadRequestError('Pêcheur, mareyeur et nom sont requis');
     }
 
+    // Ajouter le vétérinaire si fourni
+    if (req.body.veterinaire) {
+      console.log(`[${new Date().toISOString()}] INFO [PRISE] Vétérinaire spécifié pour la prise: ${req.body.veterinaire}`);
+    }
+
     // Vérifier que les dates sont valides
     if (req.body.debut && req.body.fin) {
       const debut = new Date(req.body.debut);
@@ -101,7 +106,8 @@ router.post('/', auth, checkRole(['ROLE_PECHEUR', 'ROLE_MARYEUR', 'ROLE_ADMIN'])
     // Récupérer la prise avec les relations peuplées
     const populatedPrise = await Prise.findById(newPrise._id)
       .populate('pecheur', 'nom prenom bateau matricule')
-      .populate('maryeur', 'nom prenom matricule');
+      .populate('maryeur', 'nom prenom matricule')
+      .populate('veterinaire', 'nom prenom matricule');
 
     res.created(populatedPrise, 'Prise créée avec succès');
   } catch (error) {
@@ -122,7 +128,8 @@ router.get('/:id', async (req, res, next) => {
     if (mongoose.Types.ObjectId.isValid(req.params.id)) {
       prise = await Prise.findById(req.params.id)
         .populate('pecheur', 'nom prenom bateau matricule')
-        .populate('maryeur', 'nom prenom matricule');
+        .populate('maryeur', 'nom prenom matricule')
+        .populate('veterinaire', 'nom prenom matricule');
     }
 
     if (!prise) {
@@ -173,7 +180,8 @@ router.patch('/:id', auth, checkRole(['ROLE_PECHEUR', 'ROLE_MARYEUR', 'ROLE_ADMI
     // Récupérer la prise mise à jour avec les relations peuplées
     const populatedPrise = await Prise.findById(prise._id)
       .populate('pecheur', 'nom prenom bateau matricule')
-      .populate('maryeur', 'nom prenom matricule');
+      .populate('maryeur', 'nom prenom matricule')
+      .populate('veterinaire', 'nom prenom matricule');
 
     res.success(populatedPrise, 'Prise mise à jour avec succès');
   } catch (error) {

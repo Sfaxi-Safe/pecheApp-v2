@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:seatrace/services/fish_recognition_service.dart';
 import 'package:seatrace/screens/pecheur/fish_details_screen.dart';
+import 'package:seatrace/screens/pecheur/fish_classification_screen.dart';
 import 'package:seatrace/utils/animation_service.dart';
 import 'package:seatrace/utils/responsive_service.dart';
 import 'package:seatrace/utils/navigation_service.dart';
@@ -83,45 +84,23 @@ class _ScanFishScreenState extends State<ScanFishScreen>
       // Configurer le service de reconnaissance pour utiliser l'API en ligne ou le modèle local
       _recognitionService.setPreferOnlineRecognition(_useOnlineApi);
 
-      // Afficher un message indiquant la méthode utilisée
-      final String methodMessage =
-          _useOnlineApi
-              ? 'Analyse avec Google Cloud Vision API...'
-              : 'Analyse avec le modèle local...';
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(methodMessage),
-            ],
-          ),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      // Naviguer vers l'écran de classification
+      final result = await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => FishClassificationScreen(returnResult: true),
         ),
       );
 
-      final espece = await _recognitionService.recognizeFish(_imageFile!);
-
       if (!mounted) return;
 
-      if (espece != null) {
+      // Si un résultat a été retourné, naviguer vers l'écran de détails
+      if (result != null) {
         _navigationService.navigateToWithSlideUp(
           context,
-          FishDetailsScreen(imageFile: _imageFile!, espece: espece),
+          FishDetailsScreen(imageFile: _imageFile!, espece: result),
         );
       } else {
         setState(() {
-          _errorMessage = 'Impossible d\'identifier l\'espèce de poisson';
           _isAnalyzing = false;
         });
       }

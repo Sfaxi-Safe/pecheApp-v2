@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:seatrace/utils/animation_service.dart';
+import 'package:seatrace/screens/notifications_screen.dart';
 
 /// Service pour gérer la navigation dans l'application SeaTrace
 class NavigationService {
@@ -129,5 +130,75 @@ class NavigationService {
   /// Retourne à l'écran précédent avec un résultat
   void goBack<T>(BuildContext context, [T? result]) {
     Navigator.of(context).pop<T>(result);
+  }
+
+  /// Navigue vers une route spécifique en fonction de son chemin
+  Future<dynamic> navigateToRoute(BuildContext context, String route) {
+    // Extraire les paramètres de la route
+    final Uri uri = Uri.parse(route);
+    final String path = uri.path;
+
+    // Déterminer l'écran à afficher en fonction du chemin
+    Widget? screen;
+
+    // Routes pour le pêcheur
+    if (path.startsWith('/pecheur/lots/')) {
+      final String lotId = path.substring('/pecheur/lots/'.length);
+      // Naviguer vers l'écran de détails du lot pour le pêcheur
+      // screen = LotDetailsScreen(lotId: lotId, userType: 'pecheur');
+    }
+    // Routes pour le vétérinaire
+    else if (path.startsWith('/veterinaire/lots/')) {
+      final String lotId = path.substring('/veterinaire/lots/'.length);
+      // Naviguer vers l'écran de détails du lot pour le vétérinaire
+      // screen = LotDetailsScreen(lotId: lotId, userType: 'veterinaire');
+    }
+    // Routes pour le mareyeur
+    else if (path.startsWith('/maryeur/lots/')) {
+      final String lotId = path.substring('/maryeur/lots/'.length);
+      // Naviguer vers l'écran de détails du lot pour le mareyeur
+      // screen = LotDetailsScreen(lotId: lotId, userType: 'maryeur');
+    }
+    // Routes pour le client
+    else if (path.startsWith('/client/lots/')) {
+      final String lotId = path.substring('/client/lots/'.length);
+      // Naviguer vers l'écran de détails du lot pour le client
+      // screen = LotDetailsScreen(lotId: lotId, userType: 'client');
+    }
+    // Routes pour les prises
+    else if (path.startsWith('/pecheur/prises/')) {
+      final String priseId = path.substring('/pecheur/prises/'.length);
+      // Naviguer vers l'écran de détails de la prise pour le pêcheur
+      // screen = PriseDetailsScreen(priseId: priseId, userType: 'pecheur');
+    } else if (path.startsWith('/maryeur/prises/')) {
+      final String priseId = path.substring('/maryeur/prises/'.length);
+      // Naviguer vers l'écran de détails de la prise pour le mareyeur
+      // screen = PriseDetailsScreen(priseId: priseId, userType: 'maryeur');
+    }
+    // Autres routes
+    else if (path == '/notifications') {
+      // Importer dynamiquement pour éviter les dépendances circulaires
+      screen = _getNotificationsScreen();
+    }
+
+    // Si l'écran est null, afficher un message d'erreur
+    if (screen == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Route non prise en charge: $path'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return Future.value(null);
+    }
+
+    // Naviguer vers l'écran
+    return navigateToWithSlideLeft(context, screen);
+  }
+
+  /// Retourne l'écran des notifications
+  Widget _getNotificationsScreen() {
+    // Importer dynamiquement pour éviter les dépendances circulaires
+    return const NotificationsScreen();
   }
 }

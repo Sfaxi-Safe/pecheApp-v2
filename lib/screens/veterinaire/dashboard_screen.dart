@@ -5,12 +5,15 @@ import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/screens/veterinaire/pending_lots_screen.dart';
 import 'package:seatrace/screens/profile_screen.dart';
 import 'package:seatrace/screens/lot_details_screen.dart';
+import 'package:seatrace/screens/notifications_screen.dart';
+import 'package:seatrace/services/notification_service.dart';
 import 'package:seatrace/utils/animation_service.dart';
 import 'package:seatrace/utils/responsive_service.dart';
 import 'package:seatrace/utils/navigation_service.dart';
 import 'package:seatrace/utils/error_handler.dart';
 import 'package:seatrace/widgets/sea_widgets.dart';
 import 'package:seatrace/widgets/sea_filter_bar.dart';
+import 'package:seatrace/widgets/notification_badge.dart';
 import 'package:intl/intl.dart';
 
 class VeterinaireDashboardScreen extends StatefulWidget {
@@ -49,6 +52,9 @@ class _VeterinaireDashboardScreenState
   void initState() {
     super.initState();
     _loadUserData();
+
+    // Initialiser le service de notifications
+    NotificationService.instance.initialize();
   }
 
   Future<void> _applyFilters() async {
@@ -283,6 +289,21 @@ class _VeterinaireDashboardScreenState
         title: const Text('Tableau de bord Vétérinaire'),
         elevation: 0,
         actions: [
+          // Badge de notification
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: NotificationBadge(
+              icon: Icons.notifications,
+              iconSize: 24,
+              badgeColor: Theme.of(context).colorScheme.error,
+              onTap: () {
+                _navigationService.navigateToWithSlideLeft(
+                  context,
+                  const NotificationsScreen(),
+                );
+              },
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {

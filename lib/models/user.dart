@@ -47,7 +47,7 @@ class User {
       service: map['service'],
       fonction: map['fonction'],
       photo: map['photo'],
-      isValidated: map['isValidated'] ?? map['isValid'] ?? false,
+      isValidated: map['isValidated'] ?? false,
       isBlocked: map['isBlocked'] ?? false,
     );
 

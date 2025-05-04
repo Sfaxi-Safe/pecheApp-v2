@@ -68,10 +68,10 @@ class AuctionDetailScreenState extends State<AuctionDetailScreen> {
         veterinaire = await ApiService.instance.getVeterinaireDetails(
           auction['veterinaire_id'],
         );
-      } else if (auction['vitirinaire_id'] != null) {
-        // Compatibilité avec les anciennes données
+      } else if (auction['veterinaire'] != null) {
+        // Compatibilité avec les nouvelles données (référence directe)
         veterinaire = await ApiService.instance.getVeterinaireDetails(
-          auction['vitirinaire_id'],
+          auction['veterinaire'],
         );
       }
 
