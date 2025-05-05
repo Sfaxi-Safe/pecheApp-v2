@@ -22,19 +22,28 @@ class ApiService {
 
   // Constructeur privé qui initialise l'URL de l'API
   ApiService._init() {
-    // Adresse IP de votre ordinateur pour les tests sur appareil physique
-    const String physicalDeviceUrl =
-        'http://192.168.3.233:3005/api'; // Adresse IP de votre carte Wi-Fi
-    const String emulatorUrl = 'http://10.0.2.2:3005/api';
+    // Adresse IP Wi-Fi actuelle (mise à jour)
+    const String wifiUrl = 'http://172.16.10.12:3005/api'; // Adresse Wi-Fi
 
-    // Utilisez l'URL appropriée selon le contexte
-    // Décommentez la ligne ci-dessous pour utiliser l'émulateur
-    // baseUrl = emulatorUrl;
+    // Essayer d'abord l'adresse IP Wi-Fi
+    baseUrl = wifiUrl;
 
-    // Décommentez la ligne ci-dessous pour utiliser un appareil physique
-    baseUrl =
-        physicalDeviceUrl; // ⚠️ N'oubliez pas de remplacer X par votre adresse IP
+    // Nous utiliserons un mécanisme de fallback dans les méthodes de requête
+    // pour essayer d'autres URLs si la première échoue
+
+    // Journaliser l'URL initiale
+    debugPrint('URL API initiale: $baseUrl');
   }
+
+  // Liste des URLs de fallback à essayer si la première échoue
+  final List<String> _fallbackUrls = [
+    'http://localhost:3005/api',
+    'http://127.0.0.1:3005/api',
+    'http://192.168.56.1:3005/api', // Ethernet 3
+    'http://192.168.178.1:3005/api', // VMware 1
+    'http://192.168.197.1:3005/api', // VMware 8
+    'http://10.0.2.2:3005/api', // Émulateur Android
+  ];
 
   void setAuthToken(String? token) {
     _authToken = token;
@@ -42,6 +51,85 @@ class ApiService {
 
   bool hasToken() {
     return _authToken != null && _authToken!.isNotEmpty;
+  }
+
+  /// Vérifie si le serveur est accessible
+  Future<bool> isServerReachable() async {
+    try {
+      // Essayer de faire une requête simple pour vérifier la connectivité
+      // Utiliser la route health qui est connue pour fonctionner
+      final response = await http
+          .get(Uri.parse('${baseUrl.split('/api').first}/api/health'))
+          .timeout(const Duration(seconds: 5));
+
+      debugPrint('Réponse du serveur (health): ${response.statusCode}');
+
+      // Si le serveur répond avec n'importe quel code, c'est qu'il est accessible
+      // Même un 401 (non autorisé) signifie que le serveur fonctionne
+      return response.statusCode >= 200 && response.statusCode < 500;
+    } catch (e) {
+      // Essayer une autre route si la première échoue
+      try {
+        debugPrint('Première tentative échouée, essai avec l\'URL de base');
+        final response = await http
+            .get(Uri.parse(baseUrl))
+            .timeout(const Duration(seconds: 5));
+
+        debugPrint('Réponse du serveur (baseUrl): ${response.statusCode}');
+        return response.statusCode >= 200 && response.statusCode < 500;
+      } catch (e2) {
+        debugPrint(
+          'Erreur lors de la vérification de la connectivité: ${e.toString()}',
+        );
+        debugPrint('Erreur secondaire: ${e2.toString()}');
+        return false;
+      }
+    }
+  }
+
+  /// Vérifie si le serveur est accessible et essaie les URLs alternatives si nécessaire
+  Future<bool> checkServerConnectivity() async {
+    debugPrint('Vérification de la connectivité au serveur...');
+    debugPrint('URL principale: $baseUrl');
+
+    // Essayer l'URL principale
+    if (await isServerReachable()) {
+      debugPrint('Connexion réussie à l\'URL principale: $baseUrl');
+      return true;
+    }
+
+    debugPrint(
+      'Échec de connexion à l\'URL principale, essai des alternatives...',
+    );
+
+    // Essayer les URLs alternatives
+    for (final url in _fallbackUrls) {
+      debugPrint('Essai de connexion à $url');
+      final originalUrl = baseUrl;
+      baseUrl = url;
+
+      if (await isServerReachable()) {
+        debugPrint('Connexion réussie à $url');
+        return true;
+      }
+
+      // Restaurer l'URL originale si celle-ci ne fonctionne pas
+      baseUrl = originalUrl;
+      debugPrint('Échec de connexion à $url, restauration de l\'URL originale');
+    }
+
+    // Essayer directement l'adresse IP avec le port
+    final directIpUrl = 'http://172.16.10.12:3005/api';
+    debugPrint('Essai direct avec l\'adresse IP: $directIpUrl');
+    baseUrl = directIpUrl;
+
+    if (await isServerReachable()) {
+      debugPrint('Connexion réussie à l\'adresse IP directe: $directIpUrl');
+      return true;
+    }
+
+    debugPrint('Échec de toutes les tentatives de connexion');
+    return false;
   }
 
   Map<String, String> get _headers {
@@ -53,7 +141,10 @@ class ApiService {
   }
 
   // Méthodes génériques CRUD
-  Future<Map<String, dynamic>> get(String endpoint) async {
+  Future<Map<String, dynamic>> get(
+    String endpoint, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
       // Journaliser la requête
       ErrorHandler.instance.logInfo(
@@ -61,9 +152,23 @@ class ApiService {
         context: 'ApiService',
       );
 
+      // Construire l'URI avec les paramètres de requête
+      Uri uri;
+      if (queryParameters != null && queryParameters.isNotEmpty) {
+        final queryString = queryParameters.entries
+            .map(
+              (e) =>
+                  '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value.toString())}',
+            )
+            .join('&');
+        uri = Uri.parse('$baseUrl/$endpoint?$queryString');
+      } else {
+        uri = Uri.parse('$baseUrl/$endpoint');
+      }
+
       // Ajouter un timeout pour éviter les attentes infinies
       final response = await http
-          .get(Uri.parse('$baseUrl/$endpoint'), headers: _headers)
+          .get(uri, headers: _headers)
           .timeout(
             const Duration(seconds: 30),
             onTimeout: () {
@@ -143,70 +248,128 @@ class ApiService {
     String endpoint,
     Map<String, dynamic> data,
   ) async {
-    try {
-      // Journaliser la requête
-      ErrorHandler.instance.logInfo(
-        'POST request: $endpoint',
-        context: 'ApiService',
-      );
+    // Liste des URLs à essayer, en commençant par l'URL principale
+    final urlsToTry = [baseUrl, ..._fallbackUrls];
 
-      // Ajouter un timeout pour éviter les attentes infinies
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/$endpoint'),
-            headers: _headers,
-            body: json.encode(data),
-          )
-          .timeout(
-            const Duration(
-              seconds: 60,
-            ), // Augmenter le délai d'attente à 60 secondes
-            onTimeout: () {
-              throw TimeoutException(
-                'La requête a pris trop de temps à s\'exécuter',
-              );
-            },
+    // Nombre maximum de tentatives
+    const maxRetries = 2;
+
+    // Journaliser la requête
+    ErrorHandler.instance.logInfo(
+      'POST request: $endpoint',
+      context: 'ApiService',
+    );
+
+    // Pour chaque URL à essayer
+    for (final url in urlsToTry) {
+      // Essayer plusieurs fois avec la même URL
+      for (int retry = 0; retry < maxRetries; retry++) {
+        try {
+          // Ajouter un timeout pour éviter les attentes infinies
+          // Réduire le timeout pour les tentatives suivantes
+          final timeout = retry == 0 ? 30 : 15; // secondes
+
+          ErrorHandler.instance.logInfo(
+            'Tentative ${retry + 1}/$maxRetries avec URL: $url/$endpoint',
+            context: 'ApiService',
           );
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        return responseData;
-      }
+          final response = await http
+              .post(
+                Uri.parse('$url/$endpoint'),
+                headers: _headers,
+                body: json.encode(data),
+              )
+              .timeout(
+                Duration(seconds: timeout),
+                onTimeout: () {
+                  throw TimeoutException(
+                    'La requête a pris trop de temps à s\'exécuter (${timeout}s)',
+                  );
+                },
+              );
 
-      throw _createAppError(response, 'POST', endpoint);
-    } on SocketException catch (e) {
-      ErrorHandler.instance.logError(e, context: 'ApiService.post($endpoint)');
-      throw AppError(
-        message:
-            'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
-        type: ErrorType.network,
-        originalError: e,
-      );
-    } on TimeoutException catch (e) {
-      ErrorHandler.instance.logError(e, context: 'ApiService.post($endpoint)');
-      throw AppError(
-        message: 'La requête a pris trop de temps. Veuillez réessayer.',
-        type: ErrorType.network,
-        originalError: e,
-      );
-    } on FormatException catch (e) {
-      ErrorHandler.instance.logError(e, context: 'ApiService.post($endpoint)');
-      throw AppError(
-        message: 'Erreur de format de données reçues du serveur.',
-        type: ErrorType.server,
-        originalError: e,
-      );
-    } catch (e) {
-      ErrorHandler.instance.logError(e, context: 'ApiService.post($endpoint)');
-      if (e is AppError) {
-        rethrow;
+          if (response.statusCode == 201 || response.statusCode == 200) {
+            // Si cette URL fonctionne, la définir comme URL par défaut
+            if (url != baseUrl) {
+              ErrorHandler.instance.logInfo(
+                'Changement d\'URL de base: $baseUrl -> $url',
+                context: 'ApiService',
+              );
+              baseUrl = url;
+            }
+
+            final responseData = json.decode(response.body);
+            return responseData;
+          }
+
+          throw _createAppError(response, 'POST', endpoint);
+        } on SocketException catch (e) {
+          ErrorHandler.instance.logError(
+            'Tentative ${retry + 1}/$maxRetries échouée: ${e.toString()}',
+            context: 'ApiService.post($endpoint)',
+          );
+
+          // Si c'est la dernière tentative avec cette URL, continuer avec l'URL suivante
+          if (retry == maxRetries - 1) {
+            continue;
+          }
+
+          // Attendre un peu avant de réessayer
+          await Future.delayed(const Duration(milliseconds: 500));
+        } on TimeoutException catch (e) {
+          ErrorHandler.instance.logError(
+            'Timeout lors de la tentative ${retry + 1}/$maxRetries: ${e.toString()}',
+            context: 'ApiService.post($endpoint)',
+          );
+
+          // Si c'est la dernière tentative avec cette URL, continuer avec l'URL suivante
+          if (retry == maxRetries - 1) {
+            continue;
+          }
+
+          // Attendre un peu avant de réessayer
+          await Future.delayed(const Duration(milliseconds: 500));
+        } on FormatException catch (e) {
+          // Erreur de format, pas besoin de réessayer
+          ErrorHandler.instance.logError(
+            e,
+            context: 'ApiService.post($endpoint)',
+          );
+          throw AppError(
+            message: 'Erreur de format de données reçues du serveur.',
+            type: ErrorType.server,
+            originalError: e,
+          );
+        } catch (e) {
+          // Autres erreurs, pas besoin de réessayer
+          ErrorHandler.instance.logError(
+            e,
+            context: 'ApiService.post($endpoint)',
+          );
+          if (e is AppError) {
+            rethrow;
+          }
+          throw AppError(
+            message: 'Erreur lors de la requête POST: ${e.toString()}',
+            type: ErrorType.unknown,
+            originalError: e,
+          );
+        }
       }
-      throw AppError(
-        message: 'Erreur lors de la requête POST: ${e.toString()}',
-        type: ErrorType.unknown,
-        originalError: e,
-      );
     }
+
+    // Si toutes les tentatives ont échoué
+    ErrorHandler.instance.logError(
+      'Toutes les tentatives ont échoué pour POST $endpoint',
+      context: 'ApiService.post',
+    );
+
+    throw AppError(
+      message:
+          'Impossible de se connecter au serveur après plusieurs tentatives. Vérifiez votre connexion internet et réessayez plus tard.',
+      type: ErrorType.network,
+    );
   }
 
   Future<Map<String, dynamic>> put(

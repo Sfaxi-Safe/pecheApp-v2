@@ -66,7 +66,10 @@ class FishSpeciesConfig {
 
   /// Obtient la liste complète des espèces de poissons
   static List<String> getAllSpecies() {
-    final Set<String> allSpecies = {...mediterraneanSpecies, ...additionalSpecies};
+    final Set<String> allSpecies = {
+      ...mediterraneanSpecies,
+      ...additionalSpecies,
+    };
     return allSpecies.toList()..sort();
   }
 
@@ -99,10 +102,10 @@ class FishSpeciesConfig {
     'shrimp': 'crevettes',
     'prawn': 'chevrette',
     'scorpion fish': 'scorpaena',
-    'sea bream': 'sbares',
+    'gilt head bream': 'sbares',
     'grey mullet': 'bouri',
     'grouper': 'meeza',
-    'sea bass': 'karous',
+    'mediterranean sea bass': 'karous',
     'red porgy': 'morjan',
     'common dentex': 'denté',
     'white seabream': 'sar',
@@ -117,7 +120,7 @@ class FishSpeciesConfig {
     'whiting': 'merlan',
     'gurnard': 'grondin',
     'red sea bream': 'pageot',
-    'red porgy': 'pagre',
+    'common seabream': 'pagre',
     'scorpionfish': 'rascasse',
   };
 

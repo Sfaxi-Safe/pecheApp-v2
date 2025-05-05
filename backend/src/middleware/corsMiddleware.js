@@ -7,7 +7,7 @@ const cors = require('cors');
 const corsOptions = {
   origin: function (origin, callback) {
     // Lire les origines autorisées depuis la variable d'environnement
-    const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173,http://192.168.3.233:*').split(',');
+    const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173,http://172.16.50.169:*,http://192.168.56.1:*').split(',');
 
     // Autoriser les requêtes sans origine (comme les appels API mobiles)
     if (!origin) {

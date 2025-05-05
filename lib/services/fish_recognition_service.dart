@@ -237,6 +237,11 @@ class FishRecognitionService {
     _preferOnlineRecognition = prefer;
   }
 
+  /// Obtient la valeur actuelle de la préférence pour l'API en ligne
+  bool getPreferOnlineRecognition() {
+    return _preferOnlineRecognition;
+  }
+
   Future<List<List<List<double>>>> _preprocessImage(File imageFile) async {
     // Lire l'image
     final bytes = await imageFile.readAsBytes();

@@ -12,7 +12,7 @@ import 'package:seatrace/widgets/optimized_image.dart';
 class FishClassificationScreen extends StatefulWidget {
   /// Callback appelé lorsque l'utilisateur sélectionne une espèce
   final Function(Espece espece)? onEspeceSelected;
-  
+
   /// Indique si l'écran doit retourner l'espèce sélectionnée
   final bool returnResult;
 
@@ -23,7 +23,8 @@ class FishClassificationScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<FishClassificationScreen> createState() => _FishClassificationScreenState();
+  State<FishClassificationScreen> createState() =>
+      _FishClassificationScreenState();
 }
 
 class _FishClassificationScreenState extends State<FishClassificationScreen> {
@@ -59,7 +60,7 @@ class _FishClassificationScreenState extends State<FishClassificationScreen> {
         children: [
           // Image du poisson
           _buildImageSection(),
-          
+
           // Résultat de la classification
           if (_isProcessing) ...[
             const SizedBox(height: 32),
@@ -117,9 +118,7 @@ class _FishClassificationScreenState extends State<FishClassificationScreen> {
   Widget _buildImageSection() {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -227,7 +226,7 @@ class _FishClassificationScreenState extends State<FishClassificationScreen> {
         maxHeight: 1200,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           _imageFile = File(image.path);
@@ -235,7 +234,7 @@ class _FishClassificationScreenState extends State<FishClassificationScreen> {
           _selectedEspece = null;
           _errorMessage = null;
         });
-        
+
         _classifyImage();
       }
     } catch (e) {
@@ -258,7 +257,7 @@ class _FishClassificationScreenState extends State<FishClassificationScreen> {
         maxHeight: 1200,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           _imageFile = File(image.path);
@@ -266,7 +265,7 @@ class _FishClassificationScreenState extends State<FishClassificationScreen> {
           _selectedEspece = null;
           _errorMessage = null;
         });
-        
+
         _classifyImage();
       }
     } catch (e) {
@@ -282,27 +281,28 @@ class _FishClassificationScreenState extends State<FishClassificationScreen> {
   /// Classifie l'image sélectionnée
   Future<void> _classifyImage() async {
     if (_imageFile == null) return;
-    
+
     setState(() {
       _isProcessing = true;
       _errorMessage = null;
     });
-    
+
     try {
       // Classifier l'image
       final result = await FishRecognitionService().classifyFish(_imageFile!);
-      
+
       if (result == null) {
         setState(() {
           _isProcessing = false;
-          _errorMessage = 'Impossible de classifier cette image. Veuillez réessayer avec une autre image.';
+          _errorMessage =
+              'Impossible de classifier cette image. Veuillez réessayer avec une autre image.';
         });
         return;
       }
-      
+
       // Récupérer l'espèce correspondante
       final espece = await FishRecognitionService().recognizeFish(_imageFile!);
-      
+
       setState(() {
         _classificationResult = result;
         _selectedEspece = espece;
@@ -311,13 +311,11 @@ class _FishClassificationScreenState extends State<FishClassificationScreen> {
     } catch (e) {
       setState(() {
         _isProcessing = false;
-        _errorMessage = 'Une erreur est survenue lors de la classification: ${e.toString()}';
+        _errorMessage =
+            'Une erreur est survenue lors de la classification: ${e.toString()}';
       });
-      
-      ErrorHandler.instance.logError(
-        e,
-        context: 'Classification d\'image',
-      );
+
+      ErrorHandler.instance.logError(e, context: 'Classification d\'image');
     }
   }
 
@@ -338,16 +336,16 @@ class _FishClassificationScreenState extends State<FishClassificationScreen> {
     setState(() {
       _isProcessing = true;
     });
-    
+
     try {
       // Mettre à jour le résultat de classification
       setState(() {
         _classificationResult = alternative;
       });
-      
+
       // Récupérer l'espèce correspondante
       final espece = await FishRecognitionService().recognizeFish(_imageFile!);
-      
+
       setState(() {
         _selectedEspece = espece;
         _isProcessing = false;
@@ -355,13 +353,11 @@ class _FishClassificationScreenState extends State<FishClassificationScreen> {
     } catch (e) {
       setState(() {
         _isProcessing = false;
-        _errorMessage = 'Une erreur est survenue lors de la sélection de l\'alternative: ${e.toString()}';
+        _errorMessage =
+            'Une erreur est survenue lors de la sélection de l\'alternative: ${e.toString()}';
       });
-      
-      ErrorHandler.instance.logError(
-        e,
-        context: 'Sélection d\'alternative',
-      );
+
+      ErrorHandler.instance.logError(e, context: 'Sélection d\'alternative');
     }
   }
 
@@ -369,34 +365,40 @@ class _FishClassificationScreenState extends State<FishClassificationScreen> {
   void _showSettings() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Paramètres de classification'),
-        content: StatefulBuilder(
-          builder: (context, setState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SwitchListTile(
-                  title: const Text('Préférer l\'API en ligne'),
-                  subtitle: const Text('Utiliser Google Vision API si disponible'),
-                  value: FishRecognitionService()._preferOnlineRecognition,
-                  onChanged: (value) {
-                    setState(() {
-                      FishRecognitionService().setPreferOnlineRecognition(value);
-                    });
-                  },
-                ),
-              ],
-            );
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Fermer'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Paramètres de classification'),
+            content: StatefulBuilder(
+              builder: (context, setState) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SwitchListTile(
+                      title: const Text('Préférer l\'API en ligne'),
+                      subtitle: const Text(
+                        'Utiliser Google Vision API si disponible',
+                      ),
+                      value:
+                          FishRecognitionService().getPreferOnlineRecognition(),
+                      onChanged: (value) {
+                        setState(() {
+                          FishRecognitionService().setPreferOnlineRecognition(
+                            value,
+                          );
+                        });
+                      },
+                    ),
+                  ],
+                );
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Fermer'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 }

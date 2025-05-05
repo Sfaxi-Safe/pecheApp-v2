@@ -287,6 +287,34 @@ class LoginScreenState extends State<LoginScreen> {
                             if (_errorMessage != null) ...[
                               const SizedBox(height: 16),
                               FormErrorDisplay(message: _errorMessage),
+                              const SizedBox(height: 8),
+                              if (_errorMessage!.contains('trop de temps') ||
+                                  _errorMessage!.contains('connexion') ||
+                                  _errorMessage!.contains('internet')) ...[
+                                Text(
+                                  'Conseils de dépannage:',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '• Vérifiez votre connexion internet\n'
+                                  '• Assurez-vous que le serveur est en cours d\'exécution\n'
+                                  '• Essayez de vous connecter plus tard',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                CustomButton.outline(
+                                  text: 'Réessayer',
+                                  onPressed: _isLoading ? null : _login,
+                                  size: CustomButtonSize.small,
+                                ),
+                              ],
                             ],
 
                             const SizedBox(height: 24),

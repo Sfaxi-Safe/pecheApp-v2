@@ -5,16 +5,16 @@ import '../services/filter_service.dart';
 class FilterBar extends StatefulWidget {
   /// Callback appelé lorsque les filtres sont appliqués
   final Function(Map<String, dynamic> filters) onApplyFilters;
-  
+
   /// Filtres initiaux
   final Map<String, dynamic> initialFilters;
-  
+
   /// Options de filtre disponibles
   final List<FilterOption> filterOptions;
-  
+
   /// Indique si la barre de filtre doit être compacte
   final bool isCompact;
-  
+
   /// Indique si la barre de filtre doit afficher un bouton de réinitialisation
   final bool showResetButton;
 
@@ -76,9 +76,7 @@ class _FilterBarState extends State<FilterBar> {
     return Card(
       margin: const EdgeInsets.all(8.0),
       elevation: 2.0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8.0),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
       child: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Column(
@@ -87,15 +85,9 @@ class _FilterBarState extends State<FilterBar> {
             // Barre principale
             Row(
               children: [
-                Icon(
-                  Icons.filter_list,
-                  color: Theme.of(context).primaryColor,
-                ),
+                Icon(Icons.filter_list, color: Theme.of(context).primaryColor),
                 const SizedBox(width: 8.0),
-                Text(
-                  'Filtres',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Text('Filtres', style: Theme.of(context).textTheme.titleMedium),
                 const Spacer(),
                 if (_filters.isNotEmpty && widget.showResetButton)
                   TextButton.icon(
@@ -104,12 +96,14 @@ class _FilterBarState extends State<FilterBar> {
                     label: const Text('Réinitialiser'),
                   ),
                 IconButton(
-                  icon: Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
+                  icon: Icon(
+                    _isExpanded ? Icons.expand_less : Icons.expand_more,
+                  ),
                   onPressed: _toggleExpanded,
                 ),
               ],
             ),
-            
+
             // Filtres appliqués (en mode compact)
             if (widget.isCompact && _filters.isNotEmpty && !_isExpanded)
               Padding(
@@ -117,29 +111,31 @@ class _FilterBarState extends State<FilterBar> {
                 child: Wrap(
                   spacing: 8.0,
                   runSpacing: 4.0,
-                  children: _filters.entries.map((entry) {
-                    final option = widget.filterOptions.firstWhere(
-                      (o) => o.key == entry.key,
-                      orElse: () => FilterOption(
-                        key: entry.key,
-                        label: entry.key,
-                        type: FilterType.text,
-                      ),
-                    );
-                    
-                    return Chip(
-                      label: Text(
-                        '${option.label}: ${_formatFilterValue(entry.value, option.type)}',
-                      ),
-                      onDeleted: () {
-                        _updateFilter(entry.key, null);
-                        _applyFilters();
-                      },
-                    );
-                  }).toList(),
+                  children:
+                      _filters.entries.map((entry) {
+                        final option = widget.filterOptions.firstWhere(
+                          (o) => o.key == entry.key,
+                          orElse:
+                              () => FilterOption(
+                                key: entry.key,
+                                label: entry.key,
+                                type: FilterType.text,
+                              ),
+                        );
+
+                        return Chip(
+                          label: Text(
+                            '${option.label}: ${_formatFilterValue(entry.value, option.type)}',
+                          ),
+                          onDeleted: () {
+                            _updateFilter(entry.key, null);
+                            _applyFilters();
+                          },
+                        );
+                      }).toList(),
                 ),
               ),
-            
+
             // Contenu des filtres (en mode étendu)
             if (_isExpanded)
               Padding(
@@ -217,10 +213,7 @@ class _FilterBarState extends State<FilterBar> {
       value: _filters[option.key]?.toString(),
       items: [
         if (option.allowEmpty)
-          const DropdownMenuItem<String>(
-            value: '',
-            child: Text('Tous'),
-          ),
+          const DropdownMenuItem<String>(value: '', child: Text('Tous')),
         ...items.map((item) {
           return DropdownMenuItem<String>(
             value: item.value,
@@ -234,18 +227,19 @@ class _FilterBarState extends State<FilterBar> {
 
   Widget _buildDateFilter(FilterOption option) {
     final value = _filters[option.key];
-    final displayValue = value != null
-        ? FilterService.instance.formatDate(value)
-        : 'Sélectionner une date';
-    
+    final displayValue =
+        value != null
+            ? FilterService.instance.formatDate(value)
+            : 'Sélectionner une date';
+
     return InkWell(
       onTap: () async {
-        final date = await FilterService.instance.showDatePicker(
+        final date = await FilterService.instance.selectDate(
           context: context,
           initialDate: value,
           helpText: option.hint ?? 'Sélectionner une date',
         );
-        
+
         if (date != null) {
           _updateFilter(option.key, date);
         }
@@ -261,10 +255,7 @@ class _FilterBarState extends State<FilterBar> {
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(displayValue),
-            const Icon(Icons.calendar_today),
-          ],
+          children: [Text(displayValue), const Icon(Icons.calendar_today)],
         ),
       ),
     );
@@ -275,7 +266,7 @@ class _FilterBarState extends State<FilterBar> {
     final endKey = '${option.key}End';
     final startDate = _filters[startKey];
     final endDate = _filters[endKey];
-    
+
     String displayValue;
     if (startDate != null && endDate != null) {
       displayValue =
@@ -287,17 +278,18 @@ class _FilterBarState extends State<FilterBar> {
     } else {
       displayValue = 'Sélectionner une période';
     }
-    
+
     return InkWell(
       onTap: () async {
-        final dateRange = await FilterService.instance.showDateRangePicker(
+        final dateRange = await FilterService.instance.selectDateRange(
           context: context,
-          initialDateRange: startDate != null && endDate != null
-              ? DateTimeRange(start: startDate, end: endDate)
-              : null,
+          initialDateRange:
+              startDate != null && endDate != null
+                  ? DateTimeRange(start: startDate, end: endDate)
+                  : null,
           helpText: option.hint ?? 'Sélectionner une période',
         );
-        
+
         if (dateRange != null) {
           _updateFilter(startKey, dateRange.start);
           _updateFilter(endKey, dateRange.end);
@@ -314,10 +306,7 @@ class _FilterBarState extends State<FilterBar> {
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(displayValue),
-            const Icon(Icons.date_range),
-          ],
+          children: [Text(displayValue), const Icon(Icons.date_range)],
         ),
       ),
     );
@@ -326,14 +315,11 @@ class _FilterBarState extends State<FilterBar> {
   Widget _buildCheckboxFilter(FilterOption option) {
     final items = option.items ?? [];
     final values = _filters[option.key] ?? [];
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          option.label,
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
+        Text(option.label, style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4.0),
         ...items.map((item) {
           return CheckboxListTile(
@@ -362,14 +348,11 @@ class _FilterBarState extends State<FilterBar> {
   Widget _buildRadioFilter(FilterOption option) {
     final items = option.items ?? [];
     final value = _filters[option.key];
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          option.label,
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
+        Text(option.label, style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4.0),
         ...items.map((item) {
           return RadioListTile<String>(
@@ -400,7 +383,7 @@ class _FilterBarState extends State<FilterBar> {
 
   String _formatFilterValue(dynamic value, FilterType type) {
     if (value == null) return '';
-    
+
     switch (type) {
       case FilterType.date:
         return FilterService.instance.formatDate(value);
@@ -421,32 +404,25 @@ class _FilterBarState extends State<FilterBar> {
 }
 
 /// Types de filtres disponibles
-enum FilterType {
-  text,
-  dropdown,
-  date,
-  dateRange,
-  checkbox,
-  radio,
-}
+enum FilterType { text, dropdown, date, dateRange, checkbox, radio }
 
 /// Option de filtre
 class FilterOption {
   /// Clé unique du filtre
   final String key;
-  
+
   /// Libellé du filtre
   final String label;
-  
+
   /// Type de filtre
   final FilterType type;
-  
+
   /// Texte d'aide
   final String? hint;
-  
+
   /// Liste d'éléments pour les filtres de type dropdown, checkbox et radio
   final List<FilterItem>? items;
-  
+
   /// Indique si le filtre peut être vide
   final bool allowEmpty;
 
@@ -464,12 +440,9 @@ class FilterOption {
 class FilterItem {
   /// Valeur de l'élément
   final String value;
-  
+
   /// Libellé de l'élément
   final String label;
 
-  FilterItem({
-    required this.value,
-    required this.label,
-  });
+  FilterItem({required this.value, required this.label});
 }

@@ -10,12 +10,12 @@ class FilterService {
 
   /// Formateur de date pour l'affichage
   final DateFormat _dateFormatter = DateFormat('dd/MM/yyyy');
-  
+
   /// Formateur de date pour les requêtes API
   final DateFormat _apiDateFormatter = DateFormat('yyyy-MM-dd');
 
   /// Affiche un sélecteur de date et retourne la date sélectionnée
-  Future<DateTime?> showDatePicker({
+  Future<DateTime?> selectDate({
     required BuildContext context,
     DateTime? initialDate,
     DateTime? firstDate,
@@ -48,14 +48,14 @@ class FilterService {
     } catch (error) {
       ErrorHandler.instance.logError(
         error,
-        context: 'FilterService.showDatePicker',
+        context: 'FilterService.selectDate',
       );
       return null;
     }
   }
 
   /// Affiche un sélecteur de plage de dates et retourne la plage sélectionnée
-  Future<DateTimeRange?> showDateRangePicker({
+  Future<DateTimeRange?> selectDateRange({
     required BuildContext context,
     DateTimeRange? initialDateRange,
     DateTime? firstDate,
@@ -64,12 +64,10 @@ class FilterService {
   }) async {
     try {
       final now = DateTime.now();
-      final initialRange = initialDateRange ??
-          DateTimeRange(
-            start: now.subtract(const Duration(days: 7)),
-            end: now,
-          );
-      
+      final initialRange =
+          initialDateRange ??
+          DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now);
+
       return await showDateRangePicker(
         context: context,
         initialDateRange: initialRange,
@@ -94,7 +92,7 @@ class FilterService {
     } catch (error) {
       ErrorHandler.instance.logError(
         error,
-        context: 'FilterService.showDateRangePicker',
+        context: 'FilterService.selectDateRange',
       );
       return null;
     }
@@ -147,15 +145,15 @@ class FilterService {
     String endDateParam = 'endDate',
   }) {
     final params = <String, String>{};
-    
+
     if (startDate != null) {
       params[startDateParam] = formatDateForApi(startDate);
     }
-    
+
     if (endDate != null) {
       params[endDateParam] = formatDateForApi(endDate);
     }
-    
+
     return params;
   }
 
@@ -169,10 +167,10 @@ class FilterService {
     if (startDate == null && endDate == null) {
       return items;
     }
-    
+
     return items.where((item) {
       final itemDate = getItemDate(item);
-      
+
       if (startDate != null && endDate != null) {
         return itemDate.isAfter(startDate.subtract(const Duration(days: 1))) &&
             itemDate.isBefore(endDate.add(const Duration(days: 1)));
@@ -181,7 +179,7 @@ class FilterService {
       } else if (endDate != null) {
         return itemDate.isBefore(endDate.add(const Duration(days: 1)));
       }
-      
+
       return true;
     }).toList();
   }

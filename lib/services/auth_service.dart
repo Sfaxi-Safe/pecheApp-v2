@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:seatrace/models/user.dart';
 import 'package:seatrace/services/api_service.dart';
 import 'package:seatrace/utils/error_handler.dart';
@@ -125,10 +126,63 @@ class AuthService {
         context: 'AuthService',
       );
 
+      // Vérifier la connectivité au serveur avant de tenter la connexion
+      debugPrint(
+        'Vérification de la connectivité au serveur avant connexion...',
+      );
+      final isConnected = await ApiService.instance.checkServerConnectivity();
+
+      if (!isConnected) {
+        debugPrint(
+          'Échec de connexion au serveur lors de la vérification initiale',
+        );
+
+        // Essayer une dernière fois avec l'adresse IP directe
+        final directUrl = 'http://172.16.10.12:3005/api';
+        debugPrint('Tentative directe avec: $directUrl');
+
+        ApiService.instance.baseUrl = directUrl;
+
+        // Faire une requête directe à la route health
+        try {
+          final healthResponse = await http
+              .get(Uri.parse('http://172.16.10.12:3005/api/health'))
+              .timeout(const Duration(seconds: 5));
+
+          debugPrint('Réponse health directe: ${healthResponse.statusCode}');
+
+          if (healthResponse.statusCode == 200) {
+            debugPrint('Connexion directe réussie, poursuite de la connexion');
+          } else {
+            throw AppError(
+              message:
+                  'Impossible de se connecter au serveur. Vérifiez votre connexion internet et que le serveur est en cours d\'exécution.',
+              type: ErrorType.network,
+              context: 'AuthService.login',
+            );
+          }
+        } catch (healthError) {
+          debugPrint('Erreur lors de la requête health directe: $healthError');
+          throw AppError(
+            message:
+                'Impossible de se connecter au serveur. Vérifiez votre connexion internet et que le serveur est en cours d\'exécution.',
+            type: ErrorType.network,
+            context: 'AuthService.login',
+          );
+        }
+      }
+
+      debugPrint('Connexion au serveur réussie, tentative de login...');
+      debugPrint('URL utilisée: ${ApiService.instance.baseUrl}/auth/login');
+
       final response = await ApiService.instance.post('auth/login', {
         'email': email,
         'password': password,
       });
+
+      debugPrint(
+        'Réponse de login reçue: ${response.toString().substring(0, 100)}...',
+      );
 
       if (response.containsKey('token') && response.containsKey('user')) {
         final prefs = await SharedPreferences.getInstance();
@@ -143,8 +197,11 @@ class AuthService {
           context: 'AuthService',
         );
 
+        debugPrint('Utilisateur connecté: ${user.prenom} ${user.nom}');
+
         return user;
       } else {
+        debugPrint('Réponse de login invalide: ${response.toString()}');
         throw AppError(
           message: 'Informations de connexion invalides',
           type: ErrorType.authentication,
@@ -152,9 +209,11 @@ class AuthService {
         );
       }
     } on AppError catch (e) {
+      debugPrint('AppError lors de la connexion: ${e.message}');
       ErrorHandler.instance.logError(e, context: 'AuthService.login');
       rethrow;
     } catch (e) {
+      debugPrint('Erreur générique lors de la connexion: ${e.toString()}');
       ErrorHandler.instance.logError(e, context: 'AuthService.login');
       throw AppError(
         message: 'Erreur lors de la connexion: ${e.toString()}',
