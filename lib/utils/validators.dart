@@ -1,15 +1,28 @@
 class Validators {
-  // Email validation
+  // Email validation with additional checks
   static String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
       return 'Veuillez entrer votre email';
     }
     
-    // Regular expression for email validation
-    final emailRegExp = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+    value = value.trim();
+    if (value.length > 255) {
+      return 'L\'email ne doit pas dépasser 255 caractères';
+    }
+    
+    // Regular expression for strict email validation
+    final emailRegExp = RegExp(
+      r'^[a-zA-Z0-9](?:[a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.(?:[a-zA-Z]{2,}(?:\.[a-zA-Z]{2,})?)?$'
+    );
     
     if (!emailRegExp.hasMatch(value)) {
       return 'Veuillez entrer un email valide';
+    }
+    
+    // Check for common disposable email domains
+    final disposableDomains = ['tempmail.com', 'temp-mail.org', 'guerrillamail.com'];
+    if (disposableDomains.any((domain) => value.toLowerCase().endsWith(domain))) {
+      return 'Les emails temporaires ne sont pas acceptés';
     }
     
     return null;
@@ -74,30 +87,105 @@ class Validators {
     return null;
   }
   
-  // Name validation
+  // Name validation with special character check
   static String? validateName(String? value) {
     if (value == null || value.isEmpty) {
       return 'Ce champ est obligatoire';
+    }
+    
+    value = value.trim();
+    if (value.isEmpty) {
+      return 'Ce champ ne peut pas être vide';
     }
     
     if (value.length < 2) {
       return 'Ce champ doit contenir au moins 2 caractères';
     }
     
+    if (value.length > 50) {
+      return 'Ce champ ne doit pas dépasser 50 caractères';
+    }
+    
+    // Check for valid name characters
+    final nameRegExp = RegExp(r'^[a-zA-ZÀ-ÿ\-\'\s]+$');
+    if (!nameRegExp.hasMatch(value)) {
+      return 'Ce champ ne doit contenir que des lettres, des tirets et des apostrophes';
+    }
+    
+    return null;
+  }
+
+  // Matricule validation for boats
+  static String? validateMatricule(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Le matricule est obligatoire';
+    }
+    
+    value = value.trim().toUpperCase();
+    
+    // Format: XX-999999 (2 letters followed by 6 digits)
+    final matriculeRegExp = RegExp(r'^[A-Z]{2}-\d{6}$');
+    if (!matriculeRegExp.hasMatch(value)) {
+      return 'Format invalide. Le format doit être XX-999999';
+    }
+    
+    return null;
+  }
+
+  // CIN validation
+  static String? validateCIN(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Le numéro CIN est obligatoire';
+    }
+    
+    value = value.trim().toUpperCase();
+    
+    // Format: X999999 (1 letter followed by 6 digits)
+    final cinRegExp = RegExp(r'^[A-Z]\d{6}$');
+    if (!cinRegExp.hasMatch(value)) {
+      return 'Format invalide. Le format doit être X999999';
+    }
+    
+    return null;
+  }
+
+  // License validation for veterinarians
+  static String? validateLicense(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Le numéro de licence est obligatoire';
+    }
+    
+    value = value.trim().toUpperCase();
+    
+    // Format: VET-999999 (VET- followed by 6 digits)
+    final licenseRegExp = RegExp(r'^VET-\d{6}$');
+    if (!licenseRegExp.hasMatch(value)) {
+      return 'Format invalide. Le format doit être VET-999999';
+    }
+    
     return null;
   }
   
-  // Phone validation
+  // Phone validation with international format support
   static String? validatePhone(String? value) {
     if (value == null || value.isEmpty) {
-      return null; // Phone is optional
+      return 'Le numéro de téléphone est obligatoire';
     }
     
-    // Regular expression for phone validation (numbers only)
-    final phoneRegExp = RegExp(r'^[0-9]+$');
+    value = value.trim().replaceAll(' ', '');
+    
+    // Regular expression for international phone numbers
+    final phoneRegExp = RegExp(
+      r'^\+?([0-9]{1,3})?[-. ]?\(?([0-9]{1,3})\)?[-. ]?([0-9]{1,4})[-. ]?([0-9]{1,4})$'
+    );
     
     if (!phoneRegExp.hasMatch(value)) {
-      return 'Veuillez entrer un numéro de téléphone valide';
+      return 'Veuillez entrer un numéro de téléphone valide (+XXX XX XX XX XX)';
+    }
+    
+    if (value.length < 8 || value.length > 15) {
+      return 'Le numéro de téléphone doit contenir entre 8 et 15 chiffres';
+    }
     }
     
     return null;

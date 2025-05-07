@@ -1,144 +1,195 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:dio/dio.dart';
-import '../utils/error_handler.dart';
-import '../dtos/user_dto.dart';
-import '../dtos/espece_dto.dart';
-import '../dtos/prise_dto.dart';
-import '../dtos/lot_dto.dart';
-import '../services/dto_service.dart';
+import 'package:path/path.dart' as baseUrl;
+import 'package:seatrace/dtos/lot_dto.dart';
+import 'package:seatrace/dtos/prise_dto.dart';
+import 'package:seatrace/dtos/user_dto.dart';
+import 'package:seatrace/utils/error_handler.dart';
 
 class ApiService {
   static final ApiService instance = ApiService._init();
-  // URL de l'API
   late String baseUrl;
   String? _authToken;
 
-  // Instance de Dio pour les requêtes multipart
-  final Dio _dio = Dio();
+  // Configuration des retries et timeouts
+  static const int maxRetries = 3;
+  static const Duration initialTimeout = Duration(seconds: 10);
+  static const Duration retryDelay = Duration(seconds: 2);
 
-  // Constructeur privé qui initialise l'URL de l'API
-  ApiService._init() {
-    // Adresse IP Wi-Fi actuelle (mise à jour)
-    const String wifiUrl = 'http://172.16.10.12:3005/api'; // Adresse Wi-Fi
+  // Instance de Dio avec configuration
+  final Dio _dio = Dio(
+  BaseOptions(
+    connectTimeout: Duration(milliseconds: initialTimeout.inMilliseconds),
+    receiveTimeout: Duration(milliseconds: initialTimeout.inMilliseconds),
+  ),
+);
 
-    // Essayer d'abord l'adresse IP Wi-Fi
-    baseUrl = wifiUrl;
 
-    // Nous utiliserons un mécanisme de fallback dans les méthodes de requête
-    // pour essayer d'autres URLs si la première échoue
 
-    // Journaliser l'URL initiale
-    debugPrint('URL API initiale: $baseUrl');
-  }
-
-  // Liste des URLs de fallback à essayer si la première échoue
+  // URLs de fallback pour gérer plusieurs environnements
   final List<String> _fallbackUrls = [
     'http://localhost:3005/api',
     'http://127.0.0.1:3005/api',
-    'http://192.168.56.1:3005/api', // Ethernet 3
-    'http://192.168.178.1:3005/api', // VMware 1
-    'http://192.168.197.1:3005/api', // VMware 8
+    'http://192.168.1.1:3005/api',
     'http://10.0.2.2:3005/api', // Émulateur Android
   ];
 
+  ApiService._init() {
+    baseUrl = 'http://172.16.10.12:3005/api'; // Adresse principale
+    debugPrint('Base URL configurée: $baseUrl');
+  }
+
+  // Définir ou supprimer le token d'authentification
   void setAuthToken(String? token) {
     _authToken = token;
   }
 
-  bool hasToken() {
-    return _authToken != null && _authToken!.isNotEmpty;
-  }
+  // Vérifier si un token est défini
+  bool hasToken() => _authToken != null && _authToken!.isNotEmpty;
 
-  /// Vérifie si le serveur est accessible
-  Future<bool> isServerReachable() async {
+  // Vérification si le serveur est accessible
+  Future<bool> isServerReachable(String url) async {
     try {
-      // Essayer de faire une requête simple pour vérifier la connectivité
-      // Utiliser la route health qui est connue pour fonctionner
       final response = await http
-          .get(Uri.parse('${baseUrl.split('/api').first}/api/health'))
-          .timeout(const Duration(seconds: 5));
-
-      debugPrint('Réponse du serveur (health): ${response.statusCode}');
-
-      // Si le serveur répond avec n'importe quel code, c'est qu'il est accessible
-      // Même un 401 (non autorisé) signifie que le serveur fonctionne
+          .get(Uri.parse('$url/health'))
+          .timeout(initialTimeout);
       return response.statusCode >= 200 && response.statusCode < 500;
     } catch (e) {
-      // Essayer une autre route si la première échoue
-      try {
-        debugPrint('Première tentative échouée, essai avec l\'URL de base');
-        final response = await http
-            .get(Uri.parse(baseUrl))
-            .timeout(const Duration(seconds: 5));
-
-        debugPrint('Réponse du serveur (baseUrl): ${response.statusCode}');
-        return response.statusCode >= 200 && response.statusCode < 500;
-      } catch (e2) {
-        debugPrint(
-          'Erreur lors de la vérification de la connectivité: ${e.toString()}',
-        );
-        debugPrint('Erreur secondaire: ${e2.toString()}');
-        return false;
-      }
+      debugPrint('Erreur lors de la vérification de $url: $e');
+      return false;
     }
   }
 
-  /// Vérifie si le serveur est accessible et essaie les URLs alternatives si nécessaire
+  // Essayer différentes URLs pour trouver une connexion fonctionnelle
   Future<bool> checkServerConnectivity() async {
     debugPrint('Vérification de la connectivité au serveur...');
-    debugPrint('URL principale: $baseUrl');
+    if (await isServerReachable(baseUrl)) return true;
 
-    // Essayer l'URL principale
-    if (await isServerReachable()) {
-      debugPrint('Connexion réussie à l\'URL principale: $baseUrl');
-      return true;
-    }
-
-    debugPrint(
-      'Échec de connexion à l\'URL principale, essai des alternatives...',
-    );
-
-    // Essayer les URLs alternatives
-    for (final url in _fallbackUrls) {
-      debugPrint('Essai de connexion à $url');
-      final originalUrl = baseUrl;
-      baseUrl = url;
-
-      if (await isServerReachable()) {
-        debugPrint('Connexion réussie à $url');
+    for (final fallbackUrl in _fallbackUrls) {
+      debugPrint('Essai de $fallbackUrl');
+      if (await isServerReachable(fallbackUrl)) {
+        baseUrl = fallbackUrl;
+        debugPrint('Connexion établie avec $fallbackUrl');
         return true;
       }
-
-      // Restaurer l'URL originale si celle-ci ne fonctionne pas
-      baseUrl = originalUrl;
-      debugPrint('Échec de connexion à $url, restauration de l\'URL originale');
     }
 
-    // Essayer directement l'adresse IP avec le port
-    final directIpUrl = 'http://172.16.10.12:3005/api';
-    debugPrint('Essai direct avec l\'adresse IP: $directIpUrl');
-    baseUrl = directIpUrl;
-
-    if (await isServerReachable()) {
-      debugPrint('Connexion réussie à l\'adresse IP directe: $directIpUrl');
-      return true;
-    }
-
-    debugPrint('Échec de toutes les tentatives de connexion');
+    debugPrint('Aucune connexion établie avec les URLs configurées.');
     return false;
   }
 
+  // Gestion des headers pour les requêtes HTTP
   Map<String, String> get _headers {
-    final headers = {'Content-Type': 'application/json'};
+    final headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
     if (_authToken != null) {
       headers['Authorization'] = 'Bearer $_authToken';
     }
     return headers;
   }
+
+  // Requête GET
+  Future<Map<String, dynamic>> get(String endpoint) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/$endpoint'),
+        headers: _headers,
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Erreur lors de la requête GET: $e');
+    }
+  }
+
+  // Requête POST
+  Future<Map<String, dynamic>> post(
+    String endpoint,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/$endpoint'),
+        headers: _headers,
+        body: json.encode(data),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Erreur lors de la requête POST: $e');
+    }
+  }
+
+  // Requête PUT
+  Future<Map<String, dynamic>> put(
+    String endpoint,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/$endpoint'),
+        headers: _headers,
+        body: json.encode(data),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      throw Exception('Erreur lors de la requête PUT: $e');
+    }
+  }
+
+  // Requête DELETE
+  Future<void> delete(String endpoint) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/$endpoint'),
+        headers: _headers,
+      );
+      _handleResponse(response);
+    } catch (e) {
+      throw Exception('Erreur lors de la requête DELETE: $e');
+    }
+  }
+
+  // Gestion des réponses HTTP
+  Map<String, dynamic> _handleResponse(http.Response response) {
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return json.decode(response.body);
+    } else {
+      throw Exception(
+        'Erreur HTTP ${response.statusCode}: ${response.reasonPhrase}',
+      );
+    }
+  }
+
+  // Méthode pour les requêtes multipart (upload de fichiers)
+  Future<Map<String, dynamic>> uploadFile(
+    String endpoint,
+    String filePath,
+    Map<String, String> additionalData,
+  ) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(filePath),
+        ...additionalData,
+      });
+
+      final response = await _dio.post(
+        '$baseUrl/$endpoint',
+        data: formData,
+        options: Options(headers: _headers),
+      );
+
+      return response.data;
+    } catch (e) {
+      throw Exception('Erreur lors de l\'upload de fichier: $e');
+    }
+  }
+}
+
 
   // Méthodes génériques CRUD
   Future<Map<String, dynamic>> get(
@@ -242,6 +293,9 @@ class ApiService {
         originalError: e,
       );
     }
+  }
+  
+  class _headers {
   }
 
   Future<Map<String, dynamic>> post(

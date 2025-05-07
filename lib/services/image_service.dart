@@ -12,6 +12,8 @@ import 'package:seatrace/services/auth_service.dart';
 
 class ImageService {
   static final ImageService instance = ImageService._init();
+  final Map<String, String> _imageCache = {};
+  final Duration _cacheDuration = const Duration(minutes: 30);
 
   ImageService._init();
 
@@ -23,6 +25,15 @@ class ImageService {
         debugPrint('Erreur: Le fichier image n\'existe pas');
         throw Exception('Le fichier image n\'existe pas');
       }
+
+      // Vérifier et nettoyer les métadonnées EXIF
+      final bytes = await imageFile.readAsBytes();
+      final originalImage = img.decodeImage(bytes);
+      if (originalImage == null)
+        throw Exception('Format d\'image non supporté');
+
+      // Supprimer les métadonnées EXIF pour la confidentialité et réduire la taille
+      final strippedImage = img.Image.from(originalImage);
 
       // Vérifier la taille du fichier
       final fileSize = await imageFile.length();
@@ -65,11 +76,17 @@ class ImageService {
               );
             }
 
-            // Encoder en JPEG avec la qualité réduite
-            final List<int> compressedBytes = img.encodeJpg(
-              resizedImage,
-              quality: quality,
-            );
+            // Encoder en WebP pour une meilleure compression
+            List<int> compressedBytes;
+            if (fileSize > 1 * 1024 * 1024) {
+              compressedBytes = img.encodeWebp(
+                resizedImage,
+                quality: quality,
+                effort: 6, // Compression maximale
+              );
+            } else {
+              compressedBytes = img.encodeJpg(resizedImage, quality: quality);
+            }
 
             // Créer un fichier temporaire pour stocker l'image compressée
             final tempDir = await getTemporaryDirectory();
