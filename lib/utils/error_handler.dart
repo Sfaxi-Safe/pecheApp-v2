@@ -29,7 +29,7 @@ class AppError extends Error {
     required this.type,
     this.originalError,
     this.stackTrace,
-    this.context,
+    this.context, int? statusCode,
   });
 
   @override
